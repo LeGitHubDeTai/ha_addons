@@ -1,0 +1,32 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+set -e
+
+# determine IP address for api requests
+ip=$(ifconfig | grep "inet " | grep -Fv 127.0.0.1 | awk '{sub("addr:",""); print $2}' | head -n 1)
+
+if [ -z "$ip" ]
+then
+  ip=0.0.0.0
+  bashio::log.info "Couldn't detect local syncthing address. Falling back to: $ip"
+else
+  bashio::log.info "Detected syncthing address: $ip"
+fi
+
+bashio::log.info "Waiting for Syncthing to be reachable..."
+bashio::net.wait_for 8384 "$ip"
+
+bashio::log.info "Waiting for Syncthing to be healthy..."
+until curl --insecure -s "http://$ip:8384/rest/noauth/health" | grep -o --color=never "OK"; do
+  bashio::log.info "Syncthing not yet healthy, still waiting (see Ingress output for possible DB migration progress)..."
+  sleep 15
+done
+
+bashio::log.info 'Post-Start syncthing setup'
+apikey=$(sed -n 's:.*<apikey>\(.*\)</apikey>.*:\1:p' /config/config.xml)
+if [ -n "$apikey" ]; then
+  bashio::log.info "Configuring Syncthing via API..."
+  syncthing cli --gui-address="$ip:8384" --gui-apikey="$apikey" config gui insecure-admin-access set true
+else
+  bashio::log.warning "Could not extract API key from config.xml - skipping post-setup"
+fi
