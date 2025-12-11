@@ -1,5 +1,5 @@
 name: Obsidian
-version: "25.12.2"
+version: "25.12.3"
 slug: obsidian
 description: Obsidian Notes Server pour Home Assistant
 url: https://github.com/LeGitHubDeTai/ha_addons/obsidian
@@ -36,13 +36,10 @@ schema:
   ssl: bool
   certfile: str
   keyfile: str
-webui: http://[HOST]:[PORT:3000]/
+webui: https://[HOST]:[PORT:3000]/
 ingress: true
 ingress_port: 3000
 ports:
   3000/tcp: null
   3001/tcp: null
   8082/tcp: null
-discovery:
-  - obsidian
-
