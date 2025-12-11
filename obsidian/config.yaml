@@ -3,12 +3,6 @@ version: "25.12.1"
 slug: obsidian
 description: Obsidian Notes Server pour Home Assistant
 url: https://github.com/LeGitHubDeTai/ha_addons/obsidian
-webui:  >
-  {% if ssl %}
-    https://[HOST]:[PORT:3001]/
-  {% else %}
-    http://[HOST]:[PORT:3000]/
-  {% endif %}
 panel_icon: "mdi:note-edit"
 arch:
   - aarch64
@@ -37,6 +31,7 @@ options:
   ssl: true
 schema:
   ssl: bool
+webui: http://[HOST]:[PORT:3000]/
 ingress: true
 ingress_port: 3000
 ports:
