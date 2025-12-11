@@ -34,9 +34,9 @@ options:
   keyfile: privkey.pem
 schema:
   ssl: bool
-webui: http://[HOST]:[PORT:3000]/
   certfile: str
   keyfile: str
+webui: http://[HOST]:[PORT:3000]/
 ingress: true
 ingress_port: 3000
 ports:
