@@ -6,7 +6,7 @@ n8n (pronounced n-eight-n) helps you to interconnect every app with an API in th
 
 To install, click the button below:
 
-[![Open your Home Assistant instance and show the dashboard of an add-on.](https://my.home-assistant.io/badges/supervisor_addon.svg)](https://my.home-assistant.io/redirect/supervisor_addon/?repository_url=https%3A%2F%2Fgithub.com%2FLeGitHubDeTai%2Fha_addons%2F&addon=n8n)
+[![Open your Home Assistant instance and show the dashboard of an add-on.](https://my.home-assistant.io/badges/supervisor_addon.svg)](https://my.home-assistant.io/redirect/supervisor_addon/?repository_url=https%3A%2F%2Fgithub.com%2FLeGitHubDeTai%2Fha_addons%2F&addon=f2b729e6_n8n)
 
 Or, follow these steps to get the add-on installed on your system:
 
