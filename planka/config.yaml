@@ -4,7 +4,7 @@ slug: planka
 panel_icon: "mdi:view-week"
 description: Kanban board open-source (Planka)
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/planka
-webui: https://[HOST]:[PORT:1337]/
+webui: https://[HOST]:[PORT:1338]/
 arch:
   - aarch64
   - amd64
@@ -14,11 +14,12 @@ arch:
 startup: application
 boot: auto
 ingress: true
+ingress_port: 1338
 init: false
 ports:
-    1337/tcp: 1337
+    1338/tcp: 1338
 ports_description:
-    1337/tcp: WebUI
+    1338/tcp: WebUI
 options:
     DATABASE:
       db_host: localhost

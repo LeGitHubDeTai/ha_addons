@@ -45,7 +45,7 @@ fi
 # ===============================
 # BASE_URL
 # ===============================
-BASE_URL="http://localhost:1337"
+BASE_URL="http://localhost:1338"
 
 if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
     sed -i "s|^BASE_URL=.*|BASE_URL=${BASE_URL}|" "$ENV_FILE"
