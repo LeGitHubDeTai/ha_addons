@@ -1,0 +1,42 @@
+name: Planka
+version: "25.12.1"
+slug: planka
+panel_icon: "mdi:view-week"
+description: Kanban board open-source (Planka)
+url: https://github.com/LeGitHubDeTai/ha_addons/planka
+webui: http://[HOST]:[PORT:5690]/
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+startup: application
+boot: auto
+ingress: true
+ingress_port: 5690
+init: false
+ports:
+    1337/tcp: null
+ports_description:
+    1337/tcp: WebUI
+options:
+    base_url: ""
+    admin_email: admin@example.com
+    admin_password: admin_email
+    DATABASE:
+      db_host: localhost
+      db_port: 5432
+      db_user: planka
+      db_password: homeassistant
+      db_name: planka
+schema:
+    base_url: str?
+    admin_email: str
+    admin_password: str
+    DATABASE:
+      db_host: str
+      db_port: int
+      db_user: str
+      db_password: str
+      db_name: str
