@@ -2,8 +2,32 @@
 set -euo pipefail
 
 ENV_FILE="/config/.env"
+PLANKA_ENV="/opt/planka/.env"
 
 bashio::log.info "Initialisation Planka"
+
+# ===============================
+# HELPERS
+# ===============================
+set_env() {
+    local key="$1"
+    local value="$2"
+    local changed_ref="$3"
+
+    if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+        local current
+        current="$(grep "^${key}=" "$ENV_FILE" | cut -d'=' -f2-)"
+        if [[ "$current" != "$value" ]]; then
+            bashio::log.info "Mise à jour ${key}"
+            sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+            eval "$changed_ref=true"
+        fi
+    else
+        bashio::log.info "Ajout ${key}"
+        echo "${key}=${value}" >> "$ENV_FILE"
+        eval "$changed_ref=true"
+    fi
+}
 
 # ===============================
 # SECRET (jamais modifié)
@@ -26,54 +50,44 @@ DB_NAME="$(bashio::config 'DATABASE.db_name')"
 NEW_DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
 DB_CHANGED=false
-
-if grep -q "^DATABASE_URL=" "$ENV_FILE" 2>/dev/null; then
-    CURRENT_DATABASE_URL="$(grep "^DATABASE_URL=" "$ENV_FILE" | cut -d'=' -f2-)"
-    if [[ "$CURRENT_DATABASE_URL" != "$NEW_DATABASE_URL" ]]; then
-        bashio::log.warning "DATABASE_URL modifiée"
-        sed -i "s|^DATABASE_URL=.*|DATABASE_URL=${NEW_DATABASE_URL}|" "$ENV_FILE"
-        DB_CHANGED=true
-    else
-        bashio::log.info "DATABASE_URL inchangée"
-    fi
-else
-    bashio::log.info "Ajout DATABASE_URL"
-    echo "DATABASE_URL=${NEW_DATABASE_URL}" >> "$ENV_FILE"
-    DB_CHANGED=true
-fi
+set_env "DATABASE_URL" "$NEW_DATABASE_URL" DB_CHANGED
 
 # ===============================
-# BASE_URL
+# BASE_URL (détection)
 # ===============================
 BASE_URL="http://localhost:1338"
-
-if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
-    sed -i "s|^BASE_URL=.*|BASE_URL=${BASE_URL}|" "$ENV_FILE"
-else
-    echo "BASE_URL=${BASE_URL}" >> "$ENV_FILE"
-fi
+ENV_CHANGED=false
+set_env "BASE_URL" "$BASE_URL" ENV_CHANGED
 
 # ===============================
 # ADMIN (premier démarrage uniquement)
 # ===============================
 if ! grep -q "^DEFAULT_ADMIN_EMAIL=" "$ENV_FILE" 2>/dev/null; then
+    bashio::log.info "Création admin initial"
+
     ADMIN_EMAIL="$(bashio::config 'ADMIN.email')"
     ADMIN_PASSWORD="$(bashio::config 'ADMIN.password')"
     ADMIN_NAME="$(bashio::config 'ADMIN.name')"
 
-    bashio::log.info "Création admin initial"
     echo "DEFAULT_ADMIN_EMAIL=${ADMIN_EMAIL}" >> "$ENV_FILE"
     echo "DEFAULT_ADMIN_PASSWORD=${ADMIN_PASSWORD}" >> "$ENV_FILE"
     echo "DEFAULT_ADMIN_NAME=${ADMIN_NAME}" >> "$ENV_FILE"
+
+    ENV_CHANGED=true
 fi
 
 # ===============================
-# PERMISSIONS
+# PERMISSIONS + SYNC
 # ===============================
-cd /opt/planka
-cp $ENV_FILE ./
 chmod 600 "$ENV_FILE"
-chmod 600 "./.env"
+
+if [[ ! -f "$PLANKA_ENV" ]] || ! cmp -s "$ENV_FILE" "$PLANKA_ENV"; then
+    bashio::log.info "Synchronisation .env vers Planka"
+    cp "$ENV_FILE" "$PLANKA_ENV"
+    chmod 600 "$PLANKA_ENV"
+fi
+
+cd /opt/planka
 
 # ===============================
 # DB INIT SI NECESSAIRE
