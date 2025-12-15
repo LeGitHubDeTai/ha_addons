@@ -1,5 +1,5 @@
 name: Planka
-version: "25.12.2"
+version: "25.12.3"
 slug: planka
 panel_icon: "mdi:view-week"
 description: Kanban board open-source (Planka)
@@ -17,26 +17,28 @@ ingress: true
 ingress_port: 5690
 init: false
 ports:
-    1337/tcp: null
+    1337/tcp: 1337
 ports_description:
     1337/tcp: WebUI
 options:
-    base_url: ""
-    admin_email: admin@example.com
-    admin_password: admin_email
     DATABASE:
       db_host: localhost
       db_port: 5432
       db_user: planka
       db_password: homeassistant
       db_name: planka
+    ADMIN:
+      email: admin@example.com
+      password: homeassistant
+      name: Admin
 schema:
-    base_url: str?
-    admin_email: str
-    admin_password: str
     DATABASE:
       db_host: str
       db_port: int
       db_user: str
       db_password: str
       db_name: str
+    ADMIN:
+      email: str
+      password: password
+      name: str
