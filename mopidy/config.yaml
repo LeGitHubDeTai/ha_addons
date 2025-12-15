@@ -3,7 +3,7 @@ version: "25.12.2"
 slug: mopidy
 panel_icon: "mdi:music-circle"
 description: Mopidy Music Server pour Home Assistant
-url: https://github.com/LeGitHubDeTai/ha_addons/mopidy
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/mopidy
 webui: http://[HOST]:[PORT:6680]/iris
 arch:
     - armv7

@@ -2,7 +2,7 @@ name: Obsidian
 version: "25.12.4"
 slug: obsidian
 description: Obsidian Notes Server pour Home Assistant
-url: https://github.com/LeGitHubDeTai/ha_addons/obsidian
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/obsidian
 panel_icon: "mdi:note-edit"
 arch:
   - aarch64

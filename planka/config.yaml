@@ -1,9 +1,9 @@
 name: Planka
-version: "25.12.1"
+version: "25.12.2"
 slug: planka
 panel_icon: "mdi:view-week"
 description: Kanban board open-source (Planka)
-url: https://github.com/LeGitHubDeTai/ha_addons/planka
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/planka
 webui: http://[HOST]:[PORT:5690]/
 arch:
   - aarch64

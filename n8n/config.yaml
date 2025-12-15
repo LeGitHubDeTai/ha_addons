@@ -3,7 +3,7 @@ version: "25.12.1"
 slug: n8n
 panel_icon: "mdi:sitemap-outline"
 description: Self host your n8n instance
-url: https://github.com/LeGitHubDeTai/ha_addons/n8n
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/n8n
 webui: http://[HOST]:[PORT:5690]/
 arch:
     - aarch64
