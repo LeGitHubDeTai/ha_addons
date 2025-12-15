@@ -1,17 +1,17 @@
 #!/usr/bin/env bashio
 set -euo pipefail
 
-ENV_FILE="/data/.env"
+ENV_FILE="/config/.env"
 
 bashio::log.info "Initialisation Planka"
 
 # ===============================
 # SECRET (jamais modifié)
 # ===============================
-if [[ ! -f "$ENV_FILE" ]] || ! grep -q "^SECRET=" "$ENV_FILE"; then
+if [[ ! -f "$ENV_FILE" ]] || ! grep -q "^SECRET_KEY=" "$ENV_FILE"; then
     bashio::log.info "Génération du SECRET"
     SECRET="$(openssl rand -hex 64)"
-    echo "SECRET=${SECRET}" >> "$ENV_FILE"
+    echo "SECRET_KEY=${SECRET}" >> "$ENV_FILE"
 fi
 
 # ===============================
