@@ -1,0 +1,26 @@
+name: Dolibarr
+version: "26.1.1"
+slug: dolibarr
+panel_icon: "mdi:cash-100"
+description: Dolibarr Server pour Home Assistant
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/dolibarr
+webui: http://[HOST]:[PORT:8080]/dolibarr
+arch:
+    - armv7
+    - armhf
+    - amd64
+    - i386
+startup: services
+boot: auto
+init: false
+ingress: true
+ingress_port: 80
+ingress_stream: true
+host_network: false
+map:
+    - config:rw
+    - data:rw
+ports:
+    80/tcp: 8080
+ports_description:
+    80/tcp: Web Frontend
