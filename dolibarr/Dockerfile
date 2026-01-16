@@ -1,4 +1,4 @@
-FROM php:8.2-apache-bullseye
+FROM php:8.2-apache
 
 ENV DOLIBARR_VERSION=22.0.4
 
@@ -24,8 +24,8 @@ RUN apt-get update && apt-get install -y \
 # ===============================
 
 # GD
-RUN docker-php-ext-configure imap --with-imap-ssl --with-kerberos \
-    && docker-php-ext-install imap
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd
 
 # Bases de données
 RUN docker-php-ext-install \
