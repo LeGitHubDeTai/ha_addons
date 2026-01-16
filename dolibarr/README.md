@@ -1,20 +1,51 @@
-# Dolibarr Add-on pour Home Assistant
+# Dolibarr – Home Assistant Add-on
 
-Cet add-on permet d’installer Dolibarr ERP/CRM dans Home Assistant.
+Cet add-on permet d’exécuter Dolibarr ERP/CRM dans Home Assistant via une interface web intégrée.
 
-## Configuration
+Dolibarr est une solution open source de gestion d’entreprise permettant de gérer la facturation, les clients, les fournisseurs, les produits, les stocks, les projets et bien plus encore.
 
-Les options suivantes sont disponibles :
+---
 
-- `dolibarr_port`: Port HTTP (par défaut 8080)
-- `dolibarr_db_host`: Adresse de la base MariaDB
-- `dolibarr_db_user`: Utilisateur de la base
-- `dolibarr_db_password`: Mot de passe
-- `dolibarr_db_name`: Nom de la base
+## Accès
 
-## Utilisation
+Une fois l’add-on démarré, Dolibarr est accessible depuis l’interface Home Assistant.
 
-1. Installer l’add-on via le repository local.
-2. Configurer les options selon votre base de données.
-3. Démarrer l’add-on.
-4. Accéder à Dolibarr via le port configuré.
+Suivez l’assistant d’installation affiché lors de la première ouverture pour finaliser la configuration.
+
+---
+
+## Données persistantes
+
+Les données et documents générés par Dolibarr sont stockés de manière persistante afin d’être conservés entre les redémarrages et les mises à jour de l’add-on.
+
+---
+
+## Base de données
+
+Dolibarr nécessite une base de données externe pour fonctionner.
+Les paramètres de connexion sont demandés lors de l’installation initiale.
+
+---
+
+## Mise à jour
+
+Pour mettre à jour Dolibarr :
+1. Arrêter l’add-on
+2. Mettre à jour l’image
+3. Redémarrer l’add-on
+
+---
+
+## Support
+
+Ce projet est fourni tel quel.
+Pour toute question liée à l’utilisation de Dolibarr, veuillez consulter la documentation officielle :
+
+https://www.dolibarr.org
+
+---
+
+## Licence
+
+Dolibarr est distribué sous licence GPL.
+Veuillez respecter les termes de la licence lors de son utilisation.
