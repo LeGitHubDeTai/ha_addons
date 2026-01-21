@@ -24,7 +24,7 @@ RUN apk add --no-cache \
 WORKDIR /data
 COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
 
-RUN npm install -g n8n@2.3.6
+RUN npm install -g n8n@2.4.4
 
 RUN mkdir -p /run/nginx
 
