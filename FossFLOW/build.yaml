@@ -1,0 +1,6 @@
+build_from: "stnsmith/fossflow:master-35aaa2c"
+labels:
+  org.opencontainers.image.title: "FossFLOW"
+  org.opencontainers.image.description: "Make beautiful isometric infrastructure diagrams"
+  org.opencontainers.image.source: "https://github.com/LeGitHubDeTai/ha_addons/FossFLOW"
+  org.opencontainers.image.licenses: "MIT license"

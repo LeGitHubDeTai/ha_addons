@@ -1,0 +1,33 @@
+name: FossFLOW
+version: "26.1.1"
+slug: fossflow
+panel_icon: "mdi:chart-timeline-variant"
+description: Make beautiful isometric infrastructure diagrams
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/FossFLOW
+webui: http://[HOST]:[PORT:4000]/
+arch:
+    - armv7
+    - armhf
+    - amd64
+    - i386
+startup: services
+boot: auto
+init: false
+host_network: false
+ingress: true
+ingress_port: 4000
+ingress_path: "/"
+map:
+    - data:rw
+ports:
+    80/tcp: 4000
+ports_description:
+    80/tcp: Web Frontend
+options:
+  port: 4000
+  enable_server_storage: true
+  enable_git_backup: false
+schema:
+  port: port
+  enable_server_storage: bool
+  enable_git_backup: bool
