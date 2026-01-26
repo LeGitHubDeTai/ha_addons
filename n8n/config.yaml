@@ -1,5 +1,5 @@
 name: n8n
-version: "26.1.4"
+version: "26.1.5"
 slug: n8n
 panel_icon: "mdi:sitemap-outline"
 description: Self host your n8n instance
