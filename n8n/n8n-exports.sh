@@ -5,6 +5,19 @@ export N8N_VERSION_NOTIFICATIONS_ENABLED=false
 export N8N_RUNNERS_ENABLED=true
 export N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
 
+# CORS Configuration - Allow all origins
+export N8N_CORS_ORIGIN="*"
+export N8N_CORS_ORIGINS="*"
+export N8N_CORS_ALLOW_METHODS="GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD"
+export N8N_CORS_ALLOW_HEADERS="Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-File-Name"
+export N8N_CORS_ALLOW_CREDENTIALS="false"
+export N8N_CORS_MAX_AGE="86400"
+export N8N_CONFIG_FILE="/data/n8n/n8n-config.json"
+export WEBHOOK_URL="http://localhost:8081"
+export N8N_BASIC_AUTH_ACTIVE=false
+export N8N_BASIC_AUTH_USER=""
+export N8N_BASIC_AUTH_PASSWORD=""
+
 CONFIG_PATH="/data/options.json"
 export GENERIC_TIMEZONE="$(jq --raw-output '.timezone // empty' $CONFIG_PATH)"
 export N8N_PROTOCOL="$(jq --raw-output '.protocol // empty' $CONFIG_PATH)"

@@ -1,6 +1,12 @@
 #!/bin/bash
 . /app/n8n-exports.sh
 
+# Copy n8n config file if it doesn't exist
+if [ ! -f "/data/n8n/n8n-config.json" ]; then
+    mkdir -p /data/n8n
+    cp /app/n8n-config.json /data/n8n/n8n-config.json
+fi
+
 echo "N8N_PATH: ${N8N_PATH}"
 echo "N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL}"
 echo "WEBHOOK_URL: ${WEBHOOK_URL}"
