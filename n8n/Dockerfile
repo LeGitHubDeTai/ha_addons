@@ -33,8 +33,8 @@ COPY nginx.conf /etc/nginx/nginx.conf.template
 COPY n8n-exports.sh /app/n8n-exports.sh
 COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
 COPY nginx-entrypoint.sh /app/nginx-entrypoint.sh
+COPY n8n-config.json /app/n8n-config.json
 
-COPY nginx.conf /etc/nginx/nginx.conf
 COPY supervisord.conf /etc/supervisord.conf
 
 RUN chmod +x /app/n8n-entrypoint.sh \
