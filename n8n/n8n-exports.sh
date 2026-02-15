@@ -86,11 +86,30 @@ LOCAL_N8N_PORT=${LOCAL_N8N_PORT:-5690}
 LOCAL_N8N_URL="http://$LOCAL_HA_HOSTNAME:$LOCAL_N8N_PORT"
 echo "Local Home Assistant n8n URL: ${LOCAL_N8N_URL}"
 
-# Get the external URL if configured, otherwise use the hostname and port
-EXTERNAL_N8N_URL=${EXTERNAL_URL:-$(echo "$CONFIG" | jq -r ".external_url // \"$LOCAL_N8N_URL\"")}
+# Get the external URL if configured, otherwise construct it from Home Assistant configuration
+EXTERNAL_HA_URL=$(echo "$CONFIG" | jq -r ".external_url // empty")
+if [ -n "$EXTERNAL_HA_URL" ]; then
+    EXTERNAL_N8N_URL="$EXTERNAL_HA_URL"
+else
+    # Fallback to local hostname with port 7123 (standard Home Assistant port)
+    EXTERNAL_N8N_URL="http://$LOCAL_HA_HOSTNAME:7123"
+fi
 EXTERNAL_HA_HOSTNAME=$(echo "$EXTERNAL_N8N_URL" | sed -e "s/https\?:\/\///" | cut -d':' -f1)
 echo "External Home Assistant n8n URL: ${EXTERNAL_N8N_URL}"
 
 export N8N_PATH=${N8N_PATH:-"${INGRESS_PATH}"}
-export N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-"${EXTERNAL_N8N_URL}${N8N_PATH}"}
+# Force all URLs to use port 8081 to bypass Home Assistant authentication
+export N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-"http://${LOCAL_HA_HOSTNAME}:8081"}
+# Force forms to use port 8081 to bypass Home Assistant authentication
+export N8N_PUBLIC_API_BASE_URL=${N8N_PUBLIC_API_BASE_URL:-"http://${LOCAL_HA_HOSTNAME}:8081"}
+export N8N_FORM_BASE_URL=${N8N_FORM_BASE_URL:-"http://${LOCAL_HA_HOSTNAME}:8081"}
 export WEBHOOK_URL=${WEBHOOK_URL:-"http://${LOCAL_HA_HOSTNAME}:8081"}
+
+# Additional CORS and security settings for forms
+export N8N_PUBLIC_API_BASE_PATH=${N8N_PUBLIC_API_BASE_PATH:-"/"}
+export N8N_HOST=${N8N_HOST:-"$LOCAL_HA_HOSTNAME"}
+export N8N_PORT=${N8N_PORT:-"5678"}
+export N8N_PROTOCOL=${N8N_PROTOCOL:-"http"}
+
+# Force form URLs to use port 8081
+export N8N_FORMS_BASE_URL=${N8N_FORMS_BASE_URL:-"http://${LOCAL_HA_HOSTNAME}:8081"}
