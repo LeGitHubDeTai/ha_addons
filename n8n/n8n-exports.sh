@@ -114,11 +114,11 @@ echo "External Home Assistant port: ${EXTERNAL_HA_PORT}"
 export N8N_PATH=${N8N_PATH:-"${INGRESS_PATH}"}
 # Force all URLs to use detected protocol and port to avoid mixed content issues
 export N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-"${EXTERNAL_HA_PROTOCOL}://${EXTERNAL_HA_HOSTNAME}:${EXTERNAL_HA_PORT}${INGRESS_PATH}"}
-# Force forms to use detected protocol and port with ingress to avoid mixed content
-export N8N_PUBLIC_API_BASE_URL=${N8N_PUBLIC_API_BASE_URL:-"${EXTERNAL_HA_PROTOCOL}://${EXTERNAL_HA_HOSTNAME}:${EXTERNAL_HA_PORT}${INGRESS_PATH}"}
-export N8N_FORM_BASE_URL=${N8N_FORM_BASE_URL:-"${EXTERNAL_HA_PROTOCOL}://${EXTERNAL_HA_HOSTNAME}:${EXTERNAL_HA_PORT}${INGRESS_PATH}"}
-# Force webhook URL to use ingress instead of port 8081 to avoid CORS issues
-export WEBHOOK_URL=${WEBHOOK_URL:-"${EXTERNAL_HA_PROTOCOL}://${EXTERNAL_HA_HOSTNAME}:${EXTERNAL_HA_PORT}${INGRESS_PATH}"}
+# Force forms to use port 8081 to bypass Home Assistant authentication
+export N8N_PUBLIC_API_BASE_URL=${N8N_PUBLIC_API_BASE_URL:-"${EXTERNAL_HA_PROTOCOL}://${EXTERNAL_HA_HOSTNAME}:8081"}
+export N8N_FORM_BASE_URL=${N8N_FORM_BASE_URL:-"${EXTERNAL_HA_PROTOCOL}://${EXTERNAL_HA_HOSTNAME}:8081"}
+# Force webhook URL to use port 8081 to bypass HA auth
+export WEBHOOK_URL=${WEBHOOK_URL:-"${EXTERNAL_HA_PROTOCOL}://${EXTERNAL_HA_HOSTNAME}:8081"}
 
 # Additional CORS and security settings for forms
 export N8N_PUBLIC_API_BASE_PATH=${N8N_PUBLIC_API_BASE_PATH:-"/"}
@@ -126,5 +126,5 @@ export N8N_HOST=${N8N_HOST:-"$LOCAL_HA_HOSTNAME"}
 export N8N_PORT=${N8N_PORT:-"5678"}
 export N8N_PROTOCOL=${N8N_PROTOCOL:-"http"}
 
-# Force form URLs to use detected protocol and port with ingress
-export N8N_FORMS_BASE_URL=${N8N_FORMS_BASE_URL:-"${EXTERNAL_HA_PROTOCOL}://${EXTERNAL_HA_HOSTNAME}:${EXTERNAL_HA_PORT}${INGRESS_PATH}"}
+# Force form URLs to use port 8081 to bypass HA auth
+export N8N_FORMS_BASE_URL=${N8N_FORMS_BASE_URL:-"${EXTERNAL_HA_PROTOCOL}://${EXTERNAL_HA_HOSTNAME}:8081"}
