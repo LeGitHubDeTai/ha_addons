@@ -1,0 +1,6 @@
+build_from:
+  armhf: node:18-alpine
+  armv7: node:18-alpine
+  aarch64: node:18-alpine
+  amd64: node:18-alpine
+  i386: node:18-alpine

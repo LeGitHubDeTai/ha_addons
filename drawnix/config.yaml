@@ -1,0 +1,42 @@
+name: Drawnix
+version: "26.3.1"
+slug: drawnix
+panel_icon: "mdi:draw"
+description: Open source whiteboard tool (SaaS) with integrated whiteboard, including mind maps, flowcharts, and free drawing
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/drawnix
+webui: http://[HOST]:[PORT:7200]/
+arch:
+    - armhf
+    - armv7
+    - aarch64
+    - amd64
+    - i386
+startup: application
+boot: auto
+hassio_role: "default"
+hassio_api: true
+homeassistant_api: true
+apparmor: true
+ingress: true
+ingress_port: 7200
+ingress_stream: true
+backup_exclude:
+    - "drawnix/.cache"
+    - "drawnix/.logs"
+    - "supervisord.log*"
+map:
+    - ssl:ro
+    - backup:rw
+    - share:rw
+    - media:rw
+    - config:rw
+ports:
+    7200/tcp: null
+ports_description:
+    7200/tcp: The port for Drawnix web interface. Normally not exposed, as Home Assistant Ingress is more secure and is recommended. You may expose this port if you want to bypass the Ingress (not recommended for security reasons).
+options:
+    env_vars_list: []
+schema:
+    env_vars_list: [
+      "match(^[A-Z_0-9]+: .*$)"
+    ]
