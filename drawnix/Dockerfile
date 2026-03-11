@@ -16,4 +16,4 @@ RUN npm install && npm run build
 EXPOSE 7200
 
 # Start the application in production mode
-CMD ["npm", "run", "startDDDDDDD"]
+CMD ["npm", "run", "start"]
