@@ -12,8 +12,12 @@ WORKDIR /app
 # Copy custom Vite config for Home Assistant compatibility
 COPY vite.config.js ./apps/web/
 
-# Install dependencies and build
-RUN npm install && npm run build
+# Increase Node.js memory limit and install dependencies
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+RUN npm ci --no-audit --no-fund
+
+# Build the application
+RUN npm run build
 
 # Expose port
 EXPOSE 7200
