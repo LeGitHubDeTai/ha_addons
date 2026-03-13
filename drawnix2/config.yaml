@@ -31,6 +31,10 @@ map:
     - share:rw
     - media:rw
     - config:rw
+ports:
+    80/tcp: null
+ports_description:
+    80/tcp: The port for Drawnix web interface. Normally not exposed, as Home Assistant Ingress is more secure and is recommended. You may expose this port if you want to bypass the Ingress (not recommended for security reasons).
 options:
     env_vars_list: []
 schema:
