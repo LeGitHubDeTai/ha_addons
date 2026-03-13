@@ -1,5 +1,5 @@
 name: Drawnix2
-version: "26.3.1"
+version: "26.3.2"
 slug: drawnix2
 description: Open source whiteboard tool (SaaS) with integrated whiteboard, including mind maps, flowcharts, and free drawing
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/drawnix
@@ -15,6 +15,8 @@ panel_title: Drawnix
 
 ports:
   7200/tcp: 7200
+
+image: pubuzhixing/drawnix:v0.3.0
 
 arch:
   - amd64
