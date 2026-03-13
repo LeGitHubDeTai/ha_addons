@@ -1,0 +1,39 @@
+name: Drawnix2
+version: "v0.3.0"
+slug: drawnix2
+panel_icon: "mdi:draw"
+description: Open source whiteboard tool (SaaS) with integrated whiteboard, including mind maps, flowcharts, and free drawing
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/drawnix
+webui: http://[HOST]:[PORT:80]/
+image: pubuzhixing/drawnix
+arch:
+    - armhf
+    - armv7
+    - aarch64
+    - amd64
+    - i386
+startup: application
+boot: auto
+hassio_role: "default"
+hassio_api: true
+homeassistant_api: true
+apparmor: true
+ingress: true
+ingress_port: 80
+ingress_stream: true
+backup_exclude:
+    - "drawnix/.cache"
+    - "drawnix/.logs"
+    - "supervisord.log*"
+map:
+    - ssl:ro
+    - backup:rw
+    - share:rw
+    - media:rw
+    - config:rw
+options:
+    env_vars_list: []
+schema:
+    env_vars_list: [
+      "match(^[A-Z_0-9]+: .*$)"
+    ]
