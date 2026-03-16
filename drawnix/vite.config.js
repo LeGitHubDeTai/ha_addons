@@ -10,14 +10,13 @@ export default defineConfig({
   server: {
     port: 7200,
     host: 'localhost',
+    allowedHosts: [
+      "homeassistant.local",
+      "127.0.0.1",
+      "localhost",
+      "*"
+    ]
   },
-
-  allowedHosts: [
-    "homeassistant.local",
-    "127.0.0.1",
-    "localhost",
-    "*"
-  ],
 
   preview: {
     port: 4300,
