@@ -1,0 +1,83 @@
+name: Test Workflow Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type de test'
+        required: true
+        default: 'syntax'
+        type: choice
+        options:
+          - 'syntax'
+          - 'dry-run'
+
+jobs:
+  test-syntax:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'syntax'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate YAML syntax
+        run: |
+          echo "Validation des fichiers YAML..."
+          find . -name "*.yaml" -o -name "*.yml" | while read file; do
+            echo "Validation de $file"
+            python3 -c "import yaml; yaml.safe_load(open('$file'))" || exit 1
+          done
+          echo "✅ Tous les fichiers YAML sont valides"
+
+      - name: Validate Dockerfiles
+        run: |
+          echo "Validation des Dockerfiles..."
+          find . -name "Dockerfile" | while read file; do
+            echo "Validation de $file"
+            docker build --dry-run -f "$file" . || exit 1
+          done
+          echo "✅ Tous les Dockerfiles sont valides"
+
+  dry-run:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'dry-run'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test addon detection
+        run: |
+          echo "Test de détection des addons..."
+          addons=()
+          for dir in */; do
+            if [ -f "$dir/config.yaml" ] && [ -f "$dir/Dockerfile" ]; then
+              addon_name=$(basename "$dir")
+              addons+=("$addon_name")
+              echo "✅ Addon trouvé: $addon_name"
+            fi
+          done
+          echo "Total addons: ${#addons[@]}"
+          echo "Addons: ${addons[*]}"
+
+      - name: Test version extraction
+        run: |
+          echo "Test d'extraction des versions..."
+          for dir in */; do
+            if [ -f "$dir/config.yaml" ]; then
+              addon_name=$(basename "$dir")
+              VERSION=$(grep '^version:' "$dir/config.yaml" | sed 's/version: "//' | sed 's/"//' || echo "unknown")
+              echo "$addon_name: $VERSION"
+            fi
+          done
+
+      - name: Simulate build matrix
+        run: |
+          echo "Simulation de la matrice de build..."
+          echo "Addons qui seraient buildés:"
+          
+          # Simuler la détection de changements (tous pour ce test)
+          addons=("FossFLOW" "dolibarr" "mopidy" "n8n" "obsidian" "planka" "syncthing")
+          
+          for addon in "${addons[@]}"; do
+            echo "  - $addon (build AMD64, ARM64, ARMv7)"
+          done
