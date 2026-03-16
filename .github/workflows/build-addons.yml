@@ -15,7 +15,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME_PREFIX: ghcr.io/legithubdetai/
+  IMAGE_NAME_PREFIX: ghcr.io/legithubdetai/ha_addons/
   BUILD_ARGS: ''
 
 jobs:
@@ -43,6 +43,7 @@ jobs:
           echo "Registry: ${{ env.REGISTRY }}"
           echo "Username: ${{ github.repository_owner }}"
           echo "Repository: ${{ github.repository }}"
+          echo "Image namespace: ${{ env.IMAGE_NAME_PREFIX }}"
           docker pull alpine:latest
           docker tag alpine:latest ${{ env.IMAGE_NAME_PREFIX }}test:latest || echo "Tag failed"
           docker push ${{ env.IMAGE_NAME_PREFIX }}test:latest || echo "Push failed"
