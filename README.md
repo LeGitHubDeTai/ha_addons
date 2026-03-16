@@ -86,6 +86,8 @@ Exemples :
 - `ghcr.io/LeGitHubDeTai/fossflow:26.1.2`
 - `ghcr.io/LeGitHubDeTai/n8n:latest`
 
+**Note** : Les noms d'images sont automatiquement convertis en minuscules pour respecter les exigences de GitHub Container Registry.
+
 ## 🔄 Développement
 
 ### Structure d'un addon
