@@ -79,12 +79,12 @@ Fonctionnalités :
 Les images sont publiées sur :
 
 ```
-ghcr.io/LeGitHubDeTai/addon-name:version
+ghcr.io/legithubdetai/addon-name:version
 ```
 
 Exemples :
-- `ghcr.io/LeGitHubDeTai/fossflow:26.1.2`
-- `ghcr.io/LeGitHubDeTai/n8n:latest`
+- `ghcr.io/legithubdetai/fossflow:26.1.2`
+- `ghcr.io/legithubdetai/n8n:latest`
 
 **Note** : Les noms d'images sont automatiquement convertis en minuscules pour respecter les exigences de GitHub Container Registry.
 
