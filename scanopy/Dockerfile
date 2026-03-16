@@ -15,6 +15,7 @@ RUN apk add --no-cache \
     nginx \
     nmap \
     nmap-scripts \
+    docker \
     && rm -rf /var/cache/apk/*
 
 # Create app directories
@@ -22,14 +23,11 @@ RUN mkdir -p /data/scanopy \
     && mkdir -p /var/log/scanopy \
     && mkdir -p /etc/s6-overlay/s6-rc.d/init
 
-# Download and install Scanopy binaries
-RUN curl -L -o /tmp/scanopy-server.tar.gz "https://github.com/scanopy/scanopy/releases/latest/download/scanopy-server-linux-amd64.tar.gz" \
-    && curl -L -o /tmp/scanopy-daemon.tar.gz "https://github.com/scanopy/scanopy/releases/latest/download/scanopy-daemon-linux-amd64.tar.gz" \
+# Download and install Scanopy daemon
+RUN curl -L -o /tmp/scanopy-daemon "https://github.com/scanopy/scanopy/releases/latest/download/scanopy-daemon-linux-amd64" \
     && mkdir -p /opt/scanopy \
-    && tar -xzf /tmp/scanopy-server.tar.gz -C /opt/scanopy \
-    && tar -xzf /tmp/scanopy-daemon.tar.gz -C /opt/scanopy \
-    && chmod +x /opt/scanopy/* \
-    && rm -f /tmp/*.tar.gz
+    && mv /tmp/scanopy-daemon /opt/scanopy/ \
+    && chmod +x /opt/scanopy/scanopy-daemon
 
 # Copy configuration files
 COPY nginx.conf /etc/nginx/nginx.conf
