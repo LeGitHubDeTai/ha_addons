@@ -7,7 +7,7 @@ if [ -n "$TZ" ]; then
 fi
 
 # Create ISO storage directory if it doesn't exist
-ISO_STORAGE_PATH="${ISO_STORAGE_PATH:-/data/isoman}"
+ISO_STORAGE_PATH="${ISO_STORAGE_PATH:-/share/isoman}"
 mkdir -p "$ISO_STORAGE_PATH"
 
 # Set environment variables for Isoman
@@ -47,5 +47,5 @@ if [ -n "$ENV_VARS_LIST" ]; then
     done
 fi
 
-# Start Isoman backend
+# Start Isoman
 exec /usr/local/bin/isoman
