@@ -10,24 +10,35 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apk add --no-cache \
     curl \
     jq \
+    postgresql \
     postgresql-client \
-    supervisor \
     nginx \
+    nmap \
+    nmap-scripts \
     && rm -rf /var/cache/apk/*
 
 # Create app directories
 RUN mkdir -p /data/scanopy \
-    && mkdir -p /var/log/supervisor \
-    && mkdir -p /var/log/nginx
+    && mkdir -p /var/log/scanopy \
+    && mkdir -p /etc/s6-overlay/s6-rc.d/init
+
+# Download and install Scanopy binaries
+RUN curl -L -o /tmp/scanopy-server.tar.gz "https://github.com/scanopy/scanopy/releases/latest/download/scanopy-server-linux-amd64.tar.gz" \
+    && curl -L -o /tmp/scanopy-daemon.tar.gz "https://github.com/scanopy/scanopy/releases/latest/download/scanopy-daemon-linux-amd64.tar.gz" \
+    && mkdir -p /opt/scanopy \
+    && tar -xzf /tmp/scanopy-server.tar.gz -C /opt/scanopy \
+    && tar -xzf /tmp/scanopy-daemon.tar.gz -C /opt/scanopy \
+    && chmod +x /opt/scanopy/* \
+    && rm -f /tmp/*.tar.gz
 
 # Copy configuration files
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY scanopy-entrypoint.sh /scripts/
-COPY nginx-entrypoint.sh /scripts/
+COPY init-db.sh /scripts/
+COPY scanopy-server.sh /etc/s6-overlay/s6-rc.d/init/
+COPY scanopy-daemon.sh /etc/s6-overlay/s6-rc.d/init/
 
 # Make scripts executable
-RUN chmod +x /scripts/*.sh
+RUN chmod +x /scripts/*.sh /etc/s6-overlay/s6-rc.d/init/*.sh
 
 # Create data directory structure
 RUN mkdir -p /data/scanopy/postgres_data \
@@ -48,5 +59,4 @@ ENV SCANOPY_DATABASE_URL=postgresql://postgres:password@localhost:5432/scanopy
 ENV SCANOPY_WEB_EXTERNAL_PATH=/app/static
 ENV SCANOPY_INTEGRATED_DAEMON_URL=http://localhost:60073
 
-# Start supervisord
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# s6-overlay will automatically start services in /etc/s6-overlay/s6-rc.d/init/
