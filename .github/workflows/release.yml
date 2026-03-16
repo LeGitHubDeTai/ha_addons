@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME_PREFIX: ghcr.io/${{ github.actor }}/
+  IMAGE_NAME_PREFIX: ghcr.io/legithubdetai/
 
 jobs:
   extract-addons:
