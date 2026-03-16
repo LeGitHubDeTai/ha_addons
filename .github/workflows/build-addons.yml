@@ -90,18 +90,32 @@ jobs:
         include:
           - addon: FossFLOW
             arch: amd64
+            base_image: ghcr.io/home-assistant/base:3.18
+            platforms: linux/amd64,linux/arm64,linux/arm/v7
           - addon: dolibarr
             arch: amd64
+            base_image: ghcr.io/home-assistant/base:3.18
+            platforms: linux/amd64,linux/arm64,linux/arm/v7
           - addon: mopidy
             arch: amd64
+            base_image: ghcr.io/home-assistant/base:3.18
+            platforms: linux/amd64,linux/arm64,linux/arm/v7
           - addon: n8n
             arch: amd64
+            base_image: ghcr.io/home-assistant/base:3.18
+            platforms: linux/amd64,linux/arm64,linux/arm/v7
           - addon: obsidian
             arch: amd64
+            base_image: ghcr.io/home-assistant/base:3.18
+            platforms: linux/amd64,linux/arm64,linux/arm/v7
           - addon: planka
             arch: amd64
+            base_image: ubuntu:22.04
+            platforms: linux/amd64,linux/arm64
           - addon: syncthing
             arch: amd64
+            base_image: ghcr.io/home-assistant/base:3.18
+            platforms: linux/amd64,linux/arm64,linux/arm/v7
     continue-on-error: true
     
     steps:
@@ -165,14 +179,14 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./${{ matrix.addon }}
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: ${{ matrix.platforms }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.18
+            BUILD_FROM=${{ matrix.base_image }}
             BUILD_VERSION=${{ steps.version.outputs.version }}
 
       - name: Generate SBOM
