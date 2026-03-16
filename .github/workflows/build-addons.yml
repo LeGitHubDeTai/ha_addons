@@ -44,6 +44,10 @@ jobs:
       - name: Discover and build addons
         if: env.BUILD_ARGS != '--test'
         run: |
+          # Créer un fichier pour suivre les builds
+          echo "# Build Report - $(date)" > build_report.md
+          echo "" >> build_report.md
+          
           for dir in */; do
             addon_name=$(basename "$dir")
             
@@ -77,6 +81,7 @@ jobs:
               image_name="${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}:${version}"
               echo "Image cible: $image_name"
               
+              # Vérifier si la version existe déjà dans le registry
               if [ "${{ github.event.inputs.force_rebuild }}" = "true" ]; then
                 echo "Force rebuild activé"
                 should_build=true
@@ -107,7 +112,9 @@ jobs:
               # Builder l'image si nécessaire
               if [ "$should_build" = "true" ]; then
                 echo "Build de $addon_name..."
-                docker buildx build \
+                
+                # Tenter le build avec gestion d'erreur
+                if docker buildx build \
                   --platform "$platforms" \
                   --push \
                   --tag "$image_name" \
@@ -117,13 +124,23 @@ jobs:
                   --build-arg "BUILD_ARCH=amd64" \
                   --cache-from "type=gha" \
                   --cache-to "type=gha,mode=max" \
-                  "./$addon_name"
-                
-                echo "✅ Build terminé pour $addon_name"
+                  "./$addon_name"; then
+                  
+                  echo "✅ Build terminé pour $addon_name"
+                  echo "- ✅ **$addon_name** ($version) : Build réussi" >> build_report.md
+                else
+                  echo "❌ Build échoué pour $addon_name"
+                  echo "- ❌ **$addon_name** ($version) : Build échoué" >> build_report.md
+                  # Continuer avec le prochain addon
+                fi
               else
                 echo "⏭️  Skip $addon_name (image existe)"
+                echo "- ⏭️ **$addon_name** ($version) : Image existante, skip" >> build_report.md
               fi
               
               echo ""
             fi
           done
+          
+          echo "## Rapport de build" >> $GITHUB_STEP_SUMMARY
+          cat build_report.md >> $GITHUB_STEP_SUMMARY
