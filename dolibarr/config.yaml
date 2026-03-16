@@ -1,10 +1,11 @@
 name: Dolibarr
-version: "26.1.4"
+version: "26.3.1"
 slug: dolibarr
 panel_icon: "mdi:cash-100"
 description: Dolibarr Server pour Home Assistant
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/dolibarr
 webui: http://[HOST]:[PORT:8080]/
+image: ghcr.io/legithubdetai/ha_addons/dolibarr-{arch}
 arch:
     - armv7
     - armhf
