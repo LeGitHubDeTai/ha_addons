@@ -41,18 +41,6 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Test registry access
-        if: github.event_name != 'pull_request' && env.BUILD_ARGS != '--test'
-        run: |
-          echo "Testing registry access..."
-          echo "Registry: ${{ env.REGISTRY }}"
-          echo "Username: ${{ github.repository_owner }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Image namespace: ${{ env.IMAGE_NAME_PREFIX }}"
-          docker pull alpine:latest
-          docker tag alpine:latest ${{ env.IMAGE_NAME_PREFIX }}test:latest || echo "Tag failed"
-          docker push ${{ env.IMAGE_NAME_PREFIX }}test:latest || echo "Push failed"
-
       - name: Discover and build addons
         if: env.BUILD_ARGS != '--test'
         run: |
