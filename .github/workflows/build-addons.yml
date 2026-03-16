@@ -66,7 +66,8 @@ jobs:
               echo "Platforms: $platforms"
               
               # Vérifier si l'image existe déjà
-              image_name="${{ env.IMAGE_NAME_PREFIX }}${addon_name}:${version}"
+              addon_name_lower=$(echo "$addon_name" | tr '[:upper:]' '[:lower:]')
+              image_name="${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}:${version}"
               echo "Image cible: $image_name"
               
               if [ "${{ github.event.inputs.force_rebuild }}" = "true" ]; then
@@ -87,7 +88,7 @@ jobs:
                   --platform "$platforms" \
                   --push \
                   --tag "$image_name" \
-                  --tag "${{ env.IMAGE_NAME_PREFIX }}${addon_name}:latest" \
+                  --tag "${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}:latest" \
                   --build-arg "BUILD_FROM=$base_image" \
                   --build-arg "BUILD_VERSION=$version" \
                   --cache-from "type=gha" \
