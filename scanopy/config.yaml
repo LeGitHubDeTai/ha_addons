@@ -1,0 +1,54 @@
+name: Scanopy
+version: "26.3.1"
+slug: scanopy
+panel_icon: "mdi:network-outline"
+description: Network documentation that updates itself - Automatic network discovery and visualization
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/scanopy
+webui: http://[HOST]:[PORT:60072]/
+arch:
+  - armhf
+  - armv7
+  - aarch64
+  - amd64
+  - i386
+startup: application
+boot: auto
+hassio_role: "default"
+hassio_api: true
+homeassistant_api: true
+apparmor: true
+ingress: true
+ingress_port: 60072
+ingress_stream: true
+backup_exclude:
+  - "scanopy/.cache"
+  - "scanopy/logs/*.log"
+  - "supervisord.log*"
+map:
+  - ssl:ro
+  - backup:rw
+  - share:rw
+  - media:rw
+  - config:rw
+ports:
+  60072/tcp: 60072
+  60073/tcp: 60073
+ports_description:
+  60072/tcp: The main port for Scanopy web interface and API
+  60073/tcp: The port for Scanopy daemon API and health checks
+options:
+  log_level: "info"
+  postgres_password: "password"
+  public_url: "http://localhost:60072"
+  enable_docker_discovery: true
+  scan_intervals:
+    initial: "5m"
+    recurring: "1h"
+schema:
+  log_level: "list(info|debug|warn|error)"
+  postgres_password: str
+  public_url: str
+  enable_docker_discovery: bool
+  scan_intervals:
+    initial: "list(5m|10m|30m|1h|2h|6h|12h|24h)"
+    recurring: "list(30m|1h|2h|6h|12h|24h|3d|7d)"
