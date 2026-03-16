@@ -79,12 +79,12 @@ Fonctionnalités :
 Les images sont publiées sur :
 
 ```
-ghcr.io/LeGitHubDeTai/ha_addons/addon-name:version
+ghcr.io/LeGitHubDeTai/addon-name:version
 ```
 
 Exemples :
-- `ghcr.io/LeGitHubDeTai/ha_addons/fossflow:26.1.2`
-- `ghcr.io/LeGitHubDeTai/ha_addons/n8n:latest`
+- `ghcr.io/LeGitHubDeTai/fossflow:26.1.2`
+- `ghcr.io/LeGitHubDeTai/n8n:latest`
 
 ## 🔄 Développement
 
