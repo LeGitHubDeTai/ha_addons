@@ -58,7 +58,7 @@ jobs:
                 base_image="ubuntu:22.04"
                 platforms="linux/amd64,linux/arm64"
               else
-                base_image="ghcr.io/home-assistant/base:3.18"
+                base_image="ghcr.io/home-assistant/amd64-base:3.18"
                 platforms="linux/amd64,linux/arm64,linux/arm/v7"
               fi
               
@@ -91,6 +91,7 @@ jobs:
                   --tag "${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}:latest" \
                   --build-arg "BUILD_FROM=$base_image" \
                   --build-arg "BUILD_VERSION=$version" \
+                  --build-arg "BUILD_ARCH=amd64" \
                   --cache-from "type=gha" \
                   --cache-to "type=gha,mode=max" \
                   "./$addon_name"
