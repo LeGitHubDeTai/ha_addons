@@ -1,0 +1,197 @@
+name: Build Home Assistant Addons Docker Images
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'FossFLOW/**'
+      - 'dolibarr/**'
+      - 'mopidy/**'
+      - 'n8n/**'
+      - 'obsidian/**'
+      - 'planka/**'
+      - 'syncthing/**'
+      - '.github/workflows/build-addons.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'FossFLOW/**'
+      - 'dolibarr/**'
+      - 'mopidy/**'
+      - 'n8n/**'
+      - 'obsidian/**'
+      - 'planka/**'
+      - 'syncthing/**'
+      - '.github/workflows/build-addons.yml'
+  workflow_dispatch:
+    inputs:
+      addon:
+        description: 'Addon to build (leave empty for all changed addons)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - 'FossFLOW'
+          - 'dolibarr'
+          - 'mopidy'
+          - 'n8n'
+          - 'obsidian'
+          - 'planka'
+          - 'syncthing'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_PREFIX: ghcr.io/${{ github.repository }}/
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      fossflow: ${{ steps.changes.outputs.fossflow }}
+      dolibarr: ${{ steps.changes.outputs.dolibarr }}
+      mopidy: ${{ steps.changes.outputs.mopidy }}
+      n8n: ${{ steps.changes.outputs.n8n }}
+      obsidian: ${{ steps.changes.outputs.obsidian }}
+      planka: ${{ steps.changes.outputs.planka }}
+      syncthing: ${{ steps.changes.outputs.syncthing }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for file changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            fossflow:
+              - 'FossFLOW/**'
+            dolibarr:
+              - 'dolibarr/**'
+            mopidy:
+              - 'mopidy/**'
+            n8n:
+              - 'n8n/**'
+            obsidian:
+              - 'obsidian/**'
+            planka:
+              - 'planka/**'
+            syncthing:
+              - 'syncthing/**'
+
+  build-addon:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        addon: [FossFLOW, dolibarr, mopidy, n8n, obsidian, planka, syncthing]
+        include:
+          - addon: FossFLOW
+            arch: amd64
+          - addon: dolibarr
+            arch: amd64
+          - addon: mopidy
+            arch: amd64
+          - addon: n8n
+            arch: amd64
+          - addon: obsidian
+            arch: amd64
+          - addon: planka
+            arch: amd64
+          - addon: syncthing
+            arch: amd64
+    if: |
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.addon == '' || github.event.inputs.addon == matrix.addon)) ||
+      (github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs[matrix.addon] == 'true')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get addon version
+        id: version
+        run: |
+          if [ -f "${{ matrix.addon }}/config.yaml" ]; then
+            VERSION=$(grep '^version:' "${{ matrix.addon }}/config.yaml" | sed 's/version: "//' | sed 's/"//')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "Addon version: $VERSION"
+          else
+            echo "version=latest" >> $GITHUB_OUTPUT
+            echo "No config.yaml found, using latest"
+          fi
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME_PREFIX }}${{ matrix.addon }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.addon }}
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.18
+            BUILD_VERSION=${{ steps.version.outputs.version }}
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        if: github.event_name != 'pull_request'
+        with:
+          image: ${{ env.IMAGE_NAME_PREFIX }}${{ matrix.addon }}:${{ steps.version.outputs.version }}
+          format: spdx-json
+          output-file: "${{ matrix.addon }}-sbom.spdx.json"
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: ${{ matrix.addon }}-sbom
+          path: "${{ matrix.addon }}-sbom.spdx.json"
+          retention-days: 30
+
+  summary:
+    needs: [detect-changes, build-addon]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Changed Addons:" >> $GITHUB_STEP_SUMMARY
+          echo "- FossFLOW: ${{ needs.detect-changes.outputs.fossflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "- dolibarr: ${{ needs.detect-changes.outputs.dolibarr }}" >> $GITHUB_STEP_SUMMARY
+          echo "- mopidy: ${{ needs.detect-changes.outputs.mopidy }}" >> $GITHUB_STEP_SUMMARY
+          echo "- n8n: ${{ needs.detect-changes.outputs.n8n }}" >> $GITHUB_STEP_SUMMARY
+          echo "- obsidian: ${{ needs.detect-changes.outputs.obsidian }}" >> $GITHUB_STEP_SUMMARY
+          echo "- planka: ${{ needs.detect-changes.outputs.planka }}" >> $GITHUB_STEP_SUMMARY
+          echo "- syncthing: ${{ needs.detect-changes.outputs.syncthing }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Status:" >> $GITHUB_STEP_SUMMARY
+          echo "Build job result: ${{ needs.build-addon.result }}" >> $GITHUB_STEP_SUMMARY
