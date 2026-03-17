@@ -3,6 +3,11 @@ name: Build Home Assistant Addons Docker Images
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - '.github/**'
+      - 'README.md'
+      - 'TROUBLESHOOTING.md'
+      - 'LICENSE'
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -63,6 +68,24 @@ jobs:
           ADDONS_LIST=$(echo "$ADDONS_LIST" | sed 's/^,//')
           echo "Addons disponibles: $ADDONS_LIST"
           
+          # Détecter les addons modifiés
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Détection des addons modifiés..."
+            MODIFIED_ADDONS=$(git diff --name-only HEAD~1 HEAD | grep -E '^[^/]+/$' | sed 's|/$||' | tr '\n' ',' | sed 's/,$//')
+            echo "Addons modifiés: $MODIFIED_ADDONS"
+            
+            # Si aucun addon modifié, ne rien builder
+            if [ -z "$MODIFIED_ADDONS" ]; then
+              echo "Aucun addon modifié, build terminé"
+              echo "## Rapport de build" >> $GITHUB_STEP_SUMMARY
+              echo "Aucun addon modifié dans ce push" >> $GITHUB_STEP_SUMMARY
+              exit 0
+            fi
+            
+            # Convertir en tableau pour itération
+            IFS=',' read -ra MODIFIED_ARRAY <<< "$MODIFIED_ADDONS"
+          fi
+          
           # Vérifier si un addon spécifique est demandé
           TARGET_ADDON="${{ github.event.inputs.target_addon }}"
           echo "Addon cible: $TARGET_ADDON"
@@ -74,6 +97,22 @@ jobs:
             if [ -n "$TARGET_ADDON" ] && [ "$TARGET_ADDON" != "$addon_name" ]; then
               echo "Skip $addon_name (addon cible: $TARGET_ADDON)"
               continue
+            fi
+            
+            # Si c'est un push et l'addon n'a pas été modifié, le skipper
+            if [ "${{ github.event_name }}" = "push" ] && [ -n "$MODIFIED_ADDONS" ]; then
+              ADDON_MODIFIED=false
+              for modified in "${MODIFIED_ARRAY[@]}"; do
+                if [ "$modified" = "$addon_name" ]; then
+                  ADDON_MODIFIED=true
+                  break
+                fi
+              done
+              
+              if [ "$ADDON_MODIFIED" = "false" ]; then
+                echo "Skip $addon_name (non modifié dans ce push)"
+                continue
+              fi
             fi
             
             # Vérifier si c'est un addon valide
