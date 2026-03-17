@@ -141,14 +141,14 @@ jobs:
                 
                 # Lire le build.yaml pour déterminer les images de base
                 if grep -q "build_from:" "$dir/build.yaml"; then
-                  # Cas avec une seule image (FossFLOW)
-                  if grep -A1 "^build_from:" "$dir/build.yaml" | grep -q "^[[:space:]]*\""; then
+                  # Cas avec une seule image (FossFLOW) - ligne avec build_from: "image"
+                  if grep "^build_from:" "$dir/build.yaml" | grep -q '"'; then
                     base_image=$(grep "^build_from:" "$dir/build.yaml" | sed 's/build_from: "//' | sed 's/"//')
                     platforms="linux/amd64,linux/arm64,linux/arm/v7"
                     echo "Image de base unique: $base_image"
                     build_type="single"
                   else
-                    # Cas avec plusieurs images par architecture (n8n, planka)
+                    # Cas avec plusieurs images par architecture (n8n, planka, mopidy)
                     base_image="ubuntu:22.04"  # Image par défaut pour multi-arch
                     platforms="linux/amd64,linux/arm64,linux/arm/v7,linux/armhf"
                     echo "Images multi-architecture détectées, utilisation de l'image par défaut: $base_image"
