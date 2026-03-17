@@ -146,78 +146,30 @@ jobs:
                 
                 # Lire le build.yaml pour déterminer les images de base
                 if grep -q "build_from:" "$dir/build.yaml"; then
-                  # Cas avec une seule image (FossFLOW) - ligne avec build_from: "image"
-                  if grep "^build_from:" "$dir/build.yaml" | grep -q '"'; then
-                    base_image=$(grep "^build_from:" "$dir/build.yaml" | sed 's/build_from: "//' | sed 's/"//' | tr -d '\r\n')
-                    # Pour les images uniques, limiter à amd64 uniquement
-                    platforms="linux/amd64"
+                  # Cas avec une seule image (FossFLOW)
+                  if grep -A1 "^build_from:" "$dir/build.yaml" | grep -q "^[[:space:]]*\""; then
+                    base_image=$(grep "^build_from:" "$dir/build.yaml" | sed 's/build_from: "//' | sed 's/"//')
+                    platforms="linux/amd64,linux/arm64,linux/arm/v7"
                     echo "Image de base unique: $base_image"
-                    echo "Limitation à amd64 pour image unique"
-                    build_type="single"
                   else
-                    # Cas avec plusieurs images par architecture - lire les architectures disponibles
-                    echo "Détection des architectures depuis build.yaml..."
-                    
-                    # Initialiser les variables
-                    platforms=""
-                    build_images=""
-                    
-                    # Lire chaque ligne d'architecture dans build_from
-                    while IFS= read -r line; do
-                      if echo "$line" | grep -qE "^\s*[a-z0-9]+:"; then
-                        arch=$(echo "$line" | sed 's/^\s*//' | cut -d':' -f1)
-                        image=$(echo "$line" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
-                        
-                        echo "Debug: trouvé arch=$arch, image=$image"
-                        
-                        case $arch in
-                          "amd64") 
-                            platforms="$platforms linux/amd64"
-                            # Utiliser l'image amd64 spécifique
-                            if [ -z "$base_image" ]; then 
-                              base_image="$image"
-                              echo "Debug: base_image mis à jour avec amd64: $base_image"
-                            fi
-                            ;;
-                          "arm64"|"aarch64") 
-                            platforms="$platforms linux/arm64"
-                            ;;
-                          "armv7") 
-                            platforms="$platforms linux/arm/v7"
-                            ;;
-                          "armhf") 
-                            platforms="$platforms linux/armhf"
-                            ;;
-                          "i386") 
-                            platforms="$platforms linux/386"
-                            ;;
-                        esac
-                      fi
-                    done < "$dir/build.yaml"
-                    
-                    # Nettoyer la chaîne de plateformes
-                    platforms=$(echo "$platforms" | sed 's/^ //' | tr ' ' ',')
-                    
-                    echo "Architectures détectées: $platforms"
-                    echo "Image de base principale: $base_image"
-                    build_type="multi-arch"
+                    # Cas avec plusieurs images par architecture (n8n, planka)
+                    base_image="multi-arch"
+                    platforms="linux/amd64,linux/arm64,linux/armv7,linux/armhf"
+                    echo "Images multi-architecture détectées"
                   fi
                 else
                   # Fallback si pas de build_from dans build.yaml
                   base_image="ghcr.io/home-assistant/amd64-base:3.18"
                   platforms="linux/amd64,linux/arm64,linux/arm/v7"
-                  build_type="single"
                 fi
               else
                 # Détection automatique si pas de build.yaml
                 if grep -q "apt-get" "$dir/Dockerfile"; then
                   base_image="ubuntu:22.04"
                   platforms="linux/amd64,linux/arm64"
-                  build_type="single"
                 else
                   base_image="ghcr.io/home-assistant/amd64-base:3.18"
                   platforms="linux/amd64,linux/arm64,linux/arm/v7"
-                  build_type="single"
                 fi
               fi
               
@@ -255,18 +207,16 @@ jobs:
                 
                 # Préparer les arguments de build selon le build.yaml
                 BUILD_ARGS=""
-                echo "Debug: base_image='$base_image', build_type='$build_type'"
-                if [ "$build_type" = "multi-arch" ]; then
-                  echo "Utilisation du build.yaml pour les images multi-architecture"
-                  # Pour le multi-arch, passer BUILD_FROM avec l'image de base principale
-                  BUILD_ARGS="--build-arg BUILD_FROM=$base_image --build-arg BUILD_CONFIG_FILE=build.yaml"
-                  echo "Debug: BUILD_ARGS='$BUILD_ARGS' (multi-arch avec BUILD_FROM principal)"
+                if [ "$base_image" = "multi-arch" ]; then
+                  echo "Utilisation des images multi-architecture depuis build.yaml"
+                  # Pour le multi-arch, on passe le build.yaml comme contexte
+                  BUILD_ARGS="--build-arg BUILD_CONFIG_FILE=build.yaml"
                 else
                   echo "Utilisation de l'image de base: $base_image"
                   BUILD_ARGS="--build-arg BUILD_FROM=$base_image"
                 fi
                 
-                BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$version"
+                BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$version --build-arg BUILD_ARCH=amd64"
                 
                 # Tenter le build avec gestion d'erreur
                 echo "Build avec plateformes: $platforms"
