@@ -128,7 +128,7 @@ jobs:
               
               # Récupérer la version
               if [ -f "$dir/config.yaml" ]; then
-                version=$(grep '^version:' "$dir/config.yaml" | sed 's/version: "//' | sed 's/"//' || echo "latest")
+                version=$(grep '^version:' "$dir/config.yaml" | sed 's/version: "//' | sed 's/"//' | tr -d '\r\n' || echo "latest")
               else
                 version="latest"
               fi
@@ -143,15 +143,56 @@ jobs:
                 if grep -q "build_from:" "$dir/build.yaml"; then
                   # Cas avec une seule image (FossFLOW) - ligne avec build_from: "image"
                   if grep "^build_from:" "$dir/build.yaml" | grep -q '"'; then
-                    base_image=$(grep "^build_from:" "$dir/build.yaml" | sed 's/build_from: "//' | sed 's/"//')
-                    platforms="linux/amd64,linux/arm64,linux/arm/v7"
+                    base_image=$(grep "^build_from:" "$dir/build.yaml" | sed 's/build_from: "//' | sed 's/"//' | tr -d '\r\n')
+                    # Pour les images uniques, limiter à amd64 uniquement
+                    platforms="linux/amd64"
                     echo "Image de base unique: $base_image"
+                    echo "Limitation à amd64 pour image unique"
                     build_type="single"
                   else
-                    # Cas avec plusieurs images par architecture (n8n, planka, mopidy)
-                    base_image="ubuntu:22.04"  # Image par défaut pour multi-arch
-                    platforms="linux/amd64,linux/arm64,linux/arm/v7,linux/armhf"
-                    echo "Images multi-architecture détectées, utilisation de l'image par défaut: $base_image"
+                    # Cas avec plusieurs images par architecture - lire les architectures disponibles
+                    echo "Détection des architectures depuis build.yaml..."
+                    
+                    # Initialiser les variables
+                    platforms=""
+                    build_images=""
+                    
+                    # Lire chaque ligne d'architecture dans build_from
+                    while IFS= read -r line; do
+                      if echo "$line" | grep -qE "^\s*[a-z0-9]+:"; then
+                        arch=$(echo "$line" | sed 's/^\s*//' | cut -d':' -f1)
+                        image=$(echo "$line" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n')
+                        
+                        case $arch in
+                          "amd64") 
+                            platforms="$platforms linux/amd64"
+                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            ;;
+                          "arm64"|"aarch64") 
+                            platforms="$platforms linux/arm64"
+                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            ;;
+                          "armv7") 
+                            platforms="$platforms linux/arm/v7"
+                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            ;;
+                          "armhf") 
+                            platforms="$platforms linux/armhf"
+                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            ;;
+                          "i386") 
+                            platforms="$platforms linux/386"
+                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            ;;
+                        esac
+                      fi
+                    done < "$dir/build.yaml"
+                    
+                    # Nettoyer la chaîne de plateformes
+                    platforms=$(echo "$platforms" | sed 's/^ //' | tr ' ' ',')
+                    
+                    echo "Architectures détectées: $platforms"
+                    echo "Image de base principale: $base_image"
                     build_type="multi-arch"
                   fi
                 else
