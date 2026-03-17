@@ -1,5 +1,5 @@
 name: FossFLOW
-version: "26.3.1"
+version: "26.3.2"
 slug: fossflow
 panel_icon: "mdi:chart-timeline-variant"
 description: Make beautiful isometric infrastructure diagrams
