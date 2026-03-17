@@ -128,6 +128,21 @@ jobs:
                   
                   echo "✅ Build terminé pour $addon_name"
                   echo "- ✅ **$addon_name** ($version) : Build réussi" >> build_report.md
+                  
+                  # Créer les tags spécifiques par architecture pour Home Assistant
+                  echo "Création des tags spécifiques par architecture..."
+                  for arch in amd64 arm64 armv7; do
+                    if echo "$platforms" | grep -q "$arch"; then
+                      arch_image="${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}-${arch}:${version}"
+                      latest_arch="${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}-${arch}:latest"
+                      
+                      echo "Création du tag $arch_image"
+                      docker buildx imagetools create \
+                        --tag "$arch_image" \
+                        --tag "$latest_arch" \
+                        "$image_name" || echo "Impossible de créer le tag pour $arch"
+                    fi
+                  done
                 else
                   echo "❌ Build échoué pour $addon_name"
                   echo "- ❌ **$addon_name** ($version) : Build échoué" >> build_report.md
