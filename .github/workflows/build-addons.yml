@@ -191,14 +191,14 @@ jobs:
                   # Récupérer la date de création de l'image existante
                   created_date=$(docker manifest inspect "$image_name" 2>/dev/null | jq -r '.manifests[0].annotations."org.opencontainers.image.created"' 2>/dev/null || echo "")
                   
-                  if [ -n "$created_date" ]; then
+                  if [ -n "$created_date" ] && [ "$created_date" != "null" ]; then
                     echo "Image existante créée le: $created_date"
                     echo "Nouvelle version: $version"
                     echo "Mise à jour automatique activée"
                     should_build=true
                   else
-                    echo "Impossible de vérifier la date de création, mise à jour automatique"
-                    should_build=true
+                    echo "Image $image_name existe déjà, pas de date de création détectée, skip"
+                    should_build=false
                   fi
                 else
                   echo "Image $image_name existe déjà, skip (mise à jour désactivée)"
