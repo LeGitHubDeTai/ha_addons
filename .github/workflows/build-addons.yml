@@ -186,20 +186,10 @@ jobs:
                 echo "Force rebuild activé"
                 should_build=true
               elif docker manifest inspect "$image_name" >/dev/null 2>&1; then
+                echo "Image $image_name existe déjà"
                 if [ "${{ github.event.inputs.update_existing }}" = "true" ]; then
-                  echo "Image $image_name existe déjà, vérification de la version..."
-                  # Récupérer la date de création de l'image existante
-                  created_date=$(docker manifest inspect "$image_name" 2>/dev/null | jq -r '.manifests[0].annotations."org.opencontainers.image.created"' 2>/dev/null || echo "")
-                  
-                  if [ -n "$created_date" ] && [ "$created_date" != "null" ]; then
-                    echo "Image existante créée le: $created_date"
-                    echo "Nouvelle version: $version"
-                    echo "Mise à jour automatique activée"
-                    should_build=true
-                  else
-                    echo "Image $image_name existe déjà, pas de date de création détectée, skip"
-                    should_build=false
-                  fi
+                  echo "Mise à jour automatique activée pour la version $version"
+                  should_build=true
                 else
                   echo "Image $image_name existe déjà, skip (mise à jour désactivée)"
                   should_build=false
