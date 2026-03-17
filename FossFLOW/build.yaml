@@ -1,4 +1,4 @@
-build_from: "stnsmith/fossflow:master-35aaa2c"
+build_from: "stnsmith/fossflow:master-35cc5e7"
 labels:
   org.opencontainers.image.title: "FossFLOW"
   org.opencontainers.image.description: "Make beautiful isometric infrastructure diagrams"
