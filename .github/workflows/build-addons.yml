@@ -135,13 +135,37 @@ jobs:
               
               echo "Version: $version"
               
-              # Déterminer l'image de base
-              if grep -q "apt-get" "$dir/Dockerfile"; then
-                base_image="ubuntu:22.04"
-                platforms="linux/amd64,linux/arm64"
+              # Déterminer l'image de base et les plateformes
+              if [ -f "$dir/build.yaml" ]; then
+                echo "Utilisation du build.yaml personnalisé"
+                
+                # Lire le build.yaml pour déterminer les images de base
+                if grep -q "build_from:" "$dir/build.yaml"; then
+                  # Cas avec une seule image (FossFLOW)
+                  if grep -A1 "^build_from:" "$dir/build.yaml" | grep -q "^[[:space:]]*\""; then
+                    base_image=$(grep "^build_from:" "$dir/build.yaml" | sed 's/build_from: "//' | sed 's/"//')
+                    platforms="linux/amd64,linux/arm64,linux/arm/v7"
+                    echo "Image de base unique: $base_image"
+                  else
+                    # Cas avec plusieurs images par architecture (n8n, planka)
+                    base_image="multi-arch"
+                    platforms="linux/amd64,linux/arm64,linux/armv7,linux/armhf"
+                    echo "Images multi-architecture détectées"
+                  fi
+                else
+                  # Fallback si pas de build_from dans build.yaml
+                  base_image="ghcr.io/home-assistant/amd64-base:3.18"
+                  platforms="linux/amd64,linux/arm64,linux/arm/v7"
+                fi
               else
-                base_image="ghcr.io/home-assistant/amd64-base:3.18"
-                platforms="linux/amd64,linux/arm64,linux/arm/v7"
+                # Détection automatique si pas de build.yaml
+                if grep -q "apt-get" "$dir/Dockerfile"; then
+                  base_image="ubuntu:22.04"
+                  platforms="linux/amd64,linux/arm64"
+                else
+                  base_image="ghcr.io/home-assistant/amd64-base:3.18"
+                  platforms="linux/amd64,linux/arm64,linux/arm/v7"
+                fi
               fi
               
               echo "Base image: $base_image"
@@ -187,15 +211,26 @@ jobs:
                 # Copier le script bashio dans le dossier de l'addon
                 cp scripts/install-bashio.sh "$addon_name/"
                 
+                # Préparer les arguments de build selon le build.yaml
+                BUILD_ARGS=""
+                if [ "$base_image" = "multi-arch" ]; then
+                  echo "Utilisation des images multi-architecture depuis build.yaml"
+                  # Pour le multi-arch, on passe le build.yaml comme contexte
+                  BUILD_ARGS="--build-arg BUILD_CONFIG_FILE=build.yaml"
+                else
+                  echo "Utilisation de l'image de base: $base_image"
+                  BUILD_ARGS="--build-arg BUILD_FROM=$base_image"
+                fi
+                
+                BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$version --build-arg BUILD_ARCH=amd64"
+                
                 # Tenter le build avec gestion d'erreur
                 if docker buildx build \
                   --platform "$platforms" \
                   --push \
                   --tag "$image_name" \
                   --tag "${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}:latest" \
-                  --build-arg "BUILD_FROM=$base_image" \
-                  --build-arg "BUILD_VERSION=$version" \
-                  --build-arg "BUILD_ARCH=amd64" \
+                  $BUILD_ARGS \
                   --cache-from "type=gha" \
                   --cache-to "type=gha,mode=max" \
                   "./$addon_name"; then
