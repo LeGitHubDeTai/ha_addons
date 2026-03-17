@@ -7,6 +7,10 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
     inputs:
+      target_addon:
+        description: 'Addon spécifique à builder (laisser vide pour tous)'
+        required: false
+        default: ''
       force_rebuild:
         description: 'Forcer le rebuild meme si l image existe'
         required: false
@@ -48,8 +52,29 @@ jobs:
           echo "# Build Report - $(date)" > build_report.md
           echo "" >> build_report.md
           
+          # Découvrir tous les addons disponibles
+          ADDONS_LIST=""
           for dir in */; do
             addon_name=$(basename "$dir")
+            if [ -f "$dir/config.yaml" ] && [ -f "$dir/Dockerfile" ]; then
+              ADDONS_LIST="$ADDONS_LIST,$addon_name"
+            fi
+          done
+          ADDONS_LIST=$(echo "$ADDONS_LIST" | sed 's/^,//')
+          echo "Addons disponibles: $ADDONS_LIST"
+          
+          # Vérifier si un addon spécifique est demandé
+          TARGET_ADDON="${{ github.event.inputs.target_addon }}"
+          echo "Addon cible: $TARGET_ADDON"
+          
+          for dir in */; do
+            addon_name=$(basename "$dir")
+            
+            # Si un addon spécifique est demandé, skip les autres
+            if [ -n "$TARGET_ADDON" ] && [ "$TARGET_ADDON" != "$addon_name" ]; then
+              echo "Skip $addon_name (addon cible: $TARGET_ADDON)"
+              continue
+            fi
             
             # Vérifier si c'est un addon valide
             if [ -f "$dir/config.yaml" ] && [ -f "$dir/Dockerfile" ]; then
