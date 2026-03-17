@@ -100,6 +100,11 @@ jobs:
           for dir in */; do
             addon_name=$(basename "$dir")
             
+            # Réinitialiser les variables pour chaque addon
+            base_image=""
+            platforms=""
+            build_type=""
+            
             # Si un addon spécifique est demandé, skip les autres
             if [ -n "$TARGET_ADDON" ] && [ "$TARGET_ADDON" != "$addon_name" ]; then
               echo "Skip $addon_name (addon cible: $TARGET_ADDON)"
