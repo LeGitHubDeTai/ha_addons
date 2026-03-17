@@ -19,6 +19,14 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # ===============================
+# INSTALL BASHIO
+# ===============================
+RUN mkdir -p /tmp/bashio && \
+    curl -fsSL https://github.com/home-assistant/supervised-installer/releases/latest/download/bashio.sh -o /tmp/bashio/bashio.sh && \
+    chmod +x /tmp/bashio/bashio.sh && \
+    /tmp/bashio/bashio.sh
+
+# ===============================
 # INSTALL NODEJS 22
 # ===============================
 RUN mkdir -p /etc/apt/keyrings && \
