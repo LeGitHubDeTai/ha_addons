@@ -71,19 +71,26 @@ jobs:
           # Détecter les addons modifiés
           if [ "${{ github.event_name }}" = "push" ]; then
             echo "Détection des addons modifiés..."
-            MODIFIED_ADDONS=$(git diff --name-only HEAD~1 HEAD | grep -E '^[^/]+/$' | sed 's|/$||' | tr '\n' ',' | sed 's/,$//')
-            echo "Addons modifiés: $MODIFIED_ADDONS"
             
-            # Si aucun addon modifié, ne rien builder
-            if [ -z "$MODIFIED_ADDONS" ]; then
-              echo "Aucun addon modifié, build terminé"
-              echo "## Rapport de build" >> $GITHUB_STEP_SUMMARY
-              echo "Aucun addon modifié dans ce push" >> $GITHUB_STEP_SUMMARY
-              exit 0
+            # Vérifier si HEAD~1 existe (premier commit)
+            if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+              MODIFIED_ADDONS=$(git diff --name-only HEAD~1 HEAD | grep -E '^[^/]+/$' | sed 's|/$||' | tr '\n' ',' | sed 's/,$//')
+              echo "Addons modifiés: $MODIFIED_ADDONS"
+              
+              # Si aucun addon modifié, ne rien builder
+              if [ -z "$MODIFIED_ADDONS" ]; then
+                echo "Aucun addon modifié, build terminé"
+                echo "## Rapport de build" >> $GITHUB_STEP_SUMMARY
+                echo "Aucun addon modifié dans ce push" >> $GITHUB_STEP_SUMMARY
+                exit 0
+              fi
+              
+              # Convertir en tableau pour itération
+              IFS=',' read -ra MODIFIED_ARRAY <<< "$MODIFIED_ADDONS"
+            else
+              echo "Premier commit détecté, build de tous les addons"
+              MODIFIED_ADDONS=""
             fi
-            
-            # Convertir en tableau pour itération
-            IFS=',' read -ra MODIFIED_ARRAY <<< "$MODIFIED_ADDONS"
           fi
           
           # Vérifier si un addon spécifique est demandé
@@ -177,6 +184,9 @@ jobs:
               if [ "$should_build" = "true" ]; then
                 echo "Build de $addon_name..."
                 
+                # Copier le script bashio dans le dossier de l'addon
+                cp scripts/install-bashio.sh "$addon_name/"
+                
                 # Tenter le build avec gestion d'erreur
                 if docker buildx build \
                   --platform "$platforms" \
@@ -212,6 +222,9 @@ jobs:
                   echo "- ❌ **$addon_name** ($version) : Build échoué" >> build_report.md
                   # Continuer avec le prochain addon
                 fi
+                
+                # Nettoyer le script temporaire
+                rm -f "$addon_name/install-bashio.sh"
               else
                 echo "⏭️  Skip $addon_name (image existe)"
                 echo "- ⏭️ **$addon_name** ($version) : Image existante, skip" >> build_report.md
