@@ -276,6 +276,16 @@ jobs:
             
             echo "Base image: $BASE_IMAGE"
             
+            # Map Home Assistant architecture names to Docker platform names
+            case "$arch" in
+              "armv7") PLATFORM="linux/arm/v7" ;;
+              "armhf") PLATFORM="linux/arm/v6" ;;
+              "aarch64") PLATFORM="linux/arm64" ;;
+              "amd64") PLATFORM="linux/amd64" ;;
+              "i386") PLATFORM="linux/386" ;;
+              *) PLATFORM="linux/$arch" ;;
+            esac
+            
             # Set build arguments
             BUILD_ARGS="--build-arg BUILD_FROM=$BASE_IMAGE"
             BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$VERSION"
@@ -290,7 +300,7 @@ jobs:
             # Build and push
             docker buildx build \
               $BUILD_ARGS \
-              --platform linux/$arch \
+              --platform "$PLATFORM" \
               --tag "$IMAGE_TAG" \
               --tag "$IMAGE_TAG_LATEST" \
               --cache-from type=local,src=/tmp/.buildx-cache \
