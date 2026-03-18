@@ -152,10 +152,50 @@ jobs:
                     platforms="linux/amd64,linux/arm64,linux/arm/v7"
                     echo "Image de base unique: $base_image"
                   else
-                    # Cas avec plusieurs images par architecture (n8n, planka)
-                    base_image="multi-arch"
-                    platforms="linux/amd64,linux/arm64,linux/armv7,linux/armhf"
-                    echo "Images multi-architecture détectées"
+                    # Cas avec plusieurs images par architecture - lire les architectures disponibles
+                    echo "Détection des architectures depuis build.yaml..."
+                    
+                    # Initialiser les variables
+                    platforms=""
+                    build_images=""
+                    
+                    # Lire chaque ligne d'architecture dans build_from
+                    while IFS= read -r line; do
+                      if echo "$line" | grep -qE "^\s*[a-z0-9]+:"; then
+                        arch=$(echo "$line" | sed 's/^\s*//' | cut -d':' -f1)
+                        image=$(echo "$line" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
+                        
+                        case $arch in
+                          "amd64") 
+                            platforms="$platforms linux/amd64"
+                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            ;;
+                          "arm64"|"aarch64") 
+                            platforms="$platforms linux/arm64"
+                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            ;;
+                          "armv7") 
+                            platforms="$platforms linux/arm/v7"
+                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            ;;
+                          "armhf") 
+                            platforms="$platforms linux/armhf"
+                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            ;;
+                          "i386") 
+                            platforms="$platforms linux/386"
+                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            ;;
+                        esac
+                      fi
+                    done < "$dir/build.yaml"
+                    
+                    # Nettoyer la chaîne de plateformes
+                    platforms=$(echo "$platforms" | sed 's/^ //' | tr ' ' ',')
+                    
+                    echo "Architectures détectées: $platforms"
+                    echo "Image de base principale: $base_image"
+                    build_type="multi-arch"
                   fi
                 else
                   # Fallback si pas de build_from dans build.yaml

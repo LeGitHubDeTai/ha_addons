@@ -24,9 +24,11 @@ RUN apk add --no-cache \
     nginx \
     supervisor \
     envsubst \
-    python3 \
     make \
-    g++
+    gcc \
+    g++ \
+    python3 \
+    linux-headers
 WORKDIR /data
 COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
 
