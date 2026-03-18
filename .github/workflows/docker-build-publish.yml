@@ -98,8 +98,10 @@ jobs:
               echo "📋 Detected changed addons: $ADDONS"
             fi
             # For push/PR, only build changed addons
+            # Get all addon directories automatically
+            ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
             ADDONS=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | \
-              grep -E '^(syncthing|n8n|mopidy|planka|dolibarr|obsidian)/' | \
+              grep -E "^($ALL_ADDONS)/" | \
               cut -d'/' -f1 | sort -u | tr '\n' ' ')
           fi
           
@@ -248,14 +250,28 @@ jobs:
           # Parse build.yaml for base images
           BUILD_CONFIG="$ADDON/build.yaml"
           
+          # Check if build.yaml has architecture-specific or single base image
+          if yq eval '.build_from | type' "$BUILD_CONFIG" | grep -q "!!map"; then
+            # Architecture-specific base images (like other addons)
+            BASE_IMAGE_TYPE="arch_specific"
+          else
+            # Single base image (like FossFLOW)
+            BASE_IMAGE_TYPE="single"
+            SINGLE_BASE_IMAGE=$(yq eval '.build_from' "$BUILD_CONFIG" | tr -d '"')
+          fi
+          
           for arch in $ARCHS; do
             echo "Building for architecture: $arch"
             
             # Get base image for this architecture
-            BASE_IMAGE=$(yq eval ".build_from.$arch" "$BUILD_CONFIG")
-            if [ "$BASE_IMAGE" = "null" ]; then
-              echo "No base image found for $arch, skipping"
-              continue
+            if [ "$BASE_IMAGE_TYPE" = "arch_specific" ]; then
+              BASE_IMAGE=$(yq eval ".build_from.$arch" "$BUILD_CONFIG")
+              if [ "$BASE_IMAGE" = "null" ]; then
+                echo "No base image found for $arch, skipping"
+                continue
+              fi
+            else
+              BASE_IMAGE="$SINGLE_BASE_IMAGE"
             fi
             
             echo "Base image: $BASE_IMAGE"
