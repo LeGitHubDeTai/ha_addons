@@ -103,18 +103,32 @@ jobs:
       - name: Sanitize text files (Unicode spaces + CRLF → LF)
         run: |
           cd "${{ matrix.addon }}"
-          UNICODE_SPACES_REGEX=$'[\\u00A0\\u2002\\u2003\\u2007\\u2008\\u2009\\u202F\\u205F\\u3000\\u200B]'
-
-          find . -type f | while read -r file; do
-            MIME_TYPE=$(file --mime-type -b "$file" 2>/dev/null || echo "")
-            [[ "$MIME_TYPE" != text/* ]] && continue
-
-            echo "Sanitizing $file"
-            # Edit in place, preserving file permissions and metadata
-            perl -i -CSD -pe "
-              s/${UNICODE_SPACES_REGEX}/ /g;  # space normalization
-              s/\\r$//;                        # CRLF → LF
-            " "$file" 2>/dev/null || true
+          
+          # Liste des extensions de fichiers texte à traiter
+          TEXT_EXTENSIONS=("sh" "yaml" "yml" "json" "py" "js" "html" "css" "md" "txt" "conf" "cfg" "ini" "xml" "Dockerfile")
+          
+          for ext in "${TEXT_EXTENSIONS[@]}"; do
+            find . -type f -iname "*.$ext" -o -name "Dockerfile" | while read -r file; do
+              # Vérifier que c'est bien un fichier texte
+              MIME_TYPE=$(file --mime-type -b "$file" 2>/dev/null || echo "")
+              if [[ "$MIME_TYPE" == text/* ]]; then
+                echo "Sanitizing $file"
+                
+                # Sauvegarder les permissions
+                PERMS=$(stat -c "%a" "$file")
+                
+                # Normaliser les espaces Unicode (plus prudent)
+                sed -i 's/[\u00A0\u2002\u2003\u2007\u2008\u2009\u202F\u205F\u3000\u200B]/ /g' "$file" 2>/dev/null || true
+                
+                # Convertir CRLF en LF (plus sûr)
+                if grep -q $'\r' "$file"; then
+                  tr -d '\r' < "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+                fi
+                
+                # Restaurer les permissions
+                chmod "$PERMS" "$file"
+              fi
+            done
           done
       
       # ────────────────────────────────────────────────────────────────
