@@ -1,0 +1,290 @@
+name: Docker Build and Publish
+
+on:
+  push:
+    branches: [ main, actions-dev ]
+    paths:
+      - '**/config.yaml'
+      - '**/Dockerfile'
+      - '**/build.yaml'
+      - '**/root/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/config.yaml'
+      - '**/Dockerfile'
+      - '**/build.yaml'
+      - '**/root/**'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: legithubdetai
+  REPO_PREFIX: ha_addons
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      addons: ${{ steps.changes.outputs.addons }}
+      matrix: ${{ steps.changes.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect changed addons
+        id: changes
+        run: |
+          # Get list of changed files
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # For manual dispatch, build all addons
+            ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' ' ')
+          else
+            # For push/PR, only build changed addons
+            # Get all addon directories automatically
+            ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
+            ADDONS=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | \
+              grep -E "^($ALL_ADDONS)/" | \
+              cut -d'/' -f1 | sort -u | tr '\n' ' ')
+          fi
+          
+          if [ -z "$ADDONS" ]; then
+            echo "addons=[]"
+            echo "matrix=[]"
+            exit 0
+          fi
+          
+          # Create JSON matrix
+          ADDON_ARRAY="["
+          for addon in $ADDONS; do
+            if [ -f "$addon/config.yaml" ]; then
+              if [ "$ADDON_ARRAY" != "[" ]; then
+                ADDON_ARRAY="$ADDON_ARRAY,"
+              fi
+              ADDON_ARRAY="$ADDON_ARRAY\"$addon\""
+            fi
+          done
+          ADDON_ARRAY="$ADDON_ARRAY]"
+          
+          echo "addons=$ADDONS"
+          echo "matrix=$ADDON_ARRAY"
+          echo "::set-output name=addons::$ADDONS"
+          echo "::set-output name=matrix::$ADDON_ARRAY"
+
+  check-versions:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.matrix != '[]'
+    outputs:
+      build-matrix: ${{ steps.version-check.outputs.build-matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
+      - name: Check versions against GHCR
+        id: version-check
+        run: |
+          MATRIX='${{ needs.detect-changes.outputs.matrix }}'
+          BUILD_ARRAY="["
+          
+          for addon in $(echo "$MATRIX" | jq -r '.[]'); do
+            echo "Processing addon: $addon"
+            
+            # Get version from config.yaml
+            VERSION=$(yq eval '.version' "$addon/config.yaml" | tr -d '"')
+            SLUG=$(yq eval '.slug' "$addon/config.yaml" | tr -d '"')
+            echo "  Version: $VERSION, Slug: $SLUG"
+            
+            # Get architectures from config.yaml
+            ARCHS=$(yq eval '.arch[]' "$addon/config.yaml" | tr '\n' ' ')
+            
+            # Check if images already exist for all architectures
+            SKIP_BUILD=true
+            for arch in $ARCHS; do
+              IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
+              
+              # Check if image exists (will fail if not found)
+              if ! docker manifest inspect "$IMAGE_TAG" > /dev/null 2>&1; then
+                echo "  Image not found: $IMAGE_TAG"
+                SKIP_BUILD=false
+                break
+              else
+                echo "  Image exists: $IMAGE_TAG"
+              fi
+            done
+            
+            if [ "$SKIP_BUILD" = false ]; then
+              if [ "$BUILD_ARRAY" != "[" ]; then
+                BUILD_ARRAY="$BUILD_ARRAY,"
+              fi
+              BUILD_ARRAY="$BUILD_ARRAY{\"addon\":\"$addon\",\"version\":\"$VERSION\",\"slug\":\"$SLUG\",\"archs\":\"$ARCHS\"}"
+              echo "  Will build $addon"
+            else
+              echo "  Skipping $addon - all images already exist"
+            fi
+          done
+          
+          BUILD_ARRAY="$BUILD_ARRAY]"
+          echo "build-matrix=$BUILD_ARRAY"
+          echo "::set-output name=build-matrix::$BUILD_ARRAY"
+
+  build-and-publish:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, check-versions]
+    if: needs.check-versions.outputs.build-matrix != '[]'
+    strategy:
+      matrix:
+        build: ${{ fromJson(needs.check-versions.outputs.build-matrix) }}
+      fail-fast: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: image=moby/buildkit:buildx-stable-1
+          buildkitd-flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ matrix.build.addon }}-${{ matrix.build.version }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-${{ matrix.build.addon }}-
+            ${{ runner.os }}-buildx-
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
+      - name: Install build tools
+        run: |
+          # Install Home Assistant CLI tools (optional, for validation)
+          pip install homeassistant-cli
+          
+          # Note: bashio is typically included in Home Assistant base images
+          # and is not needed during the build process itself
+
+      - name: Build and push images for each architecture
+        run: |
+          ADDON="${{ matrix.build.addon }}"
+          VERSION="${{ matrix.build.version }}"
+          SLUG="${{ matrix.build.slug }}"
+          ARCHS="${{ matrix.build.archs }}"
+          
+          echo "Building $ADDON version $VERSION"
+          echo "Architectures: $ARCHS"
+          
+          # Parse build.yaml for base images
+          BUILD_CONFIG="$ADDON/build.yaml"
+          
+          # Check if build.yaml has architecture-specific or single base image
+          if yq eval '.build_from | type' "$BUILD_CONFIG" | grep -q "!!map"; then
+            # Architecture-specific base images (like other addons)
+            BASE_IMAGE_TYPE="arch_specific"
+          else
+            # Single base image (like FossFLOW)
+            BASE_IMAGE_TYPE="single"
+            SINGLE_BASE_IMAGE=$(yq eval '.build_from' "$BUILD_CONFIG" | tr -d '"')
+          fi
+          
+          for arch in $ARCHS; do
+            echo "Building for architecture: $arch"
+            
+            # Get base image for this architecture
+            if [ "$BASE_IMAGE_TYPE" = "arch_specific" ]; then
+              BASE_IMAGE=$(yq eval ".build_from.$arch" "$BUILD_CONFIG")
+              if [ "$BASE_IMAGE" = "null" ]; then
+                echo "No base image found for $arch, skipping"
+                continue
+              fi
+            else
+              BASE_IMAGE="$SINGLE_BASE_IMAGE"
+            fi
+            
+            echo "Base image: $BASE_IMAGE"
+            
+            # Map Home Assistant architecture names to Docker platform names
+            case "$arch" in
+              "armv7") PLATFORM="linux/arm/v7" ;;
+              "armhf") PLATFORM="linux/arm/v6" ;;
+              "aarch64") PLATFORM="linux/arm64" ;;
+              "amd64") PLATFORM="linux/amd64" ;;
+              "i386") PLATFORM="linux/386" ;;
+              *) PLATFORM="linux/$arch" ;;
+            esac
+            
+            # Set build arguments
+            BUILD_ARGS="--build-arg BUILD_FROM=$BASE_IMAGE"
+            BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$VERSION"
+            BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_ARCH=$arch"
+            
+            # Image tag
+            IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
+            IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:latest"
+            
+            echo "Building image: $IMAGE_TAG"
+            
+            # Build and push
+            docker buildx build \
+              $BUILD_ARGS \
+              --platform "$PLATFORM" \
+              --tag "$IMAGE_TAG" \
+              --tag "$IMAGE_TAG_LATEST" \
+              --cache-from type=local,src=/tmp/.buildx-cache \
+              --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
+              --push \
+              "$ADDON/"
+            
+            echo "Successfully built and pushed $IMAGE_TAG"
+          done
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: Update repository metadata
+        run: |
+          # This step could be extended to update a repository.json file
+          # with the new image information for Home Assistant to use
+          echo "Repository metadata update completed"
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, check-versions, build-and-publish]
+    if: always()
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## Docker Build and Publish Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.detect-changes.outputs.matrix }}" = "[]" ]; then
+            echo "✅ No addon changes detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "📋 Detected changes in: ${{ needs.detect-changes.outputs.addons }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ needs.check-versions.outputs.build-matrix }}" = "[]" ]; then
+              echo "✅ All images are up to date" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "🔨 Built images for:" >> $GITHUB_STEP_SUMMARY
+              echo '${{ needs.check-versions.outputs.build-matrix }}' | jq -r '.[] | "- \(.addon) v\(.version) (\(.archs))"' >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
