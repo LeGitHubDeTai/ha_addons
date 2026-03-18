@@ -92,41 +92,53 @@ jobs:
           MATRIX='${{ needs.detect-changes.outputs.matrix }}'
           BUILD_ARRAY="["
           
+          echo "🔍 Étape 1: Addons avec changements de fichiers détectés"
+          echo "Addons avec changements: $MATRIX"
+          echo ""
+          echo "🔍 Étape 2: Vérification des versions pour ces addons"
+          echo ""
+          
           for addon in $(echo "$MATRIX" | jq -r '.[]'); do
-            echo "Processing addon: $addon"
+            echo "📦 Traitement de l'addon: $addon"
             
             # Get version from config.yaml
             VERSION=$(yq eval '.version' "$addon/config.yaml" | tr -d '"')
             SLUG=$(yq eval '.slug' "$addon/config.yaml" | tr -d '"')
-            echo "  Version: $VERSION, Slug: $SLUG"
+            echo "  📋 Version locale: $VERSION"
+            echo "  🏷️  Slug: $SLUG"
             
             # Get architectures from config.yaml
             ARCHS=$(yq eval '.arch[]' "$addon/config.yaml" | tr '\n' ' ')
+            echo "  🏗️  Architectures: $ARCHS"
             
-            # Check if images already exist for all architectures
+            # Vérifier si les images existent déjà sur GHCR
+            echo "  🔍 Vérification des images sur GitHub Container Registry..."
             SKIP_BUILD=true
+            
             for arch in $ARCHS; do
               IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
               
               # Check if image exists (will fail if not found)
               if ! docker manifest inspect "$IMAGE_TAG" > /dev/null 2>&1; then
-                echo "  Image not found: $IMAGE_TAG"
+                echo "    ❌ Image manquante: $IMAGE_TAG"
                 SKIP_BUILD=false
                 break
               else
-                echo "  Image exists: $IMAGE_TAG"
+                echo "    ✅ Image existante: $IMAGE_TAG"
               fi
             done
             
+            # Décision finale: build ou skip basé sur les changements ET la version
             if [ "$SKIP_BUILD" = false ]; then
+              echo "  🔨 BUILD NÉCESSAIRE - Changements détectés + images manquantes"
               if [ "$BUILD_ARRAY" != "[" ]; then
                 BUILD_ARRAY="$BUILD_ARRAY,"
               fi
               BUILD_ARRAY="$BUILD_ARRAY{\"addon\":\"$addon\",\"version\":\"$VERSION\",\"slug\":\"$SLUG\",\"archs\":\"$ARCHS\"}"
-              echo "  Will build $addon"
             else
-              echo "  Skipping $addon - all images already exist"
+              echo "  ⏭️  SKIP - Changements détectés mais images déjà existent pour la version $VERSION"
             fi
+            echo ""
           done
           
           BUILD_ARRAY="$BUILD_ARRAY]"
