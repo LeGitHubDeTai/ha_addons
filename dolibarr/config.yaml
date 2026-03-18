@@ -1,5 +1,5 @@
 name: Dolibarr
-version: "26.1.4"
+version: "26.3.2"
 slug: dolibarr
 panel_icon: "mdi:cash-100"
 description: Dolibarr Server pour Home Assistant
