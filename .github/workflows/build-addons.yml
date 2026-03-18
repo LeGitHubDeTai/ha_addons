@@ -171,23 +171,23 @@ jobs:
                         case $arch in
                           "amd64") 
                             platforms="$platforms linux/amd64"
-                            if [ -z "$base_image" ]; then base_image="$image"; fi
+                            # Utiliser l'image amd64 spécifique
+                            if [ -z "$base_image" ]; then 
+                              # Chercher l'image amd64 spécifique
+                              base_image=$(grep "amd64:" "$dir/build.yaml" | sed 's/.*amd64:\s*//' | tr -d '\r\n"')
+                            fi
                             ;;
                           "arm64"|"aarch64") 
                             platforms="$platforms linux/arm64"
-                            if [ -z "$base_image" ]; then base_image="$image"; fi
                             ;;
                           "armv7") 
                             platforms="$platforms linux/arm/v7"
-                            if [ -z "$base_image" ]; then base_image="$image"; fi
                             ;;
                           "armhf") 
                             platforms="$platforms linux/armhf"
-                            if [ -z "$base_image" ]; then base_image="$image"; fi
                             ;;
                           "i386") 
                             platforms="$platforms linux/386"
-                            if [ -z "$base_image" ]; then base_image="$image"; fi
                             ;;
                         esac
                       fi
@@ -254,17 +254,19 @@ jobs:
                 # Préparer les arguments de build selon le build.yaml
                 BUILD_ARGS=""
                 if [ "$build_type" = "multi-arch" ]; then
-                  echo "Utilisation des images multi-architecture depuis build.yaml"
-                  # Pour le multi-arch, on utilise l'image par défaut ET on passe le build.yaml
-                  BUILD_ARGS="--build-arg BUILD_FROM=$base_image --build-arg BUILD_CONFIG_FILE=build.yaml"
+                  echo "Utilisation du build.yaml pour les images multi-architecture"
+                  BUILD_ARGS="--build-arg BUILD_CONFIG_FILE=build.yaml"
+                  # Ne pas passer BUILD_FROM, il sera lu depuis build.yaml
                 else
                   echo "Utilisation de l'image de base: $base_image"
                   BUILD_ARGS="--build-arg BUILD_FROM=$base_image"
                 fi
                 
-                BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$version --build-arg BUILD_ARCH=amd64"
+                BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$version"
                 
                 # Tenter le build avec gestion d'erreur
+                echo "Build avec plateformes: $platforms"
+                
                 if docker buildx build \
                   --platform "$platforms" \
                   --push \
