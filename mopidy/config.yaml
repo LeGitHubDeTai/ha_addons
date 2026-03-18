@@ -1,5 +1,5 @@
 name: Mopidy
-version: "26.3.1"
+version: "26.3.2"
 slug: mopidy
 panel_icon: "mdi:music-circle"
 description: Mopidy Music Server pour Home Assistant
