@@ -104,15 +104,28 @@ jobs:
         env:
           HEAD: "${{ github.head_ref }}"
         run: |
+          # Vérifier si l'architecture est supportée par HA Builder
+          case "${{ matrix.arch }}" in
+            "amd64"|"aarch64")
+              builder_supported=true
+              ;;
+            *)
+              builder_supported=false
+              echo "Architecture ${{ matrix.arch }} non supportée par HA Builder, utilisation de buildx manuel"
+              ;;
+          esac
+          
+          # Vérifier si l'architecture est dans la liste de l'addon
           if [[ "${{ steps.info.outputs.architectures }}" =~ ${{ matrix.arch }} ]]; then
-             echo "build_arch=true" >> "$GITHUB_OUTPUT";
+             echo "arch_supported=true" >> "$GITHUB_OUTPUT";
+             echo "builder_supported=$builder_supported" >> "$GITHUB_OUTPUT";
              echo "image=$(echo "${{ steps.info.outputs.image }}" | cut -d'/' -f3)" >> "$GITHUB_OUTPUT";
              if [[ "${{ github.event_name }}" == "pull_request" ]]; then
                  echo "BUILD_ARGS=--test" >> "$GITHUB_ENV";
              fi
           else
              echo "${{ matrix.arch }} is not a valid arch for ${{ matrix.addon }}, skipping build";
-             echo "build_arch=false" >> "$GITHUB_OUTPUT";
+             echo "arch_supported=false" >> "$GITHUB_OUTPUT";
           fi
       
       - name: Login to GitHub Container Registry
@@ -123,9 +136,9 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Build ${{ matrix.addon }} add-on
+      - name: Build ${{ matrix.addon }} add-on (HA Builder)
         id: builderstep
-        if: steps.arch_check.outputs.build_arch == 'true' && steps.dockerfile_check.outputs.has_dockerfile == 'true' && steps.should_build.outputs.build == 'true'
+        if: steps.arch_check.outputs.arch_supported == 'true' && steps.arch_check.outputs.builder_supported == 'true' && steps.dockerfile_check.outputs.has_dockerfile == 'true' && steps.should_build.outputs.build == 'true'
         uses: home-assistant/builder@2026.02.1
         with:
           args: |
@@ -135,3 +148,50 @@ jobs:
             --image "${{ matrix.addon }}" \
             --docker-hub "ghcr.io/${{ github.repository_owner }}/ha_addons" \
             --addon
+      
+      - name: Build ${{ matrix.addon }} add-on (Docker Buildx)
+        if: steps.arch_check.outputs.arch_supported == 'true' && steps.arch_check.outputs.builder_supported == 'false' && steps.dockerfile_check.outputs.has_dockerfile == 'true' && steps.should_build.outputs.build == 'true'
+        run: |
+          echo "Build avec Docker Buildx pour ${{ matrix.arch }} (non supporté par HA Builder)"
+          
+          # Récupérer l'image de base depuis build.yaml si disponible
+          if [ -f "${{ matrix.addon }}/build.yaml" ]; then
+            base_image=$(grep "${{ matrix.arch }}:" "${{ matrix.addon }}/build.yaml" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
+            if [ -z "$base_image" ]; then
+              # Fallback vers une image de base par défaut
+              case "${{ matrix.arch }}" in
+                "armv7") base_image="ghcr.io/home-assistant/armv7-base:3.18" ;;
+                "armhf") base_image="ghcr.io/home-assistant/armhf-base:3.18" ;;
+                "i386") base_image="ghcr.io/home-assistant/i386-base:3.18" ;;
+                *) base_image="ghcr.io/home-assistant/amd64-base:3.18" ;;
+              esac
+            fi
+          else
+            base_image="ghcr.io/home-assistant/amd64-base:3.18"
+          fi
+          
+          echo "Image de base: $base_image"
+          
+          # Convertir l'architecture pour Docker
+          case "${{ matrix.arch }}" in
+            "armv7") docker_arch="linux/arm/v7" ;;
+            "armhf") docker_arch="linux/armhf" ;;
+            "i386") docker_arch="linux/386" ;;
+            *) docker_arch="linux/${{ matrix.arch }}" ;;
+          esac
+          
+          # Construire avec buildx
+          if docker buildx build \
+            --platform "$docker_arch" \
+            --push \
+            --tag "ghcr.io/${{ github.repository_owner }}/ha_addons/${{ matrix.addon }}-${{ matrix.arch }}:latest" \
+            --build-arg BUILD_FROM="$base_image" \
+            --build-arg BUILD_VERSION="latest" \
+            --cache-from "type=gha" \
+            --cache-to "type=gha,mode=max" \
+            "./${{ matrix.addon}}"; then
+            echo "✅ Build réussi pour ${{ matrix.addon }} (${{ matrix.arch }})"
+          else
+            echo "❌ Build échoué pour ${{ matrix.addon }} (${{ matrix.arch }})"
+            exit 1
+          fi
