@@ -222,17 +222,15 @@ jobs:
               echo "Base image: $base_image"
               echo "Platforms: $platforms"
               
-              # Vérifier si l'image existe déjà
+              # Vérifier si la version existe déjà dans le registry
               addon_name_lower=$(echo "$addon_name" | tr '[:upper:]' '[:lower:]')
               image_name="${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}:${version}"
               echo "Image cible: $image_name"
               
-              # Vérifier si la version existe déjà dans le registry
-              if [ "${{ github.event.inputs.force_rebuild }}" = "true" ]; then
-                echo "Force rebuild activé"
-                should_build=true
-              elif docker manifest inspect "$image_name" >/dev/null 2>&1; then
-                echo "Image $image_name existe déjà"
+              # Debug: vérification de l'image existante
+              echo "Debug: Vérification de l'image $image_name..."
+              if docker manifest inspect "$image_name" >/dev/null 2>&1; then
+                echo "Debug: Image $image_name trouvée dans le registry"
                 if [ "${{ github.event.inputs.update_existing }}" = "true" ]; then
                   echo "Mise à jour automatique activée pour la version $version"
                   should_build=true
@@ -241,6 +239,7 @@ jobs:
                   should_build=false
                 fi
               else
+                echo "Debug: Image $image_name NON trouvée dans le registry"
                 echo "Image $image_name n'existe pas, build requis"
                 should_build=true
               fi
