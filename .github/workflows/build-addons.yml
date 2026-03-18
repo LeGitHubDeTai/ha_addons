@@ -166,7 +166,7 @@ jobs:
                     while IFS= read -r line; do
                       if echo "$line" | grep -qE "^\s*[a-z0-9]+:"; then
                         arch=$(echo "$line" | sed 's/^\s*//' | cut -d':' -f1)
-                        image=$(echo "$line" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n')
+                        image=$(echo "$line" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
                         
                         case $arch in
                           "amd64") 
