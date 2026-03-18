@@ -168,13 +168,15 @@ jobs:
                         arch=$(echo "$line" | sed 's/^\s*//' | cut -d':' -f1)
                         image=$(echo "$line" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
                         
+                        echo "Debug: trouvé arch=$arch, image=$image"
+                        
                         case $arch in
                           "amd64") 
                             platforms="$platforms linux/amd64"
                             # Utiliser l'image amd64 spécifique
                             if [ -z "$base_image" ]; then 
-                              # Chercher l'image amd64 spécifique
-                              base_image=$(grep "amd64:" "$dir/build.yaml" | sed 's/.*amd64:\s*//' | tr -d '\r\n"')
+                              base_image="$image"
+                              echo "Debug: base_image mis à jour avec amd64: $base_image"
                             fi
                             ;;
                           "arm64"|"aarch64") 
@@ -253,10 +255,16 @@ jobs:
                 
                 # Préparer les arguments de build selon le build.yaml
                 BUILD_ARGS=""
+                echo "Debug: base_image='$base_image', build_type='$build_type'"
                 if [ "$build_type" = "multi-arch" ]; then
                   echo "Utilisation du build.yaml pour les images multi-architecture"
-                  BUILD_ARGS="--build-arg BUILD_CONFIG_FILE=build.yaml"
-                  # Ne pas passer BUILD_FROM, il sera lu depuis build.yaml
+                  # Passer une image de base par défaut ET le build.yaml
+                  if [ -z "$base_image" ]; then
+                    base_image="ghcr.io/home-assistant/amd64-base:3.18"
+                    echo "Debug: base_image vide, utilisation par défaut: $base_image"
+                  fi
+                  BUILD_ARGS="--build-arg BUILD_FROM=$base_image --build-arg BUILD_CONFIG_FILE=build.yaml"
+                  echo "Debug: BUILD_ARGS='$BUILD_ARGS'"
                 else
                   echo "Utilisation de l'image de base: $base_image"
                   BUILD_ARGS="--build-arg BUILD_FROM=$base_image"
