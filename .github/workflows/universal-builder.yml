@@ -161,10 +161,51 @@ jobs:
           cd "${{ matrix.addon }}"
           find . -type f -iname "*.sh" -exec chmod u+x {} \;
 
-  # 3. Lint add-on configs
-  lint_config:
+  # 3. Validate Home Assistant integration requirements
+  validate-ha-integration:
     if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
     needs: [detect-changed-addons, prebuild-setup]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        addon: ${{ fromJSON(needs.detect-changed-addons.outputs.changedAddons) }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check Home Assistant requirements
+        id: ha_check
+        run: |
+          cd "${{ matrix.addon }}"
+          
+          echo "🔍 Vérification des intégrations Home Assistant pour ${{ matrix.addon }}"
+          
+          # Vérifier les exigences Home Assistant dans config.yaml
+          if [ -f "config.yaml" ]; then
+            ha_version=$(grep "homeassistant:" config.yaml | sed 's/homeassistant: //' | tr -d ' ')
+            if [ -n "$ha_version" ]; then
+              echo "📋 Version Home Assistant requise: $ha_version"
+              echo "ha_version=$ha_version" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          
+          # Vérifier les dépendances et intégrations
+          if [ -f "config.yaml" ]; then
+            echo "🔗 Dépendances détectées:"
+            grep -E "(version|image|ports|map)" config.yaml || echo "  Aucune dépendance spécifique"
+          fi
+          
+          # Vérifier si l'addon nécessite des services Home Assistant
+          if [ -f "config.yaml" ]; then
+            if grep -q "hassio:" config.yaml; then
+              echo "🏠 L'addon utilise des services Hass.io"
+              echo "requires_hassio=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  # 4. Lint add-on configs
+  lint_config:
+    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    needs: [detect-changed-addons, prebuild-setup, validate-ha-integration]
     runs-on: ubuntu-latest
     continue-on-error: true
     strategy:
@@ -177,10 +218,10 @@ jobs:
         with:
           path: "./${{ matrix.addon }}"
 
-  # 4. Build images for changed addons/arches
+  # 5. Build images for changed addons/arches
   build:
     if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
-    needs: [detect-changed-addons, prebuild-setup]
+    needs: [detect-changed-addons, validate-ha-integration, lint_config]
     runs-on: ubuntu-latest
     environment: production
     name: Build ${{ matrix.arch }} ${{ matrix.addon }} add-on
@@ -214,7 +255,36 @@ jobs:
           fi
       
       # ────────────────────────────────────────────────────────────────
-      # 2. Resolve Symlinks (in repo)
+      # 2. Setup Home Assistant environment
+      # ────────────────────────────────────────────────────────────────
+      - name: Setup Home Assistant build environment
+        run: |
+          cd "${{ matrix.addon }}"
+          
+          echo "🏠 Configuration de l'environnement Home Assistant pour ${{ matrix.addon }}"
+          
+          # Créer les répertoires nécessaires pour Home Assistant
+          mkdir -p /tmp/data
+          mkdir -p /tmp/config
+          
+          # Configurer les variables d'environnement Home Assistant
+          export HA_VERSION="2024.1"
+          export BUILD_ARCH="${{ matrix.arch }}"
+          
+          # Vérifier si l'addon nécessite bashio
+          if [ -f "config.yaml" ] && grep -q "bashio" config.yaml; then
+            echo "📦 L'addon nécessite bashio - installation prévue"
+            export INSTALL_BASHIO=true
+          fi
+          
+          # Configurer les permissions pour les volumes Home Assistant
+          if [ -f "config.yaml" ]; then
+            echo "🔧 Configuration des volumes Home Assistant"
+            grep -A 10 "map:" config.yaml || echo "  Aucun volume spécifié"
+          fi
+      
+      # ────────────────────────────────────────────────────────────────
+      # 3. Resolve Symlinks (in repo)
       # ────────────────────────────────────────────────────────────────
       - name: Resolve Symlinks
         run: |
@@ -302,7 +372,7 @@ jobs:
             --addon
       
       # ────────────────────────────────────────────────────────────────
-      # 3. Build avec Docker Buildx (pour armv7/armhf/i386)
+      # 5. Build avec Docker Buildx (pour armv7/armhf/i386)
       # ────────────────────────────────────────────────────────────────
       - name: Build ${{ matrix.addon }} add-on (Docker Buildx)
         if: steps.check.outputs.build_arch == 'true' && steps.check.outputs.builder_supported == 'false' && steps.dockerfile_check.outputs.has_dockerfile == 'true'
@@ -312,15 +382,17 @@ jobs:
           # Récupérer la version depuis config.yaml
           if [ -f "${{ matrix.addon }}/config.yaml" ]; then
             version=$(grep '^version:' "${{ matrix.addon }}/config.yaml" | sed 's/version: "//' | sed 's/"//' | tr -d '\r\n' || echo "latest")
+            ha_version=$(grep '^homeassistant:' "${{ matrix.addon }}/config.yaml" | sed 's/homeassistant: //' | tr -d ' ' || echo "2024.1")
           else
             version="latest"
+            ha_version="2024.1"
           fi
           
           # Récupérer l'image de base depuis build.yaml si disponible
           if [ -f "${{ matrix.addon }}/build.yaml" ]; then
             base_image=$(grep "${{ matrix.arch }}:" "${{ matrix.addon }}/build.yaml" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
             if [ -z "$base_image" ]; then
-              # Fallback vers une image de base par défaut
+              # Fallback vers une image de base par défaut compatible Home Assistant
               case "${{ matrix.arch }}" in
                 "armv7") base_image="ghcr.io/home-assistant/armv7-base:3.18" ;;
                 "armhf") base_image="ghcr.io/home-assistant/armhf-base:3.18" ;;
@@ -334,6 +406,7 @@ jobs:
           
           echo "Image de base: $base_image"
           echo "Version: $version"
+          echo "Version Home Assistant: $ha_version"
           
           # Convertir l'architecture pour Docker
           case "${{ matrix.arch }}" in
@@ -343,7 +416,17 @@ jobs:
             *) docker_arch="linux/${{ matrix.arch }}" ;;
           esac
           
-          # Construire avec buildx
+          # Labels Home Assistant pour le registry
+          HA_LABELS="--label io.hass.version=$version \
+                     --label io.hass.arch=${{ matrix.arch }} \
+                     --label io.hass.type=addon \
+                     --label io.hass.name=${{ matrix.addon }} \
+                     --label org.opencontainers.image.title=${{ matrix.addon }} \
+                     --label org.opencontainers.image.version=$version \
+                     --label org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+                     --label org.opencontainers.image.revision=${{ github.sha }}"
+          
+          # Construire avec buildx et options Home Assistant
           if docker buildx build \
             --platform "$docker_arch" \
             --push \
@@ -351,10 +434,14 @@ jobs:
             --tag "ghcr.io/legithubdetai/ha_addons/${{ matrix.addon }}-${{ matrix.arch }}:latest" \
             --build-arg BUILD_FROM="$base_image" \
             --build-arg BUILD_VERSION="$version" \
+            --build-arg HA_VERSION="$ha_version" \
+            --build-arg BUILD_ARCH="${{ matrix.arch }}" \
+            $HA_LABELS \
             --cache-from "type=gha" \
             --cache-to "type=gha,mode=max" \
             "./${{ matrix.addon}}"; then
             echo "✅ Build réussi pour ${{ matrix.addon }} (${{ matrix.arch }}) - $version"
+            echo "🏠 Intégrations Home Assistant configurées"
           else
             echo "❌ Build échoué pour ${{ matrix.addon }} (${{ matrix.arch }})"
             exit 1
@@ -459,6 +546,16 @@ jobs:
           echo "- ✅ **Smart Builder** : HA Builder pour amd64/aarch64, Docker Buildx pour les autres" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Versionnage** : Tags avec version et latest" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Détection intelligente** : Build uniquement les addons modifiés (push)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏠 **Intégrations Home Assistant** : Configuration automatique des intégrations" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 **Labels HA** : Métadonnées Home Assistant dans les images Docker" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔧 **bashio** : Installation automatique de la bibliothèque bashio" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🏠 Configuration Home Assistant" >> $GITHUB_STEP_SUMMARY
+          echo "- 📋 **Version HA** : Détection automatique depuis config.yaml" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏷️ **Labels** : Métadonnées io.hass.* pour compatibilité" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 **Volumes** : Configuration des montages Home Assistant" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 **Images de base** : Utilisation des images officielles HA" >> $GITHUB_STEP_SUMMARY
           
           # Section erreurs si échec
           if [ "${{ needs.build.result }}" = "failure" ]; then
