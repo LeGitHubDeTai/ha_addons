@@ -1,5 +1,5 @@
 build_from:
-  armhf: ghcr.io/hassio-addons/ubuntu-base:11.0.0
+  armhf: ghcr.io/hassio-addons/ubuntu-base/armhf:11.0.0
   armv7: ghcr.io/hassio-addons/ubuntu-base/armv7:1add7a9
   amd64: ghcr.io/hassio-addons/ubuntu-base/amd64:11.0.0
   i386: ghcr.io/hassio-addons/ubuntu-base/i386:16ab705
