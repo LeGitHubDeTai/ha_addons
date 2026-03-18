@@ -17,391 +17,212 @@ on:
         required: false
         default: ''
       force_rebuild:
-        description: 'Forcer le rebuild meme si l image existe'
+        description: 'Forcer le rebuild même si l image existe'
         required: false
         default: false
         type: boolean
       update_existing:
-        description: 'Mettre a jour les images existantes si version plus recente'
+        description: 'Mettre à jour les images existantes si version plus récente'
         required: false
         default: true
         type: boolean
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME_PREFIX: ghcr.io/legithubdetai/ha_addons/
   BUILD_ARGS: ''
 
 jobs:
-  discover-and-build:
+  # 1. Detect which add-on folders changed
+  detect-changed-addons:
     runs-on: ubuntu-latest
+    outputs:
+      changedAddons: ${{ steps.find_addons.outputs.changed_addons }}
+      allAddons: ${{ steps.find_addons.outputs.all_addons }}
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
+      
+      - name: Find addon directories
+        id: find_addons
+        run: |
+          # Pour les pushes, trouver les addons modifiés
+          if [ "${{ github.event_name }}" = "push" ]; then
+            git fetch origin "${{ github.event.before }}" || true
+            changed_files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" || true)
+            echo "Changed files: $changed_files"
+            
+            changed_addons=""
+            for file in $changed_files; do
+              if [[ "$file" =~ ^[^/]+/ ]] && [ -d "$(dirname "$file")" ]; then
+                addon=$(dirname "$file")
+                if [ -f "$addon/config.yaml" ] || [ -f "$addon/config.json" ]; then
+                  changed_addons="$changed_addons $addon"
+                fi
+              fi
+            done
+            
+            changed_addons=$(echo "$changed_addons" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/ *$//')
+            echo "Changed addons: $changed_addons"
+            echo "changed_addons=$changed_addons" >> "$GITHUB_OUTPUT"
+          else
+            # Pour workflow_dispatch ou PR, prendre tous les addons
+            all_addons=""
+            for dir in */; do
+              addon_name=$(basename "$dir")
+              if [ -f "$dir/config.yaml" ] || [ -f "$dir/config.json" ]; then
+                all_addons="$all_addons $addon_name"
+              fi
+            done
+            all_addons=$(echo "$all_addons" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/ *$//')
+            echo "All addons: $all_addons"
+            echo "all_addons=$all_addons" >> "$GITHUB_OUTPUT"
+            echo "changed_addons=$all_addons" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+  # 2. Pre-build sanitize
+  prebuild-sanitize:
+    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    needs: detect-changed-addons
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        addon: ${{ fromJSON(needs.detect-changed-addons.outputs.changedAddons) }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Sanitize text files (Unicode spaces + CRLF → LF)
+        run: |
+          cd "${{ matrix.addon }}"
+          UNICODE_SPACES_REGEX=$'[\\u00A0\\u2002\\u2003\\u2007\\u2008\\u2009\\u202F\\u205F\\u3000\\u200B]'
 
+          find . -type f | while read -r file; do
+            MIME_TYPE=$(file --mime-type -b "$file" 2>/dev/null || echo "")
+            [[ "$MIME_TYPE" != text/* ]] && continue
+
+            echo "Sanitizing $file"
+            perl -i -CSD -pe "
+              s/${UNICODE_SPACES_REGEX}/ /g;
+              s/\\r$//;
+            " "$file" 2>/dev/null || true
+          done
+      
+      - name: Make all .sh scripts executable
+        run: |
+          cd "${{ matrix.addon }}"
+          find . -type f -iname "*.sh" -exec chmod u+x {} \;
+
+  # 3. Lint add-on configs
+  lint_config:
+    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    needs: [detect-changed-addons, prebuild-sanitize]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        addon: ${{ fromJSON(needs.detect-changed-addons.outputs.changedAddons) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Home Assistant Add-on Lint
+        uses: frenck/action-addon-linter@v2
+        with:
+          path: "./${{ matrix.addon }}"
+
+  # 4. Build images for changed addons/arches
+  build:
+    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    needs: [detect-changed-addons, lint_config]
+    runs-on: ubuntu-latest
+    environment: production
+    name: Build ${{ matrix.arch }} ${{ matrix.addon }} add-on
+    strategy:
+      fail-fast: false
+      matrix:
+        addon: ${{ fromJSON(needs.detect-changed-addons.outputs.changedAddons) }}
+        arch: ["aarch64", "amd64", "armv7", "armhf", "i386"]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Filter target addon
+        if: ${{ github.event.inputs.target_addon != '' }}
+        run: |
+          if [ "${{ matrix.addon }}" != "${{ github.event.inputs.target_addon }}" ]; then
+            echo "Skipping ${{ matrix.addon }} (target: ${{ github.event.inputs.target_addon }})"
+            exit 1
+          fi
+      
+      - name: Get information
+        id: info
+        uses: home-assistant/actions/helpers/info@master
+        with:
+          path: "./${{ matrix.addon }}"
+      
+      - name: Check if Dockerfile exists
+        id: dockerfile_check
+        run: |
+          if [ -f "./${{ matrix.addon }}/Dockerfile" ]; then
+            echo "has_dockerfile=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Dockerfile found in ${{ matrix.addon }}, skipping build."
+            echo "has_dockerfile=false" >> "$GITHUB_OUTPUT"
+          fi
+      
+      - name: Check if add-on should be built for arch
+        id: check
+        env:
+          HEAD: "${{ github.head_ref }}"
+        run: |
+          if [[ "${{ steps.info.outputs.architectures }}" =~ ${{ matrix.arch }} ]]; then
+             echo "build_arch=true" >> "$GITHUB_OUTPUT";
+             echo "image=$(echo "${{ steps.info.outputs.image }}" | cut -d'/' -f3)" >> "$GITHUB_OUTPUT";
+             if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+                 echo "BUILD_ARGS=--test" >> "$GITHUB_ENV";
+             fi
+          else
+             echo "${{ matrix.arch }} is not a valid arch for ${{ matrix.addon }}, skipping build";
+             echo "build_arch=false" >> "$GITHUB_OUTPUT";
+          fi
+      
       - name: Login to GitHub Container Registry
-        if: github.event_name != 'pull_request'
+        if: env.BUILD_ARGS != '--test'
         uses: docker/login-action@v4.0.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build ${{ matrix.addon }} add-on
+        id: builderstep
+        if: steps.check.outputs.build_arch == 'true' && steps.dockerfile_check.outputs.has_dockerfile == 'true'
+        uses: home-assistant/builder@2026.02.1
+        with:
+          args: |
+            ${{ env.BUILD_ARGS }} \
+            --${{ matrix.arch }} \
+            --target "/data/${{ matrix.addon }}" \
+            --image "${{ steps.check.outputs.image }}" \
+            --docker-hub "ghcr.io/${{ github.repository_owner }}" \
+            --addon
 
-      - name: Discover and build addons
-        if: env.BUILD_ARGS != '--test'
+  # 5. Build Summary
+  build-summary:
+    if: always()
+    needs: [detect-changed-addons, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate build summary
         run: |
-          # Créer un fichier pour suivre les builds
-          echo "# Build Report - $(date)" > build_report.md
-          echo "" >> build_report.md
+          echo "# Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Addons processed:" >> $GITHUB_STEP_SUMMARY
           
-          # Découvrir tous les addons disponibles
-          ADDONS_LIST=""
-          for dir in */; do
-            addon_name=$(basename "$dir")
-            if [ -f "$dir/config.yaml" ] && [ -f "$dir/Dockerfile" ]; then
-              ADDONS_LIST="$ADDONS_LIST,$addon_name"
-            fi
-          done
-          ADDONS_LIST=$(echo "$ADDONS_LIST" | sed 's/^,//')
-          echo "Addons disponibles: $ADDONS_LIST"
-          
-          # Détecter les addons modifiés
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "Détection des addons modifiés..."
-            
-            # Vérifier si HEAD~1 existe (premier commit)
-            if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-              MODIFIED_ADDONS=$(git diff --name-only HEAD~1 HEAD | grep -E '^[^/]+/$' | sed 's|/$||' | tr '\n' ',' | sed 's/,$//')
-              echo "Addons modifiés: $MODIFIED_ADDONS"
-              
-              # Si aucun addon modifié, ne rien builder
-              if [ -z "$MODIFIED_ADDONS" ]; then
-                echo "Aucun addon modifié, build terminé"
-                echo "## Rapport de build" >> $GITHUB_STEP_SUMMARY
-                echo "Aucun addon modifié dans ce push" >> $GITHUB_STEP_SUMMARY
-                exit 0
+          addons="${{ needs.detect-changed-addons.outputs.changedAddons }}"
+          if [ -n "$addons" ] && [ "$addons" != "[]" ]; then
+            echo "$addons" | tr ',' '\n' | while read addon; do
+              addon=$(echo "$addon" | sed 's/^ *//' | sed 's/ *$//')
+              if [ -n "$addon" ]; then
+                echo "- **$addon**" >> $GITHUB_STEP_SUMMARY
               fi
-              
-              # Convertir en tableau pour itération
-              IFS=',' read -ra MODIFIED_ARRAY <<< "$MODIFIED_ADDONS"
-            else
-              echo "Premier commit détecté, build de tous les addons"
-              MODIFIED_ADDONS=""
-            fi
+            done
+          else
+            echo "No addons to process" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          # Vérifier si un addon spécifique est demandé
-          TARGET_ADDON="${{ github.event.inputs.target_addon }}"
-          echo "Addon cible: $TARGET_ADDON"
-          
-          for dir in */; do
-            addon_name=$(basename "$dir")
-            
-            # Réinitialiser les variables pour chaque addon
-            base_image=""
-            platforms=""
-            build_type=""
-            
-            # Si un addon spécifique est demandé, skip les autres
-            if [ -n "$TARGET_ADDON" ] && [ "$TARGET_ADDON" != "$addon_name" ]; then
-              echo "Skip $addon_name (addon cible: $TARGET_ADDON)"
-              continue
-            fi
-            
-            # Si c'est un push et l'addon n'a pas été modifié, le skipper
-            if [ "${{ github.event_name }}" = "push" ] && [ -n "$MODIFIED_ADDONS" ]; then
-              ADDON_MODIFIED=false
-              for modified in "${MODIFIED_ARRAY[@]}"; do
-                if [ "$modified" = "$addon_name" ]; then
-                  ADDON_MODIFIED=true
-                  break
-                fi
-              done
-              
-              if [ "$ADDON_MODIFIED" = "false" ]; then
-                echo "Skip $addon_name (non modifié dans ce push)"
-                continue
-              fi
-            fi
-            
-            # Vérifier si c'est un addon valide
-            if [ -f "$dir/config.yaml" ] && [ -f "$dir/Dockerfile" ]; then
-              echo "=== Traitement de l'addon: $addon_name ==="
-              
-              # Récupérer la version
-              if [ -f "$dir/config.yaml" ]; then
-                version=$(grep '^version:' "$dir/config.yaml" | sed 's/version: "//' | sed 's/"//' | tr -d '\r\n' || echo "latest")
-              else
-                version="latest"
-              fi
-              
-              echo "Version: $version"
-              
-              # Déterminer l'image de base et les plateformes
-              if [ -f "$dir/build.yaml" ]; then
-                echo "Utilisation du build.yaml personnalisé"
-                
-                # Lire le build.yaml pour déterminer les images de base
-                if grep -q "build_from:" "$dir/build.yaml"; then
-                  # Cas avec une seule image (FossFLOW)
-                  if grep -A1 "^build_from:" "$dir/build.yaml" | grep -q "^[[:space:]]*\""; then
-                    base_image=$(grep "^build_from:" "$dir/build.yaml" | sed 's/build_from: "//' | sed 's/"//')
-                    platforms="linux/amd64,linux/arm64,linux/arm/v7"
-                    echo "Image de base unique: $base_image"
-                  else
-                    # Cas avec plusieurs images par architecture - lire les architectures disponibles
-                    echo "Détection des architectures depuis build.yaml..."
-                    
-                    # Initialiser les variables
-                    platforms=""
-                    build_images=""
-                    
-                    # Lire chaque ligne d'architecture dans build_from
-                    while IFS= read -r line; do
-                      if echo "$line" | grep -qE "^\s*[a-z0-9]+:"; then
-                        arch=$(echo "$line" | sed 's/^\s*//' | cut -d':' -f1)
-                        image=$(echo "$line" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
-                        
-                        case $arch in
-                          "amd64") 
-                            platforms="$platforms linux/amd64"
-                            if [ -z "$base_image" ]; then base_image="$image"; fi
-                            ;;
-                          "arm64"|"aarch64") 
-                            platforms="$platforms linux/arm64"
-                            if [ -z "$base_image" ]; then base_image="$image"; fi
-                            ;;
-                          "armv7") 
-                            platforms="$platforms linux/arm/v7"
-                            if [ -z "$base_image" ]; then base_image="$image"; fi
-                            ;;
-                          "armhf") 
-                            platforms="$platforms linux/armhf"
-                            if [ -z "$base_image" ]; then base_image="$image"; fi
-                            ;;
-                          "i386") 
-                            platforms="$platforms linux/386"
-                            if [ -z "$base_image" ]; then base_image="$image"; fi
-                            ;;
-                        esac
-                      fi
-                    done < "$dir/build.yaml"
-                    
-                    # Nettoyer la chaîne de plateformes
-                    platforms=$(echo "$platforms" | sed 's/^ //' | tr ' ' ',')
-                    
-                    echo "Architectures détectées: $platforms"
-                    echo "Image de base principale: $base_image"
-                    build_type="multi-arch"
-                  fi
-                else
-                  # Fallback si pas de build_from dans build.yaml
-                  base_image="ghcr.io/home-assistant/amd64-base:3.18"
-                  platforms="linux/amd64,linux/arm64,linux/arm/v7"
-                fi
-              else
-                # Détection automatique si pas de build.yaml
-                if grep -q "apt-get" "$dir/Dockerfile"; then
-                  base_image="ubuntu:22.04"
-                  platforms="linux/amd64,linux/arm64"
-                else
-                  base_image="ghcr.io/home-assistant/amd64-base:3.18"
-                  platforms="linux/amd64,linux/arm64,linux/arm/v7"
-                fi
-              fi
-              
-              echo "Base image: $base_image"
-              echo "Platforms: $platforms"
-              
-              # Vérifier si la version existe déjà dans le registry
-              addon_name_lower=$(echo "$addon_name" | tr '[:upper:]' '[:lower:]')
-              image_name="${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}:${version}"
-              echo "Image cible: $image_name"
-              
-              # Debug: vérification de l'image existante
-              echo "Debug: Vérification de l'image $image_name..."
-              if docker manifest inspect "$image_name" >/dev/null 2>&1; then
-                echo "Debug: Image $image_name trouvée dans le registry"
-                if [ "${{ github.event.inputs.update_existing }}" = "true" ]; then
-                  echo "Mise à jour automatique activée pour la version $version"
-                  should_build=true
-                else
-                  echo "Image $image_name existe déjà, skip (mise à jour désactivée)"
-                  should_build=false
-                fi
-              else
-                echo "Debug: Image $image_name NON trouvée dans le registry"
-                echo "Image $image_name n'existe pas, build requis"
-                should_build=true
-              fi
-              
-              # Builder l'image si nécessaire
-              if [ "$should_build" = "true" ]; then
-                echo "Build de $addon_name..."
-                
-                # Copier le script bashio dans le dossier de l'addon
-                cp scripts/install-bashio.sh "$addon_name/"
-                
-                # Préparer les arguments de build selon le build.yaml
-                BUILD_ARGS=""
-                echo "Debug: base_image='$base_image', build_type='$build_type'"
-                
-                if [ "$build_type" = "multi-arch" ]; then
-                  echo "Vérification de la compatibilité multi-architecture..."
-                  
-                  # Vérifier si l'image de base principale est multi-architecture
-                  if docker buildx imagetools inspect "$base_image" 2>/dev/null | grep -q "linux/amd64"; then
-                    # Compter les plateformes supportées par l'image de base
-                    SUPPORTED_PLATFORMS=$(docker buildx imagetools inspect "$base_image" 2>/dev/null | grep -c "Platform:" || echo "1")
-                    
-                    if [ "$SUPPORTED_PLATFORMS" -gt 2 ]; then
-                      echo "Image de base multi-architecture détectée ($SUPPORTED_PLATFORMS plateformes)"
-                      echo "Utilisation du build multi-architecture"
-                      BUILD_ARGS="--build-arg BUILD_FROM=$base_image --build-arg BUILD_CONFIG_FILE=build.yaml"
-                      build_mode="multi-arch"
-                    else
-                      echo "Image de base non multi-architecture, utilisation de builds séparés par architecture"
-                      build_mode="separate"
-                    fi
-                  else
-                    echo "Image de base invalide, utilisation de builds séparés par architecture"
-                    build_mode="separate"
-                  fi
-                else
-                  echo "Utilisation de l'image de base unique: $base_image"
-                  BUILD_ARGS="--build-arg BUILD_FROM=$base_image"
-                  build_mode="single"
-                fi
-                
-                BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$version"
-                echo "Debug: mode=$build_mode, BUILD_ARGS='$BUILD_ARGS'"
-                
-                # Stratégie de build selon le mode
-                if [ "$build_mode" = "separate" ]; then
-                  echo "Build séparé par architecture..."
-                  
-                  # Lire les architectures depuis build.yaml
-                  ARCH_IMAGES=""
-                  while IFS= read -r line; do
-                    if echo "$line" | grep -qE "^\s*[a-z0-9]+:"; then
-                      arch=$(echo "$line" | sed 's/^\s*//' | cut -d':' -f1)
-                      image=$(echo "$line" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
-                      ARCH_IMAGES="$ARCH_IMAGES $arch:$image"
-                    fi
-                  done < "$dir/build.yaml"
-                  
-                  echo "Architectures à construire: $ARCH_IMAGES"
-                  build_success=true
-                  
-                  # Construire chaque architecture séparément
-                  for arch_image in $ARCH_IMAGES; do
-                    arch=$(echo "$arch_image" | cut -d':' -f1)
-                    img=$(echo "$arch_image" | cut -d':' -f2-)
-                    
-                    case $arch in
-                      "amd64") docker_platform="linux/amd64" ;;
-                      "arm64"|"aarch64") docker_platform="linux/arm64" ;;
-                      "armv7") docker_platform="linux/arm/v7" ;;
-                      "armhf") docker_platform="linux/armhf" ;;
-                      "i386") docker_platform="linux/386" ;;
-                      *) continue ;;
-                    esac
-                    
-                    echo "Construction de $arch avec $img ($docker_platform)..."
-                    image_prefix="${{ env.IMAGE_NAME_PREFIX }}"
-                    tag_version="$image_prefix$addon_name_lower-$arch:$version"
-                    tag_latest="$image_prefix$addon_name_lower-$arch:latest"
-                    
-                    if docker buildx build \
-                      --platform "$docker_platform" \
-                      --push \
-                      --tag "$tag_version" \
-                      --tag "$tag_latest" \
-                      --build-arg BUILD_FROM="$img" \
-                      --build-arg BUILD_VERSION="$version" \
-                      --cache-from "type=gha" \
-                      --cache-to "type=gha,mode=max" \
-                      "./$addon_name"; then
-                      echo "✅ Build réussi pour $arch"
-                    else
-                      echo "❌ Build échoué pour $arch"
-                      build_success=false
-                    fi
-                  done
-                  
-                  # Créer le manifest multi-architecture si tous les builds ont réussi
-                  if [ "$build_success" = "true" ]; then
-                    echo "Création du manifest multi-architecture..."
-                    manifest_args=""
-                    image_prefix="${{ env.IMAGE_NAME_PREFIX }}"
-                    for arch_image in $ARCH_IMAGES; do
-                      arch=$(echo "$arch_image" | cut -d':' -f1)
-                      tag_name="$image_prefix$addon_name_lower-$arch:$version"
-                      manifest_args="$manifest_args --amend $tag_name"
-                    done
-                    
-                    if docker manifest create "$image_name" $manifest_args && \
-                       docker manifest push "$image_name"; then
-                      echo "✅ Manifest multi-architecture créé avec succès"
-                    else
-                      echo "❌ Échec de la création du manifest"
-                    fi
-                  fi
-                  
-                else
-                  # Build normal (multi-arch ou single)
-                  echo "Build avec plateformes: $platforms"
-                  image_prefix="${{ env.IMAGE_NAME_PREFIX }}"
-                  latest_tag="$image_prefix$addon_name_lower:latest"
-                  
-                  if docker buildx build \
-                    --platform "$platforms" \
-                    --push \
-                    --tag "$image_name" \
-                    --tag "$latest_tag" \
-                    $BUILD_ARGS \
-                    --cache-from "type=gha" \
-                    --cache-to "type=gha,mode=max" \
-                    "./$addon_name"; then
-                    
-                    echo "✅ Build terminé pour $addon_name"
-                    echo "- ✅ **$addon_name** ($version) : Build réussi" >> build_report.md
-                    
-                    # Créer les tags spécifiques par architecture pour Home Assistant
-                    if [ "$build_mode" = "multi-arch" ]; then
-                      echo "Création des tags spécifiques par architecture..."
-                      for arch in amd64 arm64 armv7; do
-                        if echo "$platforms" | grep -q "$arch"; then
-                          arch_image="$image_prefix$addon_name_lower-$arch:$version"
-                          latest_arch="$image_prefix$addon_name_lower-$arch:latest"
-                          
-                          echo "Création du tag $arch_image"
-                          docker buildx imagetools create \
-                            --tag "$arch_image" \
-                            --tag "$latest_arch" \
-                            "$image_name" || echo "Impossible de créer le tag pour $arch"
-                        fi
-                      done
-                    fi
-                  else
-                    echo "❌ Build échoué pour $addon_name"
-                    echo "- ❌ **$addon_name** ($version) : Build échoué" >> build_report.md"
-                  fi
-                fi
-                
-                # Nettoyer le script temporaire
-                rm -f "$addon_name/install-bashio.sh"
-              else
-                echo "⏭️  Skip $addon_name (image existe)"
-                echo "- ⏭️ **$addon_name** ($version) : Image existante, skip" >> build_report.md
-              fi
-              
-              echo ""
-            fi
-          done
-          
-          echo "## Rapport de build" >> $GITHUB_STEP_SUMMARY
-          cat build_report.md >> $GITHUB_STEP_SUMMARY
