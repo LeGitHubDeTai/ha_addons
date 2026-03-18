@@ -258,9 +258,9 @@ jobs:
                 echo "Debug: base_image='$base_image', build_type='$build_type'"
                 if [ "$build_type" = "multi-arch" ]; then
                   echo "Utilisation du build.yaml pour les images multi-architecture"
-                  # Pour le multi-arch, ne PAS passer BUILD_FROM pour qu'il utilise le build.yaml
-                  BUILD_ARGS="--build-arg BUILD_CONFIG_FILE=build.yaml"
-                  echo "Debug: BUILD_ARGS='$BUILD_ARGS' (multi-arch sans BUILD_FROM)"
+                  # Pour le multi-arch, passer BUILD_FROM avec l'image de base principale
+                  BUILD_ARGS="--build-arg BUILD_FROM=$base_image --build-arg BUILD_CONFIG_FILE=build.yaml"
+                  echo "Debug: BUILD_ARGS='$BUILD_ARGS' (multi-arch avec BUILD_FROM principal)"
                 else
                   echo "Utilisation de l'image de base: $base_image"
                   BUILD_ARGS="--build-arg BUILD_FROM=$base_image"
