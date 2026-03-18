@@ -24,12 +24,13 @@ RUN apk add --no-cache \
     nginx \
     supervisor \
     envsubst \
-    make \
-    gcc \
-    g++ \
     python3 \
-    linux-headers
+    make \
+    g++
 WORKDIR /data
+COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
+
+# Install n8n (simplified for ARM64/AMD64 compatibility)
 RUN npm install -g n8n@2.11.4
 
 RUN mkdir -p /run/nginx
