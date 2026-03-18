@@ -330,16 +330,29 @@ jobs:
             exit 1
           fi
 
-  # 5. Build Summary
+  # 5. Build Summary with Status and Errors
   build-summary:
     if: always()
     needs: [detect-changed-addons, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Generate build summary
+      - name: Generate build summary with status
         run: |
           echo "# 🏗️ Universal Home Assistant Addon Builder" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # État global du workflow
+          if [ "${{ needs.build.result }}" = "success" ]; then
+            echo "## ✅ État Global : SUCCÈS" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.build.result }}" = "failure" ]; then
+            echo "## ❌ État Global : ÉCHEC" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.build.result }}" = "cancelled" ]; then
+            echo "## ⏹️ État Global : ANNULÉ" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⏳ État Global : EN COURS" >> $GITHUB_STEP_SUMMARY
+          fi
+          
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 📊 Addons traités" >> $GITHUB_STEP_SUMMARY
           
@@ -360,7 +373,23 @@ jobs:
             echo "$addons" | tr ',' '\n' | while read addon; do
               addon=$(echo "$addon" | sed 's/^ *//' | sed 's/ *$//' | sed 's/^"//' | sed 's/"$//')
               if [ -n "$addon" ]; then
-                echo "- 📦 **$addon**" >> $GITHUB_STEP_SUMMARY
+                # Vérifier l'état du build pour cet addon
+                addon_status="⏳ En cours"
+                addon_error=""
+                
+                # Pour l'instant, on met un statut par défaut
+                # Dans une version améliorée, on pourrait utiliser les outputs des jobs
+                if [ "${{ needs.build.result }}" = "success" ]; then
+                  addon_status="✅ Succès"
+                elif [ "${{ needs.build.result }}" = "failure" ]; then
+                  addon_status="❌ Échec"
+                  addon_error="[Voir les logs du build](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+                fi
+                
+                echo "- 📦 **$addon** : $addon_status" >> $GITHUB_STEP_SUMMARY
+                if [ -n "$addon_error" ]; then
+                  echo "  - 🔗 $addon_error" >> $GITHUB_STEP_SUMMARY
+                fi
               fi
             done
           else
@@ -393,3 +422,14 @@ jobs:
           echo "- ✅ **Smart Builder** : HA Builder pour amd64/aarch64, Docker Buildx pour les autres" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Versionnage** : Tags avec version et latest" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Détection intelligente** : Build uniquement les addons modifiés (push)" >> $GITHUB_STEP_SUMMARY
+          
+          # Section erreurs si échec
+          if [ "${{ needs.build.result }}" = "failure" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## 🚨 Erreurs détectées" >> $GITHUB_STEP_SUMMARY
+            echo "Le build a échoué. Consultez les logs détaillés pour plus d'informations :" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📋 **Liens utiles** :" >> $GITHUB_STEP_SUMMARY
+            echo "- [🔍 Logs complets du workflow](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+            echo "- [📊 Résumé des jobs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true)" >> $GITHUB_STEP_SUMMARY
+          fi
