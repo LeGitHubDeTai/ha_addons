@@ -149,41 +149,53 @@ jobs:
           MATRIX='${{ needs.detect-changes.outputs.matrix }}'
           BUILD_ARRAY="["
           
+          echo "🔍 Étape 1: Addons avec changements de fichiers détectés"
+          echo "Addons avec changements: $MATRIX"
+          echo ""
+          echo "🔍 Étape 2: Vérification des versions pour ces addons"
+          echo ""
+          
           for addon in $(echo "$MATRIX" | jq -r '.[]'); do
-            echo "Processing addon: $addon"
+            echo "📦 Traitement de l'addon: $addon"
             
             # Get version from config.yaml
             VERSION=$(yq eval '.version' "$addon/config.yaml" | tr -d '"')
             SLUG=$(yq eval '.slug' "$addon/config.yaml" | tr -d '"')
-            echo "  Version: $VERSION, Slug: $SLUG"
+            echo "  📋 Version locale: $VERSION"
+            echo "  🏷️  Slug: $SLUG"
             
             # Get architectures from config.yaml
             ARCHS=$(yq eval '.arch[]' "$addon/config.yaml" | tr '\n' ' ')
+            echo "  🏗️  Architectures: $ARCHS"
             
-            # Check if images already exist for all architectures
+            # Vérifier si les images existent déjà sur GHCR
+            echo "  🔍 Vérification des images sur GitHub Container Registry..."
             SKIP_BUILD=true
+            
             for arch in $ARCHS; do
               IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
               
               # Check if image exists (will fail if not found)
               if ! docker manifest inspect "$IMAGE_TAG" > /dev/null 2>&1; then
-                echo "  Image not found: $IMAGE_TAG"
+                echo "    ❌ Image manquante: $IMAGE_TAG"
                 SKIP_BUILD=false
                 break
               else
-                echo "  Image exists: $IMAGE_TAG"
+                echo "    ✅ Image existante: $IMAGE_TAG"
               fi
             done
             
+            # Décision finale: build ou skip basé sur les changements ET la version
             if [ "$SKIP_BUILD" = false ]; then
+              echo "  🔨 BUILD NÉCESSAIRE - Changements détectés + images manquantes"
               if [ "$BUILD_ARRAY" != "[" ]; then
                 BUILD_ARRAY="$BUILD_ARRAY,"
               fi
               BUILD_ARRAY="$BUILD_ARRAY{\"addon\":\"$addon\",\"version\":\"$VERSION\",\"slug\":\"$SLUG\",\"archs\":\"$ARCHS\"}"
-              echo "  Will build $addon"
             else
-              echo "  Skipping $addon - all images already exist"
+              echo "  ⏭️  SKIP - Changements détectés mais images déjà existent pour la version $VERSION"
             fi
+            echo ""
           done
           
           BUILD_ARRAY="$BUILD_ARRAY]"
@@ -198,6 +210,8 @@ jobs:
       matrix:
         build: ${{ fromJson(needs.check-versions.outputs.build-matrix) }}
       fail-fast: false
+    outputs:
+      build-status: ${{ steps.status.outputs.build-status }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -358,11 +372,36 @@ jobs:
           # with the new image information for Home Assistant to use
           echo "Repository metadata update completed"
 
+      - name: Record build status
+        id: status
+        if: always()
+        run: |
+          ADDON="${{ matrix.build.addon }}"
+          VERSION="${{ matrix.build.version }}"
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            STATUS="success"
+          elif [ "${{ job.status }}" == "failure" ]; then
+            STATUS="error"
+          else
+            STATUS="skipped"
+          fi
+          
+          echo "build-status={\"addon\":\"$ADDON\",\"version\":\"$VERSION\",\"status\":\"$STATUS\"}" >> $GITHUB_OUTPUT
+
   summary:
     runs-on: ubuntu-latest
     needs: [detect-changes, check-versions, build-and-publish]
     if: always()
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
       - name: Build Summary
         run: |
           echo "## Docker Build and Publish Summary" >> $GITHUB_STEP_SUMMARY
@@ -374,10 +413,33 @@ jobs:
             echo "📋 Detected changes in: ${{ needs.detect-changes.outputs.addons }}" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             
-            if [ "${{ needs.check-versions.outputs.build-matrix }}" = "[]" ]; then
-              echo "✅ All images are up to date" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "🔨 Built images for:" >> $GITHUB_STEP_SUMMARY
-              echo '${{ needs.check-versions.outputs.build-matrix }}' | jq -r '.[] | "- \(.addon) v\(.version) (\(.archs))"' >> $GITHUB_STEP_SUMMARY
-            fi
+            # Get all changed addons
+            ALL_ADDONS='${{ needs.detect-changes.outputs.matrix }}'
+            
+            # Get addons that were built
+            BUILT_ADDONS='${{ needs.check-versions.outputs.build-matrix }}'
+            
+            echo "### 📊 Build Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Process each addon and determine its status
+            for addon in $(echo "$ALL_ADDONS" | jq -r '.[]'); do
+              # Get version from config.yaml (we need to checkout for this)
+              if [ -f "$addon/config.yaml" ]; then
+                VERSION=$(yq eval '.version' "$addon/config.yaml" 2>/dev/null | tr -d '"')
+                
+                # Check if this addon was in the build matrix
+                if echo "$BUILT_ADDONS" | jq -e '.[] | select(.addon == "'$addon'")' > /dev/null 2>&1; then
+                  # This addon was built - check build job status
+                  if [ "${{ needs.build-and-publish.result }}" == "success" ]; then
+                    echo "🔨 **$addon** v$VERSION - ✅ Built successfully" >> $GITHUB_STEP_SUMMARY
+                  else
+                    echo "🔨 **$addon** v$VERSION - ❌ Build failed" >> $GITHUB_STEP_SUMMARY
+                  fi
+                else
+                  # This addon was skipped (version already exists)
+                  echo "⏭️ **$addon** v$VERSION - ⏸️ Skipped (version already exists)" >> $GITHUB_STEP_SUMMARY
+                fi
+              fi
+            done
           fi
