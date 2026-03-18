@@ -144,7 +144,19 @@ jobs:
           fi
       
       # ────────────────────────────────────────────────────────────────
-      # 1. Resolve Symlinks (in repo)
+      # 1. Copy shared scripts to addon directory
+      # ────────────────────────────────────────────────────────────────
+      - name: Copy shared scripts
+        run: |
+          # Copy install-bashio.sh to addon directory if it exists in repo root
+          if [ -f "install-bashio.sh" ]; then
+            echo "Copying install-bashio.sh to ${{ matrix.addon }}/"
+            cp install-bashio.sh "${{ matrix.addon }}/"
+            chmod +x "${{ matrix.addon }}/install-bashio.sh"
+          fi
+      
+      # ────────────────────────────────────────────────────────────────
+      # 2. Resolve Symlinks (in repo)
       # ────────────────────────────────────────────────────────────────
       - name: Resolve Symlinks
         run: |
