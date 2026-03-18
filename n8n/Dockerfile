@@ -1,8 +1,6 @@
 ARG BUILD_FROM
 ARG BUILD_CONFIG_FILE
-
-# Utiliser BUILD_FROM si disponible, sinon lire depuis BUILD_CONFIG_FILE
-FROM ${BUILD_FROM:-}
+FROM $BUILD_FROM
 
 ARG NGINX_ALLOWED_IP=172.30.32.2
 ENV NGINX_ALLOWED_IP=${NGINX_ALLOWED_IP}
@@ -30,10 +28,7 @@ RUN apk add --no-cache \
     python3 \
     linux-headers
 WORKDIR /data
-COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
-
-# Install n8n (simplified for ARM64/AMD64 compatibility)
-RUN npm install -g n8n@2.13.4
+RUN npm install -g n8n@2.11.4
 
 RUN mkdir -p /run/nginx
 
