@@ -204,3 +204,46 @@ jobs:
             echo "❌ Build échoué pour ${{ matrix.addon }} (${{ matrix.arch }})"
             exit 1
           fi
+
+  # 3. Build Summary
+  build-summary:
+    if: always()
+    needs: [detect-changed-addons, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate build summary
+        run: |
+          echo "# 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Addons traités" >> $GITHUB_STEP_SUMMARY
+          
+          addons="${{ needs.detect-changed-addons.outputs.changedAddons }}"
+          if [ -n "$addons" ] && [ "$addons" != "[]" ]; then
+            echo "$addons" | tr ',' '\n' | while read addon; do
+              addon=$(echo "$addon" | sed 's/^ *//' | sed 's/ *$//' | sed 's/^"//' | sed 's/"$//')
+              if [ -n "$addon" ]; then
+                echo "- 📦 **$addon**" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          else
+            echo "ℹ️ Aucun addon modifié dans ce push" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🏛️ Architectures supportées" >> $GITHUB_STEP_SUMMARY
+          echo "| Architecture | Méthode | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------------|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| amd64 | HA Builder | ✅ Supportée |" >> $GITHUB_STEP_SUMMARY
+          echo "| aarch64 | HA Builder | ✅ Supportée |" >> $GITHUB_STEP_SUMMARY
+          echo "| armv7 | Docker Buildx | ⚡ Alternative |" >> $GITHUB_STEP_SUMMARY
+          echo "| armhf | Docker Buildx | ⚡ Alternative |" >> $GITHUB_STEP_SUMMARY
+          echo "| i386 | Docker Buildx | ⚡ Alternative |" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Format des images" >> $GITHUB_STEP_SUMMARY
+          echo "Les images sont créées avec le format :" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo "ghcr.io/legithubdetai/ha_addons/<addon>-<arch>:<version>" >> $GITHUB_STEP_SUMMARY
+          echo "ghcr.io/legithubdetai/ha_addons/<addon>-<arch>:latest" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
