@@ -132,6 +132,6 @@ jobs:
             ${{ env.BUILD_ARGS }} \
             --${{ matrix.arch }} \
             --target "/data/${{ matrix.addon }}" \
-            --image "${{ steps.arch_check.outputs.image }}" \
-            --docker-hub "ghcr.io/${{ github.repository_owner }}" \
+            --image "${{ matrix.addon }}" \
+            --docker-hub "ghcr.io/${{ github.repository_owner }}/ha_addons" \
             --addon
