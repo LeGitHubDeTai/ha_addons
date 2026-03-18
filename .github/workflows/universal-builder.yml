@@ -86,8 +86,8 @@ jobs:
             echo "changed_addons=$all_addons" >> "$GITHUB_OUTPUT"
           fi
 
-  # 2. Pre-build sanitize: normalize spaces, fix script permissions, single commit per add-on
-  prebuild-sanitize:
+  # 2. Pre-build setup: ensure scripts are executable
+  prebuild-setup:
     if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
     needs: detect-changed-addons
     runs-on: ubuntu-latest
@@ -97,70 +97,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # ────────────────────────────────────────────────────────────────
-      # 1. Replace non-printable Unicode spaces and convert Windows line endings (CRLF) → Unix (LF)
-      # ────────────────────────────────────────────────────────────────
-      - name: Sanitize text files (Unicode spaces + CRLF → LF)
-        run: |
-          cd "${{ matrix.addon }}"
-          
-          # Liste des extensions de fichiers texte à traiter
-          TEXT_EXTENSIONS=("sh" "yaml" "yml" "json" "py" "js" "html" "css" "md" "txt" "conf" "cfg" "ini" "xml" "Dockerfile")
-          
-          for ext in "${TEXT_EXTENSIONS[@]}"; do
-            find . -type f -iname "*.$ext" -o -name "Dockerfile" | while read -r file; do
-              # Vérifier que c'est bien un fichier texte
-              MIME_TYPE=$(file --mime-type -b "$file" 2>/dev/null || echo "")
-              if [[ "$MIME_TYPE" == text/* ]]; then
-                echo "Sanitizing $file"
-                
-                # Sauvegarder les permissions
-                PERMS=$(stat -c "%a" "$file")
-                
-                # Normaliser les espaces Unicode (plus prudent)
-                sed -i 's/[\u00A0\u2002\u2003\u2007\u2008\u2009\u202F\u205F\u3000\u200B]/ /g' "$file" 2>/dev/null || true
-                
-                # Convertir CRLF en LF (plus sûr)
-                if grep -q $'\r' "$file"; then
-                  tr -d '\r' < "$file" > "$file.tmp" && mv "$file.tmp" "$file"
-                fi
-                
-                # Restaurer les permissions
-                chmod "$PERMS" "$file"
-              fi
-            done
-          done
-      
-      # ────────────────────────────────────────────────────────────────
       # 2. Ensure every *.sh script is executable
-      # ────────────────────────────────────────────────────────────────
       - name: Make all .sh scripts executable
         run: |
           cd "${{ matrix.addon }}"
           find . -type f -iname "*.sh" -exec chmod u+x {} \;
-      
-      # ────────────────────────────────────────────────────────────────
-      # 3. Verify nothing with mixed line endings slipped through
-      # ────────────────────────────────────────────────────────────────
-      - name: Assert no mixed CRLF/LF remain
-        uses: ymwymw/check-mixed-line-endings@v2
-      
-      # ────────────────────────────────────────────────────────────────
-      # 4. Commit any changes we made
-      # ────────────────────────────────────────────────────────────────
-      - name: Commit if needed
-        uses: EndBug/add-and-commit@v9
-        with:
-          commit: -u
-          message: "GitHub bot: sanitize (spaces + LF endings) & chmod"
-          default_author: github_actions
-          pull: --rebase --autostash
-          fetch: --tags --force
 
   # 3. Lint add-on configs
   lint_config:
     if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
-    needs: [detect-changed-addons, prebuild-sanitize]
+    needs: [detect-changed-addons, prebuild-setup]
     runs-on: ubuntu-latest
     continue-on-error: true
     strategy:
@@ -176,7 +122,7 @@ jobs:
   # 4. Build images for changed addons/arches
   build:
     if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
-    needs: [detect-changed-addons, lint_config]
+    needs: [detect-changed-addons, prebuild-setup]
     runs-on: ubuntu-latest
     environment: production
     name: Build ${{ matrix.arch }} ${{ matrix.addon }} add-on
