@@ -1,0 +1,121 @@
+name: Manual Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_addon:
+        description: 'Addon spécifique à builder (laisser vide pour tous)'
+        required: false
+        default: ''
+      force_rebuild:
+        description: 'Forcer le rebuild même si l image existe'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  BUILD_ARGS: ""
+
+jobs:
+  # 1. Get all addons or specific addon
+  get-addons:
+    runs-on: ubuntu-latest
+    outputs:
+      addons: ${{ steps.get_addons.outputs.addons }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get addons to build
+        id: get_addons
+        run: |
+          if [ -n "${{ github.event.inputs.target_addon }}" ]; then
+            # Build specific addon
+            addon="${{ github.event.inputs.target_addon }}"
+            if [ -d "$addon" ] && [ -f "$addon/config.yaml" ]; then
+              echo "addons=[\"$addon\"]" >> "$GITHUB_OUTPUT"
+              echo "Building specific addon: $addon"
+            else
+              echo "Addon $addon not found"
+              echo "addons=[]" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            # Build all addons
+            addons="["
+            first=true
+            for dir in */; do
+              addon_name=$(basename "$dir")
+              if [ -f "$dir/config.yaml" ] && [ -f "$dir/Dockerfile" ]; then
+                if [ "$first" = true ]; then
+                  addons="$addons\"$addon_name\""
+                  first=false
+                else
+                  addons="$addons,\"$addon_name\""
+                fi
+              fi
+            done
+            addons="$addons]"
+            echo "addons=$addons" >> "$GITHUB_OUTPUT"
+            echo "Building all addons: $addons"
+          fi
+
+  # 2. Build images
+  build:
+    if: ${{ needs.get-addons.outputs.addons != '' }}
+    needs: get-addons
+    runs-on: ubuntu-latest
+    environment: production
+    name: Build ${{ matrix.arch }} ${{ matrix.addon }} add-on
+    strategy:
+      fail-fast: false
+      matrix:
+        addon: ${{ fromJson(needs.get-addons.outputs.addons) }}
+        arch: ["aarch64", "amd64", "armv7", "armhf", "i386"]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get information
+        id: info
+        uses: home-assistant/actions/helpers/info@master
+        with:
+          path: "./${{ matrix.addon }}"
+      
+      - name: Check if Dockerfile exists
+        id: dockerfile_check
+        run: |
+          if [ -f "./${{ matrix.addon }}/Dockerfile" ]; then
+            echo "has_dockerfile=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Dockerfile found in ${{ matrix.addon }}, skipping build."
+            echo "has_dockerfile=false" >> "$GITHUB_OUTPUT"
+          fi
+      
+      - name: Check if add-on should be built for arch
+        id: check
+        run: |
+          if [[ "${{ steps.info.outputs.architectures }}" =~ ${{ matrix.arch }} ]]; then
+             echo "build_arch=true" >> "$GITHUB_OUTPUT";
+             echo "image=$(echo "${{ steps.info.outputs.image }}" | cut -d'/' -f3)" >> "$GITHUB_OUTPUT";
+          else
+             echo "${{ matrix.arch }} is not a valid arch for ${{ matrix.addon }}, skipping build";
+             echo "build_arch=false" >> "$GITHUB_OUTPUT";
+          fi
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build ${{ matrix.addon }} add-on
+        id: builderstep
+        if: steps.check.outputs.build_arch == 'true' && steps.dockerfile_check.outputs.has_dockerfile == 'true'
+        uses: home-assistant/builder@2026.02.1
+        with:
+          args: |
+            ${{ env.BUILD_ARGS }} \
+            --${{ matrix.arch }} \
+            --target "/data/${{ matrix.addon }}" \
+            --image "${{ steps.check.outputs.image }}" \
+            --docker-hub "ghcr.io/${{ github.repository_owner }}" \
+            --addon
