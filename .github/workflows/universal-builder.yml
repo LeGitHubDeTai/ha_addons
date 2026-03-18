@@ -212,7 +212,7 @@ jobs:
         uses: docker/login-action@v4.0.0
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: legithubdetai
           password: ${{ secrets.GITHUB_TOKEN }}
       
       # ────────────────────────────────────────────────────────────────
@@ -228,7 +228,7 @@ jobs:
             --${{ matrix.arch }} \
             --target "/data/${{ matrix.addon }}" \
             --image "${{ matrix.addon }}" \
-            --docker-hub "ghcr.io/${{ github.repository_owner }}/ha_addons" \
+            --docker-hub "ghcr.io/legithubdetai/ha_addons" \
             --addon
       
       # ────────────────────────────────────────────────────────────────
@@ -277,8 +277,8 @@ jobs:
           if docker buildx build \
             --platform "$docker_arch" \
             --push \
-            --tag "ghcr.io/${{ github.repository_owner }}/ha_addons/${{ matrix.addon }}-${{ matrix.arch }}:$version" \
-            --tag "ghcr.io/${{ github.repository_owner }}/ha_addons/${{ matrix.addon }}-${{ matrix.arch }}:latest" \
+            --tag "ghcr.io/legithubdetai/ha_addons/${{ matrix.addon }}-${{ matrix.arch }}:$version" \
+            --tag "ghcr.io/legithubdetai/ha_addons/${{ matrix.addon }}-${{ matrix.arch }}:latest" \
             --build-arg BUILD_FROM="$base_image" \
             --build-arg BUILD_VERSION="$version" \
             --cache-from "type=gha" \
@@ -370,8 +370,8 @@ jobs:
           echo "## 📦 Format des images" >> $GITHUB_STEP_SUMMARY
           echo "Les images sont créées avec le format :" >> $GITHUB_STEP_SUMMARY
           echo "```" >> $GITHUB_STEP_SUMMARY
-          echo "ghcr.io/${{ github.repository_owner }}/ha_addons/<addon>-<arch>:<version>" >> $GITHUB_STEP_SUMMARY
-          echo "ghcr.io/${{ github.repository_owner }}/ha_addons/<addon>-<arch>:latest" >> $GITHUB_STEP_SUMMARY
+          echo "ghcr.io/legithubdetai/ha_addons/<addon>-<arch>:<version>" >> $GITHUB_STEP_SUMMARY
+          echo "ghcr.io/legithubdetai/ha_addons/<addon>-<arch>:latest" >> $GITHUB_STEP_SUMMARY
           echo "```" >> $GITHUB_STEP_SUMMARY
           
           echo "" >> $GITHUB_STEP_SUMMARY
