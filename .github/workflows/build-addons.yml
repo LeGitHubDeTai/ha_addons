@@ -247,51 +247,149 @@ jobs:
                 
                 # Préparer les arguments de build selon le build.yaml
                 BUILD_ARGS=""
-                if [ "$base_image" = "multi-arch" ]; then
-                  echo "Utilisation des images multi-architecture depuis build.yaml"
-                  # Pour le multi-arch, on passe le build.yaml comme contexte
-                  BUILD_ARGS="--build-arg BUILD_CONFIG_FILE=build.yaml"
+                echo "Debug: base_image='$base_image', build_type='$build_type'"
+                
+                if [ "$build_type" = "multi-arch" ]; then
+                  echo "Vérification de la compatibilité multi-architecture..."
+                  
+                  # Vérifier si l'image de base principale est multi-architecture
+                  if docker buildx imagetools inspect "$base_image" 2>/dev/null | grep -q "linux/amd64"; then
+                    # Compter les plateformes supportées par l'image de base
+                    SUPPORTED_PLATFORMS=$(docker buildx imagetools inspect "$base_image" 2>/dev/null | grep -c "Platform:" || echo "1")
+                    
+                    if [ "$SUPPORTED_PLATFORMS" -gt 2 ]; then
+                      echo "Image de base multi-architecture détectée ($SUPPORTED_PLATFORMS plateformes)"
+                      echo "Utilisation du build multi-architecture"
+                      BUILD_ARGS="--build-arg BUILD_FROM=$base_image --build-arg BUILD_CONFIG_FILE=build.yaml"
+                      build_mode="multi-arch"
+                    else
+                      echo "Image de base non multi-architecture, utilisation de builds séparés par architecture"
+                      build_mode="separate"
+                    fi
+                  else
+                    echo "Image de base invalide, utilisation de builds séparés par architecture"
+                    build_mode="separate"
+                  fi
                 else
-                  echo "Utilisation de l'image de base: $base_image"
+                  echo "Utilisation de l'image de base unique: $base_image"
                   BUILD_ARGS="--build-arg BUILD_FROM=$base_image"
+                  build_mode="single"
                 fi
                 
-                BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$version --build-arg BUILD_ARCH=amd64"
+                BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$version"
+                echo "Debug: mode=$build_mode, BUILD_ARGS='$BUILD_ARGS'"
                 
-                # Tenter le build avec gestion d'erreur
-                echo "Build avec plateformes: $platforms"
-                
-                if docker buildx build \
-                  --platform "$platforms" \
-                  --push \
-                  --tag "$image_name" \
-                  --tag "${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}:latest" \
-                  $BUILD_ARGS \
-                  --cache-from "type=gha" \
-                  --cache-to "type=gha,mode=max" \
-                  "./$addon_name"; then
+                # Stratégie de build selon le mode
+                if [ "$build_mode" = "separate" ]; then
+                  echo "Build séparé par architecture..."
                   
-                  echo "✅ Build terminé pour $addon_name"
-                  echo "- ✅ **$addon_name** ($version) : Build réussi" >> build_report.md
+                  # Lire les architectures depuis build.yaml
+                  ARCH_IMAGES=""
+                  while IFS= read -r line; do
+                    if echo "$line" | grep -qE "^\s*[a-z0-9]+:"; then
+                      arch=$(echo "$line" | sed 's/^\s*//' | cut -d':' -f1)
+                      image=$(echo "$line" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
+                      ARCH_IMAGES="$ARCH_IMAGES $arch:$image"
+                    fi
+                  done < "$dir/build.yaml"
                   
-                  # Créer les tags spécifiques par architecture pour Home Assistant
-                  echo "Création des tags spécifiques par architecture..."
-                  for arch in amd64 arm64 armv7; do
-                    if echo "$platforms" | grep -q "$arch"; then
-                      arch_image="${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}-${arch}:${version}"
-                      latest_arch="${{ env.IMAGE_NAME_PREFIX }}${addon_name_lower}-${arch}:latest"
-                      
-                      echo "Création du tag $arch_image"
-                      docker buildx imagetools create \
-                        --tag "$arch_image" \
-                        --tag "$latest_arch" \
-                        "$image_name" || echo "Impossible de créer le tag pour $arch"
+                  echo "Architectures à construire: $ARCH_IMAGES"
+                  build_success=true
+                  
+                  # Construire chaque architecture séparément
+                  for arch_image in $ARCH_IMAGES; do
+                    arch=$(echo "$arch_image" | cut -d':' -f1)
+                    img=$(echo "$arch_image" | cut -d':' -f2-)
+                    
+                    case $arch in
+                      "amd64") docker_platform="linux/amd64" ;;
+                      "arm64"|"aarch64") docker_platform="linux/arm64" ;;
+                      "armv7") docker_platform="linux/arm/v7" ;;
+                      "armhf") docker_platform="linux/armhf" ;;
+                      "i386") docker_platform="linux/386" ;;
+                      *) continue ;;
+                    esac
+                    
+                    echo "Construction de $arch avec $img ($docker_platform)..."
+                    image_prefix="${{ env.IMAGE_NAME_PREFIX }}"
+                    tag_version="$image_prefix$addon_name_lower-$arch:$version"
+                    tag_latest="$image_prefix$addon_name_lower-$arch:latest"
+                    
+                    if docker buildx build \
+                      --platform "$docker_platform" \
+                      --push \
+                      --tag "$tag_version" \
+                      --tag "$tag_latest" \
+                      --build-arg BUILD_FROM="$img" \
+                      --build-arg BUILD_VERSION="$version" \
+                      --cache-from "type=gha" \
+                      --cache-to "type=gha,mode=max" \
+                      "./$addon_name"; then
+                      echo "✅ Build réussi pour $arch"
+                    else
+                      echo "❌ Build échoué pour $arch"
+                      build_success=false
                     fi
                   done
+                  
+                  # Créer le manifest multi-architecture si tous les builds ont réussi
+                  if [ "$build_success" = "true" ]; then
+                    echo "Création du manifest multi-architecture..."
+                    manifest_args=""
+                    image_prefix="${{ env.IMAGE_NAME_PREFIX }}"
+                    for arch_image in $ARCH_IMAGES; do
+                      arch=$(echo "$arch_image" | cut -d':' -f1)
+                      tag_name="$image_prefix$addon_name_lower-$arch:$version"
+                      manifest_args="$manifest_args --amend $tag_name"
+                    done
+                    
+                    if docker manifest create "$image_name" $manifest_args && \
+                       docker manifest push "$image_name"; then
+                      echo "✅ Manifest multi-architecture créé avec succès"
+                    else
+                      echo "❌ Échec de la création du manifest"
+                    fi
+                  fi
+                  
                 else
-                  echo "❌ Build échoué pour $addon_name"
-                  echo "- ❌ **$addon_name** ($version) : Build échoué" >> build_report.md
-                  # Continuer avec le prochain addon
+                  # Build normal (multi-arch ou single)
+                  echo "Build avec plateformes: $platforms"
+                  image_prefix="${{ env.IMAGE_NAME_PREFIX }}"
+                  latest_tag="$image_prefix$addon_name_lower:latest"
+                  
+                  if docker buildx build \
+                    --platform "$platforms" \
+                    --push \
+                    --tag "$image_name" \
+                    --tag "$latest_tag" \
+                    $BUILD_ARGS \
+                    --cache-from "type=gha" \
+                    --cache-to "type=gha,mode=max" \
+                    "./$addon_name"; then
+                    
+                    echo "✅ Build terminé pour $addon_name"
+                    echo "- ✅ **$addon_name** ($version) : Build réussi" >> build_report.md
+                    
+                    # Créer les tags spécifiques par architecture pour Home Assistant
+                    if [ "$build_mode" = "multi-arch" ]; then
+                      echo "Création des tags spécifiques par architecture..."
+                      for arch in amd64 arm64 armv7; do
+                        if echo "$platforms" | grep -q "$arch"; then
+                          arch_image="$image_prefix$addon_name_lower-$arch:$version"
+                          latest_arch="$image_prefix$addon_name_lower-$arch:latest"
+                          
+                          echo "Création du tag $arch_image"
+                          docker buildx imagetools create \
+                            --tag "$arch_image" \
+                            --tag "$latest_arch" \
+                            "$image_name" || echo "Impossible de créer le tag pour $arch"
+                        fi
+                      done
+                    fi
+                  else
+                    echo "❌ Build échoué pour $addon_name"
+                    echo "- ❌ **$addon_name** ($version) : Build échoué" >> build_report.md"
+                  fi
                 fi
                 
                 # Nettoyer le script temporaire
