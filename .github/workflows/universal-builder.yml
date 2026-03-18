@@ -21,6 +21,8 @@ on:
       - "**/config.*"
       - "**/Dockerfile"
       - "**/build.yaml"
+      - "**/build.yml"
+      - "install-bashio.sh"
   workflow_dispatch:
     inputs:
       target_addon:
@@ -55,16 +57,72 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ]; then
             # Pour les pushes, trouver les addons modifiés
             git fetch origin "${{ github.event.before }}" || true
+            
+            # Détecter les changements de config ET de version
             changed_config_files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -E '^[^/]+/config\.(json|ya?ml)$' || true)
             echo "Changed config files:"
             echo "$changed_config_files"
             
+            # Détecter les changements de Dockerfile
+            changed_dockerfiles=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -E '^[^/]+/Dockerfile$' || true)
+            if [ -n "$changed_dockerfiles" ]; then
+              echo "Changed Dockerfiles:"
+              echo "$changed_dockerfiles"
+            fi
+            
+            # Détecter les changements de build.yaml
+            changed_build_files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -E '^[^/]+/build\.ya?ml$' || true)
+            if [ -n "$changed_build_files" ]; then
+              echo "Changed build files:"
+              echo "$changed_build_files"
+            fi
+            
+            # Détecter aussi les changements de version dans les config.yaml
+            version_changes=$(git diff "${{ github.event.before }}" "${{ github.sha }}" -- "**/config.yaml" | grep -E '^[+-]\s*version:' || true)
+            if [ -n "$version_changes" ]; then
+              echo "Version changes detected:"
+              echo "$version_changes"
+              
+              # Extraire les noms des addons avec des changements de version
+              version_changed_addons=$(echo "$version_changes" | grep -oE '^[+-]\s*([^/]+)/config\.yaml' | sed 's/^[+-]\s*//' | sed 's/\/config\.yaml$//' | sort -u | tr '\n' ' ')
+              echo "Addons with version changes: $version_changed_addons"
+            fi
+            
+            # Combiner tous les changements
+            all_changed_files=""
             if [ -n "$changed_config_files" ]; then
-              changed_addons=$(printf '%s' "$changed_config_files" | awk -F/ '{print $1}' | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              all_changed_files="$all_changed_files $changed_config_files"
+            fi
+            if [ -n "$changed_dockerfiles" ]; then
+              all_changed_files="$all_changed_files $changed_dockerfiles"
+            fi
+            if [ -n "$changed_build_files" ]; then
+              all_changed_files="$all_changed_files $changed_build_files"
+            fi
+            
+            if [ -n "$all_changed_files" ]; then
+              changed_addons=$(printf '%s' "$all_changed_files" | awk -F/ '{print $1}' | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
             else
               changed_addons="[]"
             fi
-            echo "Changed addons: $changed_addons"
+            
+            # Ajouter les addons avec des changements de version
+            if [ -n "$version_changed_addons" ]; then
+              for addon in $version_changed_addons; do
+                if [ -d "$addon" ] && ([ -f "$addon/config.yaml" ] || [ -f "$addon/config.json" ]); then
+                  if [ "$changed_addons" = "[]" ]; then
+                    changed_addons="[\"$addon\"]"
+                  else
+                    # Vérifier si l'addon n'est pas déjà dans la liste
+                    if ! echo "$changed_addons" | grep -q "\"$addon\""; then
+                      changed_addons=$(echo "$changed_addons" | jq -c --arg addon "$addon" '. + [$addon]')
+                    fi
+                  fi
+                fi
+              done
+            fi
+            
+            echo "Final changed addons: $changed_addons"
             echo "changed_addons=$changed_addons" >> "$GITHUB_OUTPUT"
           else
             # Pour workflow_dispatch, trouver tous les addons
@@ -331,6 +389,13 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ]; then
             addons="${{ needs.detect-changed-addons.outputs.changedAddons }}"
             echo "🔄 **Mode** : Détection automatique (push)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## 🔍 Types de changements détectés" >> $GITHUB_STEP_SUMMARY
+            echo "- 📄 **Config files** : `config.yaml` / `config.json`" >> $GITHUB_STEP_SUMMARY
+            echo "- 🐳 **Dockerfile** : Fichiers de construction Docker" >> $GITHUB_STEP_SUMMARY
+            echo "- 🔨 **Build files** : `build.yaml` / `build.yml`" >> $GITHUB_STEP_SUMMARY
+            echo "- 📦 **Versions** : Changements de version dans les configs" >> $GITHUB_STEP_SUMMARY
+            echo "- 📜 **Scripts** : `install-bashio.sh` et autres scripts partagés" >> $GITHUB_STEP_SUMMARY
           else
             addons="${{ needs.detect-changed-addons.outputs.allAddons }}"
             target_addon="${{ github.event.inputs.target_addon || github.event.inputs.target_addon }}"
