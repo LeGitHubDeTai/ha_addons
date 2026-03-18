@@ -227,13 +227,13 @@ jobs:
           wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
           chmod +x /usr/local/bin/yq
 
-      - name: Install bashio and Home Assistant tools
+      - name: Install build tools
         run: |
-          # Install bashio
-          pip install bashio
-          
-          # Install Home Assistant CLI tools
+          # Install Home Assistant CLI tools (optional, for validation)
           pip install homeassistant-cli
+          
+          # Note: bashio is typically included in Home Assistant base images
+          # and is not needed during the build process itself
 
       - name: Build and push images for each architecture
         run: |
