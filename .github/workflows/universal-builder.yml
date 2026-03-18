@@ -1,0 +1,395 @@
+name: Universal Home Assistant Addon Builder
+
+on:
+  workflow_call:
+    inputs:
+      target_addon:
+        description: 'Addon spécifique à builder (laisser vide pour tous)'
+        required: false
+        default: ''
+        type: string
+      force_rebuild:
+        description: 'Forcer le rebuild même si l image existe'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "**/config.*"
+      - "**/Dockerfile"
+      - "**/build.yaml"
+  workflow_dispatch:
+    inputs:
+      target_addon:
+        description: 'Addon spécifique à builder (laisser vide pour tous)'
+        required: false
+        default: ''
+        type: string
+      force_rebuild:
+        description: 'Forcer le rebuild même si l image existe'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  BUILD_ARGS: ""
+
+jobs:
+  # 1. Detect which add-on folders changed (by config.json|yaml|yml modification)
+  detect-changed-addons:
+    if: ${{ github.repository_owner == 'LeGitHubDeTai' && !contains(github.event.head_commit.message, 'nobuild') }}
+    runs-on: ubuntu-latest
+    outputs:
+      changedAddons: ${{ steps.find_addons.outputs.changed_addons }}
+      allAddons: ${{ steps.find_addons.outputs.all_addons }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      
+      - name: Find addon directories
+        id: find_addons
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Pour les pushes, trouver les addons modifiés
+            git fetch origin "${{ github.event.before }}" || true
+            changed_config_files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -E '^[^/]+/config\.(json|ya?ml)$' || true)
+            echo "Changed config files:"
+            echo "$changed_config_files"
+            
+            if [ -n "$changed_config_files" ]; then
+              changed_addons=$(printf '%s' "$changed_config_files" | awk -F/ '{print $1}' | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            else
+              changed_addons="[]"
+            fi
+            echo "Changed addons: $changed_addons"
+            echo "changed_addons=$changed_addons" >> "$GITHUB_OUTPUT"
+          else
+            # Pour workflow_dispatch, trouver tous les addons
+            all_addons="[]"
+            for dir in */; do
+              addon_name=$(basename "$dir")
+              if [ -f "$dir/config.yaml" ] || [ -f "$dir/config.json" ]; then
+                if [ -f "$dir/Dockerfile" ]; then
+                  if [ "$all_addons" = "[]" ]; then
+                    all_addons="[\"$addon_name\"]"
+                  else
+                    all_addons=$(echo "$all_addons" | jq -c --arg addon "$addon_name" '. + [$addon]')
+                  fi
+                fi
+              fi
+            done
+            echo "All addons with Dockerfile: $all_addons"
+            echo "all_addons=$all_addons" >> "$GITHUB_OUTPUT"
+            echo "changed_addons=$all_addons" >> "$GITHUB_OUTPUT"
+          fi
+
+  # 2. Pre-build sanitize: normalize spaces, fix script permissions, single commit per add-on
+  prebuild-sanitize:
+    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    needs: detect-changed-addons
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        addon: ${{ fromJSON(needs.detect-changed-addons.outputs.changedAddons) }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      # ────────────────────────────────────────────────────────────────
+      # 1. Replace non-printable Unicode spaces and convert Windows line endings (CRLF) → Unix (LF)
+      # ────────────────────────────────────────────────────────────────
+      - name: Sanitize text files (Unicode spaces + CRLF → LF)
+        run: |
+          cd "${{ matrix.addon }}"
+          UNICODE_SPACES_REGEX=$'[\\u00A0\\u2002\\u2003\\u2007\\u2008\\u2009\\u202F\\u205F\\u3000\\u200B]'
+
+          find . -type f | while read -r file; do
+            MIME_TYPE=$(file --mime-type -b "$file" 2>/dev/null || echo "")
+            [[ "$MIME_TYPE" != text/* ]] && continue
+
+            echo "Sanitizing $file"
+            # Edit in place, preserving file permissions and metadata
+            perl -i -CSD -pe "
+              s/${UNICODE_SPACES_REGEX}/ /g;  # space normalization
+              s/\\r$//;                        # CRLF → LF
+            " "$file" 2>/dev/null || true
+          done
+      
+      # ────────────────────────────────────────────────────────────────
+      # 2. Ensure every *.sh script is executable
+      # ────────────────────────────────────────────────────────────────
+      - name: Make all .sh scripts executable
+        run: |
+          cd "${{ matrix.addon }}"
+          find . -type f -iname "*.sh" -exec chmod u+x {} \;
+      
+      # ────────────────────────────────────────────────────────────────
+      # 3. Verify nothing with mixed line endings slipped through
+      # ────────────────────────────────────────────────────────────────
+      - name: Assert no mixed CRLF/LF remain
+        uses: ymwymw/check-mixed-line-endings@v2
+      
+      # ────────────────────────────────────────────────────────────────
+      # 4. Commit any changes we made
+      # ────────────────────────────────────────────────────────────────
+      - name: Commit if needed
+        uses: EndBug/add-and-commit@v9
+        with:
+          commit: -u
+          message: "GitHub bot: sanitize (spaces + LF endings) & chmod"
+          default_author: github_actions
+          pull: --rebase --autostash
+          fetch: --tags --force
+
+  # 3. Lint add-on configs
+  lint_config:
+    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    needs: [detect-changed-addons, prebuild-sanitize]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        addon: ${{ fromJSON(needs.detect-changed-addons.outputs.changedAddons) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Home Assistant Add-on Lint
+        uses: frenck/action-addon-linter@v2
+        with:
+          path: "./${{ matrix.addon }}"
+
+  # 4. Build images for changed addons/arches
+  build:
+    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    needs: [detect-changed-addons, lint_config]
+    runs-on: ubuntu-latest
+    environment: production
+    name: Build ${{ matrix.arch }} ${{ matrix.addon }} add-on
+    strategy:
+      fail-fast: false
+      matrix:
+        addon: ${{ fromJSON(needs.detect-changed-addons.outputs.changedAddons) }}
+        arch: ["aarch64", "amd64", "armv7", "armhf", "i386"]
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Filtrer pour le workflow_dispatch si un addon spécifique est demandé
+      - name: Filter target addon
+        if: ${{ github.event.inputs.target_addon != '' }}
+        run: |
+          if [ "${{ matrix.addon }}" != "${{ github.event.inputs.target_addon }}" ]; then
+            echo "Skipping ${{ matrix.addon }} (target: ${{ github.event.inputs.target_addon }})"
+            exit 1
+          fi
+      
+      # ────────────────────────────────────────────────────────────────
+      # 1. Resolve Symlinks (in repo)
+      # ────────────────────────────────────────────────────────────────
+      - name: Resolve Symlinks
+        run: |
+          find . -type l | while read -r link; do
+            target="$(readlink -f "$link")"
+            if [ -z "$target" ]; then
+              echo "Skipping broken symlink: $link"
+              continue
+            fi
+            rm "$link"
+            if [ -d "$target" ]; then
+              mkdir -p "$link"
+              cp -a "$target/." "$link/"
+            else
+              cp "$target" "$link"
+            fi
+          done
+      
+      - name: Get information
+        id: info
+        uses: home-assistant/actions/helpers/info@master
+        with:
+          path: "./${{ matrix.addon }}"
+      
+      - name: Check if Dockerfile exists
+        id: dockerfile_check
+        run: |
+          if [ -f "./${{ matrix.addon }}/Dockerfile" ]; then
+            echo "has_dockerfile=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Dockerfile found in ${{ matrix.addon }}, skipping build."
+            echo "has_dockerfile=false" >> "$GITHUB_OUTPUT"
+          fi
+      
+      - name: Check if add-on should be built for arch
+        id: check
+        env:
+          HEAD: "${{ github.head_ref }}"
+        run: |
+          # Vérifier si l'architecture est supportée par HA Builder
+          case "${{ matrix.arch }}" in
+            "amd64"|"aarch64")
+              builder_supported=true
+              ;;
+            *)
+              builder_supported=false
+              echo "Architecture ${{ matrix.arch }} non supportée par HA Builder, utilisation de buildx manuel"
+              ;;
+          esac
+          
+          if [[ "${{ steps.info.outputs.architectures }}" =~ ${{ matrix.arch }} ]]; then
+             echo "build_arch=true" >> "$GITHUB_OUTPUT";
+             echo "builder_supported=$builder_supported" >> "$GITHUB_OUTPUT";
+             echo "image=$(echo "${{ steps.info.outputs.image }}" | cut -d'/' -f3)" >> "$GITHUB_OUTPUT";
+             if [[ -z "$HEAD" ]] && [[ "${{ github.event_name }}" == "push" ]]; then
+                 echo "BUILD_ARGS=" >> "$GITHUB_ENV";
+             fi
+          else
+             echo "${{ matrix.arch }} is not a valid arch for ${{ matrix.addon }}, skipping build";
+             echo "build_arch=false" >> "$GITHUB_OUTPUT";
+          fi
+      
+      - name: Login to GitHub Container Registry
+        if: env.BUILD_ARGS != '--test'
+        uses: docker/login-action@v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      # ────────────────────────────────────────────────────────────────
+      # 2. Build avec HA Builder (pour amd64/aarch64)
+      # ────────────────────────────────────────────────────────────────
+      - name: Build ${{ matrix.addon }} add-on (HA Builder)
+        id: builderstep
+        if: steps.check.outputs.build_arch == 'true' && steps.check.outputs.builder_supported == 'true' && steps.dockerfile_check.outputs.has_dockerfile == 'true'
+        uses: home-assistant/builder@2026.02.1
+        with:
+          args: |
+            ${{ env.BUILD_ARGS }} \
+            --${{ matrix.arch }} \
+            --target "/data/${{ matrix.addon }}" \
+            --image "${{ matrix.addon }}" \
+            --docker-hub "ghcr.io/${{ github.repository_owner }}/ha_addons" \
+            --addon
+      
+      # ────────────────────────────────────────────────────────────────
+      # 3. Build avec Docker Buildx (pour armv7/armhf/i386)
+      # ────────────────────────────────────────────────────────────────
+      - name: Build ${{ matrix.addon }} add-on (Docker Buildx)
+        if: steps.check.outputs.build_arch == 'true' && steps.check.outputs.builder_supported == 'false' && steps.dockerfile_check.outputs.has_dockerfile == 'true'
+        run: |
+          echo "Build avec Docker Buildx pour ${{ matrix.arch }} (non supporté par HA Builder)"
+          
+          # Récupérer la version depuis config.yaml
+          if [ -f "${{ matrix.addon }}/config.yaml" ]; then
+            version=$(grep '^version:' "${{ matrix.addon }}/config.yaml" | sed 's/version: "//' | sed 's/"//' | tr -d '\r\n' || echo "latest")
+          else
+            version="latest"
+          fi
+          
+          # Récupérer l'image de base depuis build.yaml si disponible
+          if [ -f "${{ matrix.addon }}/build.yaml" ]; then
+            base_image=$(grep "${{ matrix.arch }}:" "${{ matrix.addon }}/build.yaml" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
+            if [ -z "$base_image" ]; then
+              # Fallback vers une image de base par défaut
+              case "${{ matrix.arch }}" in
+                "armv7") base_image="ghcr.io/home-assistant/armv7-base:3.18" ;;
+                "armhf") base_image="ghcr.io/home-assistant/armhf-base:3.18" ;;
+                "i386") base_image="ghcr.io/home-assistant/i386-base:3.18" ;;
+                *) base_image="ghcr.io/home-assistant/amd64-base:3.18" ;;
+              esac
+            fi
+          else
+            base_image="ghcr.io/home-assistant/amd64-base:3.18"
+          fi
+          
+          echo "Image de base: $base_image"
+          echo "Version: $version"
+          
+          # Convertir l'architecture pour Docker
+          case "${{ matrix.arch }}" in
+            "armv7") docker_arch="linux/arm/v7" ;;
+            "armhf") docker_arch="linux/armhf" ;;
+            "i386") docker_arch="linux/386" ;;
+            *) docker_arch="linux/${{ matrix.arch }}" ;;
+          esac
+          
+          # Construire avec buildx
+          if docker buildx build \
+            --platform "$docker_arch" \
+            --push \
+            --tag "ghcr.io/${{ github.repository_owner }}/ha_addons/${{ matrix.addon }}-${{ matrix.arch }}:$version" \
+            --tag "ghcr.io/${{ github.repository_owner }}/ha_addons/${{ matrix.addon }}-${{ matrix.arch }}:latest" \
+            --build-arg BUILD_FROM="$base_image" \
+            --build-arg BUILD_VERSION="$version" \
+            --cache-from "type=gha" \
+            --cache-to "type=gha,mode=max" \
+            "./${{ matrix.addon}}"; then
+            echo "✅ Build réussi pour ${{ matrix.addon }} (${{ matrix.arch }}) - $version"
+          else
+            echo "❌ Build échoué pour ${{ matrix.addon }} (${{ matrix.arch }})"
+            exit 1
+          fi
+
+  # 5. Build Summary
+  build-summary:
+    if: always()
+    needs: [detect-changed-addons, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate build summary
+        run: |
+          echo "# 🏗️ Universal Home Assistant Addon Builder" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Addons traités" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event_name }}" = "push" ]; then
+            addons="${{ needs.detect-changed-addons.outputs.changedAddons }}"
+            echo "🔄 **Mode** : Détection automatique (push)" >> $GITHUB_STEP_SUMMARY
+          else
+            addons="${{ needs.detect-changed-addons.outputs.allAddons }}"
+            target_addon="${{ github.event.inputs.target_addon || github.event.inputs.target_addon }}"
+            if [ -n "$target_addon" ]; then
+              echo "🎯 **Mode** : Manuel - Addon cible : $target_addon" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "🔄 **Mode** : Manuel - Tous les addons" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          if [ -n "$addons" ] && [ "$addons" != "[]" ]; then
+            echo "$addons" | tr ',' '\n' | while read addon; do
+              addon=$(echo "$addon" | sed 's/^ *//' | sed 's/ *$//' | sed 's/^"//' | sed 's/"$//')
+              if [ -n "$addon" ]; then
+                echo "- 📦 **$addon**" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          else
+            echo "ℹ️ Aucun addon trouvé" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🏛️ Architectures supportées" >> $GITHUB_STEP_SUMMARY
+          echo "| Architecture | Méthode | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------------|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| amd64 | HA Builder | ✅ Officiel |" >> $GITHUB_STEP_SUMMARY
+          echo "| aarch64 | HA Builder | ✅ Officiel |" >> $GITHUB_STEP_SUMMARY
+          echo "| armv7 | Docker Buildx | ⚡ Alternative |" >> $GITHUB_STEP_SUMMARY
+          echo "| armhf | Docker Buildx | ⚡ Alternative |" >> $GITHUB_STEP_SUMMARY
+          echo "| i386 | Docker Buildx | ⚡ Alternative |" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Format des images" >> $GITHUB_STEP_SUMMARY
+          echo "Les images sont créées avec le format :" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo "ghcr.io/${{ github.repository_owner }}/ha_addons/<addon>-<arch>:<version>" >> $GITHUB_STEP_SUMMARY
+          echo "ghcr.io/${{ github.repository_owner }}/ha_addons/<addon>-<arch>:latest" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔧 Fonctionnalités" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Sanitisation automatique** : Correction des espaces Unicode et CRLF" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Linting** : Validation des configurations Home Assistant" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Multi-architecture** : Support de toutes les architectures" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Smart Builder** : HA Builder pour amd64/aarch64, Docker Buildx pour les autres" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Versionnage** : Tags avec version et latest" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Détection intelligente** : Build uniquement les addons modifiés (push)" >> $GITHUB_STEP_SUMMARY
