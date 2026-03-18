@@ -1,4 +1,5 @@
 ARG BUILD_FROM
+ARG BUILD_CONFIG_FILE
 FROM $BUILD_FROM
 
 ARG NGINX_ALLOWED_IP=172.30.32.2
@@ -27,18 +28,13 @@ RUN apk add --no-cache \
     python3 \
     linux-headers
 WORKDIR /data
-COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
-
 RUN npm install -g n8n@2.11.4
 
 RUN mkdir -p /run/nginx
 
-COPY nginx.conf /etc/nginx/nginx.conf.template
-
 COPY n8n-exports.sh /app/n8n-exports.sh
 COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
 COPY nginx-entrypoint.sh /app/nginx-entrypoint.sh
-
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY supervisord.conf /etc/supervisord.conf
 
