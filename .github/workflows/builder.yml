@@ -1,0 +1,137 @@
+name: Builder
+
+on:
+  workflow_call:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "**/config.*"
+      - "**/Dockerfile"
+      - "**/build.yaml"
+
+env:
+  BUILD_ARGS: ""
+
+jobs:
+  # 1. Detect which add-on folders changed
+  detect-changed-addons:
+    if: ${{ github.repository_owner == 'LeGitHubDeTai' && !contains(github.event.head_commit.message, 'nobuild') }}
+    runs-on: ubuntu-latest
+    outputs:
+      changedAddons: ${{ steps.find_addons.outputs.changed_addons }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      
+      - name: Find changed addon directories
+        id: find_addons
+        run: |
+          git fetch origin "${{ github.event.before }}" || true
+          changed_files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" || true)
+          echo "Changed files: $changed_files"
+          
+          # Créer un tableau JSON pour les addons modifiés
+          changed_addons="["
+          first=true
+          for file in $changed_files; do
+            if [[ "$file" =~ ^[^/]+/ ]] && [ -d "$(dirname "$file")" ]; then
+              addon=$(dirname "$file")
+              if [ -f "$addon/config.yaml" ] || [ -f "$addon/config.json" ]; then
+                if [ "$first" = true ]; then
+                  changed_addons="$changed_addons\"$addon\""
+                  first=false
+                else
+                  changed_addons="$changed_addons,\"$addon\""
+                fi
+              fi
+            fi
+          done
+          changed_addons="$changed_addons]"
+          
+          echo "Changed addons: $changed_addons"
+          echo "changed_addons=$changed_addons" >> "$GITHUB_OUTPUT"
+
+  # 2. Build images for changed addons/arches
+  build:
+    if: ${{ needs.detect-changed-addons.outputs.changedAddons != '' && needs.detect-changed-addons.outputs.changedAddons != '[]' }}
+    needs: detect-changed-addons
+    runs-on: ubuntu-latest
+    environment: production
+    name: Build ${{ matrix.arch }} ${{ matrix.addon }} add-on
+    strategy:
+      fail-fast: false
+      matrix:
+        addon: [mopidy, n8n, obsidian, planka, syncthing, dolibarr, FossFLOW]
+        arch: ["aarch64", "amd64", "armv7", "armhf", "i386"]
+    steps:
+      - name: Check if addon should be built
+        id: should_build
+        run: |
+          if [[ "${{ needs.detect-changed-addons.outputs.changedAddons }}" == *"${{ matrix.addon }}"* ]]; then
+            echo "Addon ${{ matrix.addon }} should be built"
+            echo "::set-output name=build::true"
+          else
+            echo "Addon ${{ matrix.addon }} not in changed list, skipping"
+            echo "::set-output name=build::false"
+          fi
+      
+      - uses: actions/checkout@v4
+        if: steps.should_build.outputs.build == 'true'
+      
+      - name: Get information
+        id: info
+        if: steps.should_build.outputs.build == 'true'
+        uses: home-assistant/actions/helpers/info@master
+        with:
+          path: "./${{ matrix.addon }}"
+      
+      - name: Check if Dockerfile exists
+        id: dockerfile_check
+        if: steps.should_build.outputs.build == 'true'
+        run: |
+          if [ -f "./${{ matrix.addon }}/Dockerfile" ]; then
+            echo "has_dockerfile=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Dockerfile found in ${{ matrix.addon }}, skipping build."
+            echo "has_dockerfile=false" >> "$GITHUB_OUTPUT"
+          fi
+      
+      - name: Check if add-on should be built for arch
+        id: arch_check
+        if: steps.should_build.outputs.build == 'true'
+        env:
+          HEAD: "${{ github.head_ref }}"
+        run: |
+          if [[ "${{ steps.info.outputs.architectures }}" =~ ${{ matrix.arch }} ]]; then
+             echo "build_arch=true" >> "$GITHUB_OUTPUT";
+             echo "image=$(echo "${{ steps.info.outputs.image }}" | cut -d'/' -f3)" >> "$GITHUB_OUTPUT";
+             if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+                 echo "BUILD_ARGS=--test" >> "$GITHUB_ENV";
+             fi
+          else
+             echo "${{ matrix.arch }} is not a valid arch for ${{ matrix.addon }}, skipping build";
+             echo "build_arch=false" >> "$GITHUB_OUTPUT";
+          fi
+      
+      - name: Login to GitHub Container Registry
+        if: env.BUILD_ARGS != '--test' && steps.should_build.outputs.build == 'true'
+        uses: docker/login-action@v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build ${{ matrix.addon }} add-on
+        id: builderstep
+        if: steps.arch_check.outputs.build_arch == 'true' && steps.dockerfile_check.outputs.has_dockerfile == 'true' && steps.should_build.outputs.build == 'true'
+        uses: home-assistant/builder@2026.02.1
+        with:
+          args: |
+            ${{ env.BUILD_ARGS }} \
+            --${{ matrix.arch }} \
+            --target "/data/${{ matrix.addon }}" \
+            --image "${{ steps.arch_check.outputs.image }}" \
+            --docker-hub "ghcr.io/${{ github.repository_owner }}" \
+            --addon
