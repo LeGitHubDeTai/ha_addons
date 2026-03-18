@@ -159,6 +159,13 @@ jobs:
         run: |
           echo "Build avec Docker Buildx pour ${{ matrix.arch }} (non supporté par HA Builder)"
           
+          # Récupérer la version depuis config.yaml
+          if [ -f "${{ matrix.addon }}/config.yaml" ]; then
+            version=$(grep '^version:' "${{ matrix.addon }}/config.yaml" | sed 's/version: "//' | sed 's/"//' | tr -d '\r\n' || echo "latest")
+          else
+            version="latest"
+          fi
+          
           # Récupérer l'image de base depuis build.yaml si disponible
           if [ -f "${{ matrix.addon }}/build.yaml" ]; then
             base_image=$(grep "${{ matrix.arch }}:" "${{ matrix.addon }}/build.yaml" | sed 's/^[^:]*:\s*//' | sed 's/^"//' | sed 's/"$//' | tr -d '\r\n' | tr -d '"')
@@ -176,6 +183,7 @@ jobs:
           fi
           
           echo "Image de base: $base_image"
+          echo "Version: $version"
           
           # Convertir l'architecture pour Docker
           case "${{ matrix.arch }}" in
@@ -189,13 +197,14 @@ jobs:
           if docker buildx build \
             --platform "$docker_arch" \
             --push \
+            --tag "ghcr.io/${{ github.repository_owner }}/ha_addons/${{ matrix.addon }}-${{ matrix.arch }}:$version" \
             --tag "ghcr.io/${{ github.repository_owner }}/ha_addons/${{ matrix.addon }}-${{ matrix.arch }}:latest" \
             --build-arg BUILD_FROM="$base_image" \
-            --build-arg BUILD_VERSION="latest" \
+            --build-arg BUILD_VERSION="$version" \
             --cache-from "type=gha" \
             --cache-to "type=gha,mode=max" \
             "./${{ matrix.addon}}"; then
-            echo "✅ Build réussi pour ${{ matrix.addon }} (${{ matrix.arch }})"
+            echo "✅ Build réussi pour ${{ matrix.addon }} (${{ matrix.arch }}) - $version"
           else
             echo "❌ Build échoué pour ${{ matrix.addon }} (${{ matrix.arch }})"
             exit 1
