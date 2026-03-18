@@ -258,13 +258,9 @@ jobs:
                 echo "Debug: base_image='$base_image', build_type='$build_type'"
                 if [ "$build_type" = "multi-arch" ]; then
                   echo "Utilisation du build.yaml pour les images multi-architecture"
-                  # Passer une image de base par défaut ET le build.yaml
-                  if [ -z "$base_image" ]; then
-                    base_image="ghcr.io/home-assistant/amd64-base:3.18"
-                    echo "Debug: base_image vide, utilisation par défaut: $base_image"
-                  fi
-                  BUILD_ARGS="--build-arg BUILD_FROM=$base_image --build-arg BUILD_CONFIG_FILE=build.yaml"
-                  echo "Debug: BUILD_ARGS='$BUILD_ARGS'"
+                  # Pour le multi-arch, ne PAS passer BUILD_FROM pour qu'il utilise le build.yaml
+                  BUILD_ARGS="--build-arg BUILD_CONFIG_FILE=build.yaml"
+                  echo "Debug: BUILD_ARGS='$BUILD_ARGS' (multi-arch sans BUILD_FROM)"
                 else
                   echo "Utilisation de l'image de base: $base_image"
                   BUILD_ARGS="--build-arg BUILD_FROM=$base_image"
