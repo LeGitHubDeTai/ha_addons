@@ -18,7 +18,8 @@ RUN apk add --no-cache \
     unzip \
     build-base \
     python3 \
-    py3-pip
+    py3-pip \
+    openssl
 
 # ===============================
 # INSTALL PLANKA

@@ -1,5 +1,5 @@
 name: Planka DEV
-version: "dev-26.3.3"
+version: "dev-26.3.4"
 slug: dev-planka
 panel_icon: "mdi:view-week"
 description: Kanban board open-source (Planka)
