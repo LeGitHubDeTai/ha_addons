@@ -4,6 +4,7 @@ slug: syncthing
 description: "Syncthing is a continuous file synchronization program in a
   de-centralized way"
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/syncthing
+image: ghcr.io/legithubdetai/ha_addons/syncthing-{arch}
 arch:
   - armhf
   - armv7

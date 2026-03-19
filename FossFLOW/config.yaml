@@ -5,6 +5,7 @@ panel_icon: "mdi:chart-timeline-variant"
 description: Make beautiful isometric infrastructure diagrams
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/FossFLOW
 webui: http://[HOST]:[PORT:4000]/
+image: ghcr.io/legithubdetai/ha_addons/fossflow-{arch}
 arch:
     - armv7
     - armhf
