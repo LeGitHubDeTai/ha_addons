@@ -1,6 +1,6 @@
-name: Planka DEV
-version: "26.3.5.38"
-slug: dev-planka
+name: Planka
+version: "dev-26.3.3"
+slug: planka
 panel_icon: "mdi:view-week"
 description: Kanban board open-source (Planka)
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/planka
