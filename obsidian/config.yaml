@@ -3,6 +3,7 @@ version: "26.3.2"
 slug: obsidian
 description: Obsidian Notes Server pour Home Assistant
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/obsidian
+image: ghcr.io/legithubdetai/ha_addons/obsidian-{arch}
 panel_icon: "mdi:note-edit"
 image: ghcr.io/legithubdetai/ha_addons/obsidian-{arch}
 arch:
