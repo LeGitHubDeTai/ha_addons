@@ -25,7 +25,7 @@ RUN apk add --no-cache \
 WORKDIR /opt
 
 RUN curl -fsSL -o planka.zip \
-        https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
+        https://github.com/plankanban/planka/releases/download/v2.0.3/planka-prebuild.zip && \
     unzip planka.zip && \
     rm planka.zip
 
