@@ -24,11 +24,6 @@ RUN apk add --no-cache \
     bash \
     && rm -rf /var/cache/apk/*
 
-# Install bashio
-RUN curl -sL https://github.com/hassio-addons/bashio/archive/v1.0.0.tar.gz | tar -xz -C /tmp \
-    && mv /tmp/bashio-1.0.0/bashio /usr/local/lib/ \
-    && echo 'source /usr/local/lib/bashio/bashio' >> /etc/bash.bashrc
-
 # Download and install Scanopy daemon
 RUN ARCH=$(uname -m) \
     && case "$ARCH" in \
