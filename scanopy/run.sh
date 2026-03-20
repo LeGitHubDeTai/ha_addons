@@ -59,35 +59,5 @@ echo "Web UI: ${SCANOPY_PUBLIC_URL:-http://localhost:60072}"
 echo "Daemon API: ${SCANOPY_INTEGRATED_DAEMON_URL:-http://localhost:60073}"
 echo "Database: ${SCANOPY_DATABASE_URL:-${DATABASE_URL:-Not configured}}"
 
-# Keep the container running and monitor services
-while true; do
-    # Check Scanopy server container
-    if ! docker ps | grep scanopy-server >/dev/null 2>&1; then
-        echo "ERROR: Scanopy server container is not running, restarting..."
-        docker start scanopy-server || {
-            docker run -d \
-                --name scanopy-server \
-                -p 60072:60072 \
-                -v /data/scanopy:/data \
-                -e SCANOPY_LOG_LEVEL="${SCANOPY_LOG_LEVEL:-info}" \
-                -e SCANOPY_DATABASE_URL="${SCANOPY_DATABASE_URL:-${DATABASE_URL:-postgresql://user:password@host:port/database}}" \
-                -e SCANOPY_WEB_EXTERNAL_PATH="${SCANOPY_WEB_EXTERNAL_PATH:-/app/static}" \
-                -e SCANOPY_PUBLIC_URL="${SCANOPY_PUBLIC_URL:-http://localhost:60072}" \
-                -e SCANOPY_INTEGRATED_DAEMON_URL="${SCANOPY_INTEGRATED_DAEMON_URL:-http://localhost:60073}" \
-                --add-host=host.docker.internal:host-gateway \
-                --restart unless-stopped \
-                ghcr.io/scanopy/scanopy/server:latest
-        }
-    fi
-    
-    # Check daemon
-    if ! pgrep -f scanopy-daemon >/dev/null 2>&1; then
-        echo "ERROR: Scanopy daemon is not running, restarting..."
-        /opt/scanopy/scanopy-daemon \
-            --server-url="${SCANOPY_SERVER_URL:-http://127.0.0.1:60072}" \
-            --config-dir="/data/scanopy/daemon_config" \
-            --log-level="${SCANOPY_LOG_LEVEL:-info}" &
-    fi
-    
-    sleep 30
-done
+# Keep the container running as PID 1
+wait
