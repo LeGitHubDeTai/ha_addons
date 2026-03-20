@@ -28,9 +28,6 @@ RUN ARCH=$(uname -m) \
     && case "$ARCH" in \
         x86_64) ARCH="amd64" ;; \
         aarch64|arm64) ARCH="arm64" ;; \
-        armv7l) ARCH="armv7" ;; \
-        armv6l) ARCH="armhf" ;; \
-        i686) ARCH="i386" ;; \
         *) echo "Error: Unsupported architecture: $ARCH" && exit 1 ;; \
     esac \
     && PLATFORM="linux" \
