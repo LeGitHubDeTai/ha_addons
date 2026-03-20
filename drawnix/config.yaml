@@ -1,10 +1,11 @@
 name: Drawnix
-version: "26.3.11"
+version: "26.3.12"
 slug: drawnix
 panel_icon: "mdi:draw"
 description: Open source whiteboard tool (SaaS) with integrated whiteboard, including mind maps, flowcharts, and free drawing
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/drawnix
 webui: http://[HOST]:[PORT:7200]/
+image: ghcr.io/legithubdetai/ha_addons/drawnix-{arch}
 arch:
     - armhf
     - armv7
