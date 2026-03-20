@@ -33,6 +33,10 @@ COPY vite.config.js ./apps/web/
 # Installer dépendances
 RUN npm install --ignore-scripts --omit=optional
 
+# Copy entrypoint script
+COPY drawnix-entrypoint.sh /app/drawnix-entrypoint.sh
+RUN chmod +x /app/drawnix-entrypoint.sh
+
 EXPOSE 7200
 
-CMD ["npm", "start"]
+CMD ["/app/drawnix-entrypoint.sh"]
