@@ -11,7 +11,6 @@ LABEL \
 
 # Install Node.js and dependencies
 RUN apk add --no-cache \
-    git \
     nodejs \
     npm \
     g++ \
@@ -33,9 +32,6 @@ COPY vite.config.js ./apps/web/
 
 # Installer dépendances
 RUN npm install --ignore-scripts --omit=optional
-
-# Build production
-RUN npm run build
 
 EXPOSE 7200
 
