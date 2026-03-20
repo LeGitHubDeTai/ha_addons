@@ -14,11 +14,10 @@ RUN apk add --no-cache \
     nginx \
     nmap \
     nmap-scripts \
-    docker \
     bash \
     && rm -rf /var/cache/apk/*
 
-# Download and install Scanopy daemon
+# Download and install Scanopy daemon and server
 RUN ARCH=$(uname -m) \
     && case "$ARCH" in \
         x86_64) ARCH="amd64" ;; \
@@ -27,15 +26,21 @@ RUN ARCH=$(uname -m) \
     esac \
     && PLATFORM="linux" \
     && BINARY_NAME="scanopy-daemon-${PLATFORM}-${ARCH}" \
+    && SERVER_NAME="scanopy-server-${PLATFORM}-${ARCH}" \
     && BINARY_URL="https://github.com/scanopy/scanopy/releases/latest/download/${BINARY_NAME}" \
+    && SERVER_URL="https://github.com/scanopy/scanopy/releases/latest/download/${SERVER_NAME}" \
     && echo "Installing Scanopy daemon..." \
     && echo "Platform: $PLATFORM" \
     && echo "Architecture: $ARCH" \
-    && echo "Binary: $BINARY_NAME" \
-    && echo "Downloading from: $BINARY_URL" \
+    && echo "Daemon Binary: $BINARY_NAME" \
+    && echo "Server Binary: $SERVER_NAME" \
+    && echo "Downloading daemon from: $BINARY_URL" \
+    && echo "Downloading server from: $SERVER_URL" \
     && curl -fL "$BINARY_URL" -o /opt/scanopy-daemon \
+    && curl -fL "$SERVER_URL" -o /opt/scanopy-server \
     && chmod +x /opt/scanopy-daemon \
-    && echo "✓ Scanopy daemon installed successfully!"
+    && chmod +x /opt/scanopy-server \
+    && echo "✓ Scanopy daemon and server installed successfully!"
 
 # Create directories
 RUN mkdir -p /data/scanopy/daemon_config \
