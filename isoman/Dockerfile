@@ -11,30 +11,17 @@ LABEL \
 
 USER root
 
-# Install dependencies including Go for building
+# Install dependencies
 RUN apk add --no-cache \
     curl \
     ca-certificates \
     tzdata \
     supervisor \
     jq \
-    git \
     wget \
-    unzip
-
-# Install Go 1.23 (newer than Alpine's default)
-RUN case "${BUILD_ARCH}" in \
-        "amd64") GO_ARCH="amd64" ;; \
-        "armhf") GO_ARCH="armv6l" ;; \
-        "armv7") GO_ARCH="armv6l" ;; \
-        "aarch64") GO_ARCH="arm64" ;; \
-        "i386") GO_ARCH="386" ;; \
-        *) GO_ARCH="amd64" ;; \
-    esac && \
-    wget -O /tmp/go.tar.gz "https://go.dev/dl/go1.23.4.linux-${GO_ARCH}.tar.gz" && \
-    tar -C /usr/local -xzf /tmp/go.tar.gz && \
-    rm /tmp/go.tar.gz && \
-    ln -sf /usr/local/go/bin/go /usr/bin/go
+    unzip \
+    nodejs \
+    npm
 
 # Create directories
 RUN mkdir -p /data/isoman \
@@ -42,17 +29,16 @@ RUN mkdir -p /data/isoman \
 
 WORKDIR /data
 
-# Clone and build Isoman from source
+# Download and extract Isoman
 RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags/v0.3.3.zip" && \
     unzip /tmp/isoman.zip -d /tmp && \
-    mv /tmp/isoman-0.3.3 /tmp/isoman-src && \
-    cd /tmp/isoman-src/backend && \
-    go mod download && \
-    go build -ldflags="-w -s" -o /usr/local/bin/isoman . && \
-    rm -rf /tmp/isoman.zip /tmp/isoman-src
+    mv /tmp/isoman-0.3.3 /opt/isoman && \
+    rm -rf /tmp/isoman.zip
 
-# Make sure the binary is executable
-RUN chmod +x /usr/local/bin/isoman
+# Install frontend dependencies
+RUN cd /opt/isoman/ui && \
+    npm install && \
+    npm run build
 
 # Copy configuration files
 COPY supervisord.conf /etc/supervisord.conf
