@@ -19,7 +19,8 @@ RUN apk add --no-cache \
     supervisor \
     jq \
     git \
-    wget
+    wget \
+    unzip
 
 # Install Go 1.23 (newer than Alpine's default)
 RUN case "${BUILD_ARCH}" in \
@@ -42,13 +43,13 @@ RUN mkdir -p /data/isoman \
 WORKDIR /data
 
 # Clone and build Isoman from source
-RUN git clone https://github.com/aloks98/isoman.git /tmp/isoman-src && \
-    cd /tmp/isoman-src && \
-    git checkout v0.3.1 && \
-    cd backend && \
+RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags/v0.3.3.zip" && \
+    unzip /tmp/isoman.zip -d /tmp && \
+    mv /tmp/isoman-0.3.3 /tmp/isoman-src && \
+    cd /tmp/isoman-src/backend && \
     go mod download && \
     go build -ldflags="-w -s" -o /usr/local/bin/isoman . && \
-    rm -rf /tmp/isoman-src
+    rm -rf /tmp/isoman.zip /tmp/isoman-src
 
 # Make sure the binary is executable
 RUN chmod +x /usr/local/bin/isoman
