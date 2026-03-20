@@ -97,12 +97,6 @@ jobs:
                 cut -d'/' -f1 | sort -u | tr '\n' ' ')
               echo "📋 Detected changed addons: $ADDONS"
             fi
-            # For push/PR, only build changed addons
-            # Get all addon directories automatically
-            ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
-            ADDONS=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | \
-              grep -E "^($ALL_ADDONS)/" | \
-              cut -d'/' -f1 | sort -u | tr '\n' ' ')
           fi
           
           if [ -z "$ADDONS" ]; then
@@ -172,8 +166,15 @@ jobs:
             echo "  🔍 Vérification des images sur GitHub Container Registry..."
             SKIP_BUILD=true
             
+            # Determine image prefix based on branch
+            if [ "${{ github.ref_name }}" == "main" ]; then
+              IMAGE_PREFIX="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG"
+            else
+              IMAGE_PREFIX="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/dev-$SLUG"
+            fi
+            
             for arch in $ARCHS; do
-              IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
+              IMAGE_TAG="$IMAGE_PREFIX-$arch:$VERSION"
               
               # Check if image exists (will fail if not found)
               if ! docker manifest inspect "$IMAGE_TAG" > /dev/null 2>&1; then
@@ -305,9 +306,14 @@ jobs:
             BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$VERSION"
             BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_ARCH=$arch"
             
-            # Image tag
-            IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
-            IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:latest"
+            # Image tag with dev prefix for non-main branches
+            if [ "${{ github.ref_name }}" == "main" ]; then
+              IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
+              IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:latest"
+            else
+              IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/dev-$SLUG-$arch:$VERSION"
+              IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/dev-$SLUG-$arch:latest"
+            fi
             
             echo "Building image: $IMAGE_TAG"
             
