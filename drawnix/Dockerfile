@@ -17,10 +17,15 @@ RUN apk add --no-cache \
     g++ \
     make \
     python3 \
-    libc6-compat
+    libc6-compat \
+    wget \
+    unzip
 
-# Clone repo
-RUN git clone https://github.com/plait-board/drawnix.git /app
+# Download and extract Drawnix
+RUN wget https://github.com/plait-board/drawnix/archive/refs/tags/v0.3.0.zip -O drawnix.zip && \
+    unzip drawnix.zip && \
+    mv drawnix-0.3.0 /app && \
+    rm drawnix.zip
 
 WORKDIR /app
 
