@@ -21,7 +21,10 @@ RUN apk add --no-cache \
     py3-pip \
     openssl \
     nodejs \
-    npm
+    npm \
+    postgresql \
+    postgresql-init-db \
+    su-exec
 
 # ===============================
 # INSTALL PLANKA
