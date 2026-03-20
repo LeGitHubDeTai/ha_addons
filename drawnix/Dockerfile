@@ -1,6 +1,17 @@
-FROM node:25-8.1
+ARG BUILD_FROM
+ARG BUILD_CONFIG_FILE
+FROM ${BUILD_FROM}
 
-RUN apk add --no-cache git
+LABEL \
+  io.hass.version="${BUILD_VERSION}" \
+  io.hass.type="addon" \
+  io.hass.arch="${BUILD_ARCH}"
+
+# Install Node.js and dependencies
+RUN apk add --no-cache \
+    git \
+    nodejs \
+    npm
 
 # Clone repo
 RUN git clone https://github.com/plait-board/drawnix.git /app
