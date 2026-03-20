@@ -1,5 +1,5 @@
 name: Scanopy
-version: "26.3.4.6"
+version: "26.3.4.7"
 slug: scanopy
 panel_icon: "mdi:network-outline"
 description: Network documentation that updates itself - Automatic network discovery and visualization
