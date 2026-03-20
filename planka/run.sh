@@ -14,7 +14,7 @@ if [[ ! -d "$PG_DATA" ]]; then
     bashio::log.info "Initialisation PostgreSQL"
     mkdir -p "$PG_DATA"
     chown postgres:postgres "$PG_DATA"
-    sudo -u postgres initdb -D "$PG_DATA"
+    sudo -u postgres initdb -D "$PG_DATA" -E UTF8
 fi
 
 # ===============================
@@ -25,7 +25,7 @@ mkdir -p "$PG_SOCKET"
 chown postgres:postgres "$PG_SOCKET"
 
 # Start PostgreSQL in background
-sudo -u postgres pg_ctl -D "$PG_DATA" -l "$PG_DATA/postgres.log" -o "-k $PG_SOCKET" start
+sudo -u postgres pg_ctl -D "$PG_DATA" -l "$PG_DATA/postgres.log" -o "-k $PG_SOCKET -c listen_addresses=localhost" start
 
 # Wait for PostgreSQL to be ready
 for i in {1..30}; do

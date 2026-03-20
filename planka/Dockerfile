@@ -23,7 +23,6 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     postgresql \
-    postgresql-init-db \
     su-exec
 
 # ===============================
