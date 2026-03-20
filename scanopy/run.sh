@@ -1,76 +1,127 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "Starting Scanopy addon..."
+echo "=== Scanopy Addon Starting ==="
 
-# Initialize database
-/scripts/init-db.sh
+# Function to handle cleanup
+cleanup() {
+    echo "Cleaning up..."
+    # Stop PostgreSQL
+    su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log stop" || true
+    # Stop Scanopy server container
+    docker stop scanopy-server || true
+    docker rm scanopy-server || true
+    exit 0
+}
+
+# Set up signal handlers
+trap cleanup SIGTERM SIGINT
 
 # Start PostgreSQL
 echo "Starting PostgreSQL..."
+if [ ! -d "/data/scanopy/postgres_data/base" ]; then
+    echo "Initializing PostgreSQL database..."
+    su postgres -c "initdb -D /data/scanopy/postgres_data"
+    su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log start"
+    sleep 5
+    su postgres -c "createdb -h localhost -p 5432 scanopy" || true
+    su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log stop"
+fi
+
 su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log start"
 
 # Wait for PostgreSQL to be ready
+echo "Waiting for PostgreSQL to be ready..."
 until pg_isready -h localhost -p 5432 -U postgres; do
-    echo "Waiting for PostgreSQL..."
+    echo "PostgreSQL not ready, waiting..."
     sleep 2
 done
 
-echo "PostgreSQL is ready. Starting Scanopy server with Docker..."
+echo "PostgreSQL is ready!"
 
-# Create daemon config directory
+# Initialize database if needed
+if [ -f "/scripts/init-db.sh" ]; then
+    echo "Running database initialization..."
+    /scripts/init-db.sh
+fi
+
+# Create necessary directories
 mkdir -p /data/scanopy/daemon_config
 mkdir -p /data/scanopy/static
 
-# Use default values for configuration (can be overridden by environment variables)
-SCANOPY_LOG_LEVEL="${SCANOPY_LOG_LEVEL:-info}"
-SCANOPY_PUBLIC_URL="${SCANOPY_PUBLIC_URL:-http://localhost:60072}"
+# Start nginx in background
+echo "Starting nginx..."
+nginx -g "daemon off;" &
 
-# Start Scanopy server using Docker
+# Start Scanopy server container
+echo "Starting Scanopy server container..."
+
+# Remove existing container if it exists
+docker stop scanopy-server 2>/dev/null || true
+docker rm scanopy-server 2>/dev/null || true
+
 docker run -d \
     --name scanopy-server \
     -p 60072:60072 \
     -v /data/scanopy:/data \
-    -e SCANOPY_LOG_LEVEL="${SCANOPY_LOG_LEVEL}" \
+    -e SCANOPY_LOG_LEVEL="${SCANOPY_LOG_LEVEL:-info}" \
     -e SCANOPY_DATABASE_URL="${SCANOPY_DATABASE_URL}" \
     -e SCANOPY_WEB_EXTERNAL_PATH="${SCANOPY_WEB_EXTERNAL_PATH:-/app/static}" \
-    -e SCANOPY_PUBLIC_URL="${SCANOPY_PUBLIC_URL}" \
+    -e SCANOPY_PUBLIC_URL="${SCANOPY_PUBLIC_URL:-http://localhost:60072}" \
     -e SCANOPY_INTEGRATED_DAEMON_URL="${SCANOPY_INTEGRATED_DAEMON_URL:-http://localhost:60073}" \
     --add-host=host.docker.internal:host-gateway \
+    --restart unless-stopped \
     ghcr.io/scanopy/scanopy/server:latest
 
-# Wait a bit for server to start
-sleep 10
+# Wait for Scanopy server to be ready
+echo "Waiting for Scanopy server to be ready..."
+sleep 15
 
+# Start Scanopy daemon
 echo "Starting Scanopy daemon..."
-
-# Start Scanopy daemon using local binary in background
 /opt/scanopy/scanopy-daemon \
     --server-url="${SCANOPY_SERVER_URL:-http://127.0.0.1:60072}" \
     --config-dir="/data/scanopy/daemon_config" \
-    --log-level="${SCANOPY_LOG_LEVEL}" &
+    --log-level="${SCANOPY_LOG_LEVEL:-info}" &
 
-# Keep the container running and monitor processes
+echo "=== Scanopy Addon Started Successfully ==="
+echo "Web UI: ${SCANOPY_PUBLIC_URL:-http://localhost:60072}"
+echo "Daemon API: ${SCANOPY_INTEGRATED_DAEMON_URL:-http://localhost:60073}"
+
+# Keep the container running and monitor services
 while true; do
-    # Check if PostgreSQL is running
-    if ! pg_isready -h localhost -p 5432 -U postgres; then
-        echo "PostgreSQL is not running, restarting..."
+    # Check PostgreSQL
+    if ! pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+        echo "ERROR: PostgreSQL is not running, restarting..."
         su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log start"
     fi
     
-    # Check if Scanopy server container is running
-    if ! docker ps | grep scanopy-server; then
-        echo "Scanopy server container is not running, restarting..."
-        docker start scanopy-server
+    # Check Scanopy server container
+    if ! docker ps | grep scanopy-server >/dev/null 2>&1; then
+        echo "ERROR: Scanopy server container is not running, restarting..."
+        docker start scanopy-server || {
+            docker run -d \
+                --name scanopy-server \
+                -p 60072:60072 \
+                -v /data/scanopy:/data \
+                -e SCANOPY_LOG_LEVEL="${SCANOPY_LOG_LEVEL:-info}" \
+                -e SCANOPY_DATABASE_URL="${SCANOPY_DATABASE_URL}" \
+                -e SCANOPY_WEB_EXTERNAL_PATH="${SCANOPY_WEB_EXTERNAL_PATH:-/app/static}" \
+                -e SCANOPY_PUBLIC_URL="${SCANOPY_PUBLIC_URL:-http://localhost:60072}" \
+                -e SCANOPY_INTEGRATED_DAEMON_URL="${SCANOPY_INTEGRATED_DAEMON_URL:-http://localhost:60073}" \
+                --add-host=host.docker.internal:host-gateway \
+                --restart unless-stopped \
+                ghcr.io/scanopy/scanopy/server:latest
+        }
     fi
     
-    # Check if daemon is running
-    if ! pgrep -f scanopy-daemon > /dev/null; then
-        echo "Scanopy daemon is not running, restarting..."
+    # Check daemon
+    if ! pgrep -f scanopy-daemon >/dev/null 2>&1; then
+        echo "ERROR: Scanopy daemon is not running, restarting..."
         /opt/scanopy/scanopy-daemon \
             --server-url="${SCANOPY_SERVER_URL:-http://127.0.0.1:60072}" \
             --config-dir="/data/scanopy/daemon_config" \
-            --log-level="${SCANOPY_LOG_LEVEL}" &
+            --log-level="${SCANOPY_LOG_LEVEL:-info}" &
     fi
     
     sleep 30
