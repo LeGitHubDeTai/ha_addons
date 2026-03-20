@@ -31,7 +31,7 @@ WORKDIR /app
 COPY vite.config.js ./apps/web/
 
 # Installer dépendances
-RUN npm install
+RUN npm install --ignore-scripts --omit=optional
 
 EXPOSE 7200
 
