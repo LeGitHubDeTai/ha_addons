@@ -19,7 +19,8 @@ RUN apk add --no-cache \
     supervisor \
     jq \
     wget \
-    unzip
+    unzip \
+    gcompat
 
 # Install Node.js 20.0.0
 RUN case "${BUILD_ARCH}" in \
