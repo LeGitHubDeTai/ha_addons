@@ -27,7 +27,8 @@ WORKDIR /app
 COPY vite.config.js ./apps/web/
 
 # Installer dépendances
-RUN npm install
+RUN npm config set optional false && \
+    npm install --ignore-scripts --no-optional
 
 # Build production
 RUN npm run build
