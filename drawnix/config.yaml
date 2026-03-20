@@ -5,7 +5,7 @@ panel_icon: "mdi:draw"
 description: Open source whiteboard tool (SaaS) with integrated whiteboard, including mind maps, flowcharts, and free drawing
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/drawnix
 webui: http://[HOST]:[PORT:7200]/
-image: ghcr.io/legithubdetai/ha_addons/drawnix-{arch}
+image: ghcr.io/legithubdetai/ha_addons/dev-drawnix-{arch}
 arch:
     - armhf
     - armv7
