@@ -44,9 +44,9 @@ RUN ARCH=$(uname -m) \
     && cd /tmp/scanopy \
     && git checkout $(git describe --tags --abbrev=0) \
     && echo "Installing web dependencies..." \
-    && npm install --prefix web \
+    && npm install --prefix ui \
     && echo "Building web interface..." \
-    && npm run build --prefix web \
+    && npm run build --prefix ui \
     && echo "Building server binary..." \
     && CGO_ENABLED=0 GOOS=linux GOARCH=$ARCH go build -ldflags="-s -w" -o /opt/scanopy-server ./cmd/server \
     && echo "✓ Scanopy server built successfully!" \
