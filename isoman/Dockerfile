@@ -22,7 +22,7 @@ RUN apk add --no-cache \
     unzip \
     gcompat
 
-# Install Node.js 20.0.0
+# Install Node.js 18.19.0 (more compatible with ARM)
 RUN case "${BUILD_ARCH}" in \
         "amd64") NODE_ARCH="x64" ;; \
         "armhf") NODE_ARCH="armv7l" ;; \
@@ -31,11 +31,11 @@ RUN case "${BUILD_ARCH}" in \
         "i386") NODE_ARCH="x86" ;; \
         *) NODE_ARCH="x64" ;; \
     esac && \
-    wget -O /tmp/node.tar.gz "https://nodejs.org/dist/v20.0.0/node-v20.0.0-linux-${NODE_ARCH}.tar.gz" && \
+    wget -O /tmp/node.tar.gz "https://nodejs.org/dist/v18.19.0/node-v18.19.0-linux-${NODE_ARCH}.tar.gz" && \
     tar -C /usr/local -xzf /tmp/node.tar.gz && \
     rm /tmp/node.tar.gz && \
-    ln -sf /usr/local/node-v20.0.0-linux-${NODE_ARCH}/bin/node /usr/bin/node && \
-    ln -sf /usr/local/node-v20.0.0-linux-${NODE_ARCH}/bin/npm /usr/bin/npm
+    ln -sf /usr/local/node-v18.19.0-linux-${NODE_ARCH}/bin/node /usr/bin/node && \
+    ln -sf /usr/local/node-v18.19.0-linux-${NODE_ARCH}/bin/npm /usr/bin/npm
 
 # Create directories
 RUN mkdir -p /data/isoman \
