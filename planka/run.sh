@@ -14,7 +14,7 @@ if [[ ! -d "$PG_DATA" ]]; then
     bashio::log.info "Initialisation PostgreSQL"
     mkdir -p "$PG_DATA"
     chown postgres:postgres "$PG_DATA"
-    sudo -u postgres initdb -D "$PG_DATA" -E UTF8
+    su-exec postgres initdb -D "$PG_DATA" -E UTF8
 fi
 
 # ===============================
@@ -25,11 +25,11 @@ mkdir -p "$PG_SOCKET"
 chown postgres:postgres "$PG_SOCKET"
 
 # Start PostgreSQL in background
-sudo -u postgres pg_ctl -D "$PG_DATA" -l "$PG_DATA/postgres.log" -o "-k $PG_SOCKET -c listen_addresses=localhost" start
+su-exec postgres pg_ctl -D "$PG_DATA" -l "$PG_DATA/postgres.log" -o "-k $PG_SOCKET -c listen_addresses=localhost" start
 
 # Wait for PostgreSQL to be ready
 for i in {1..30}; do
-    if sudo -u postgres pg_isready -q -h "$PG_SOCKET"; then
+    if su-exec postgres pg_isready -q -h "$PG_SOCKET"; then
         break
     fi
     sleep 1
@@ -40,7 +40,7 @@ DB_USER="$(bashio::config 'DATABASE.db_user')"
 DB_PASSWORD="$(bashio::config 'DATABASE.db_password')"
 DB_NAME="$(bashio::config 'DATABASE.db_name')"
 
-sudo -u postgres psql -h "$PG_SOCKET" -d postgres <<-EOF
+su-exec postgres psql -h "$PG_SOCKET" -d postgres <<-EOF
 CREATE USER "$DB_USER" WITH PASSWORD '$DB_PASSWORD';
 CREATE DATABASE "$DB_NAME" OWNER "$DB_USER";
 GRANT ALL PRIVILEGES ON DATABASE "$DB_NAME" TO "$DB_USER";
@@ -95,7 +95,7 @@ bashio::log.info "Démarrage Planka"
 # Function to cleanup on exit
 cleanup() {
     bashio::log.info "Arrêt PostgreSQL"
-    sudo -u postgres pg_ctl -D "$PG_DATA" stop
+    su-exec postgres pg_ctl -D "$PG_DATA" stop
 }
 trap cleanup EXIT
 
