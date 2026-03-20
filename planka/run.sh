@@ -2,8 +2,49 @@
 set -euo pipefail
 
 ENV_FILE="/config/.env"
+PG_DATA="/data/postgres"
+PG_SOCKET="/tmp/postgres"
 
 bashio::log.info "Initialisation Planka"
+
+# ===============================
+# INIT POSTGRES DATA DIR
+# ===============================
+if [[ ! -d "$PG_DATA" ]]; then
+    bashio::log.info "Initialisation PostgreSQL"
+    mkdir -p "$PG_DATA"
+    chown postgres:postgres "$PG_DATA"
+    sudo -u postgres initdb -D "$PG_DATA"
+fi
+
+# ===============================
+# START POSTGRES
+# ===============================
+bashio::log.info "Démarrage PostgreSQL"
+mkdir -p "$PG_SOCKET"
+chown postgres:postgres "$PG_SOCKET"
+
+# Start PostgreSQL in background
+sudo -u postgres pg_ctl -D "$PG_DATA" -l "$PG_DATA/postgres.log" -o "-k $PG_SOCKET" start
+
+# Wait for PostgreSQL to be ready
+for i in {1..30}; do
+    if sudo -u postgres pg_isready -q -h "$PG_SOCKET"; then
+        break
+    fi
+    sleep 1
+done
+
+# Create database and user
+DB_USER="$(bashio::config 'DATABASE.db_user')"
+DB_PASSWORD="$(bashio::config 'DATABASE.db_password')"
+DB_NAME="$(bashio::config 'DATABASE.db_name')"
+
+sudo -u postgres psql -h "$PG_SOCKET" -d postgres <<-EOF
+CREATE USER "$DB_USER" WITH PASSWORD '$DB_PASSWORD';
+CREATE DATABASE "$DB_NAME" OWNER "$DB_USER";
+GRANT ALL PRIVILEGES ON DATABASE "$DB_NAME" TO "$DB_USER";
+EOF 2>/dev/null || true
 
 # ===============================
 # SECRET (jamais modifié)
@@ -15,15 +56,9 @@ if [[ ! -f "$ENV_FILE" ]] || ! grep -q "^SECRET_KEY=" "$ENV_FILE"; then
 fi
 
 # ===============================
-# DATABASE_URL (avec détection)
+# DATABASE_URL (avec socket local)
 # ===============================
-DB_HOST="$(bashio::config 'DATABASE.db_host')"
-DB_PORT="$(bashio::config 'DATABASE.db_port')"
-DB_USER="$(bashio::config 'DATABASE.db_user')"
-DB_PASSWORD="$(bashio::config 'DATABASE.db_password')"
-DB_NAME="$(bashio::config 'DATABASE.db_name')"
-
-NEW_DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+NEW_DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_NAME}"
 
 DB_CHANGED=false
 
@@ -87,4 +122,12 @@ fi
 # START PLANKA
 # ===============================
 bashio::log.info "Démarrage Planka"
+
+# Function to cleanup on exit
+cleanup() {
+    bashio::log.info "Arrêt PostgreSQL"
+    sudo -u postgres pg_ctl -D "$PG_DATA" stop
+}
+trap cleanup EXIT
+
 exec npm start --production
