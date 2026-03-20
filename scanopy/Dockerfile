@@ -1,12 +1,5 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.20
-
-# hadolint ignore=DL3006
+ARG BUILD_FROM
 FROM ${BUILD_FROM}
-
-LABEL \
-  io.hass.version="${BUILD_VERSION}" \
-  io.hass.type="addon" \
-  io.hass.arch="${BUILD_ARCH}"
 
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -39,11 +32,16 @@ RUN ARCH=$(uname -m) \
     && echo "Architecture: $ARCH" \
     && echo "Binary: $BINARY_NAME" \
     && echo "Downloading from: $BINARY_URL" \
-    && curl -fL "$BINARY_URL" -o /tmp/scanopy-daemon \
-    && chmod +x /tmp/scanopy-daemon \
-    && mkdir -p /opt/scanopy \
-    && mv /tmp/scanopy-daemon /opt/scanopy/ \
+    && curl -fL "$BINARY_URL" -o /opt/scanopy-daemon \
+    && chmod +x /opt/scanopy-daemon \
     && echo "✓ Scanopy daemon installed successfully!"
+
+# Create directories
+RUN mkdir -p /data/scanopy/postgres_data \
+    && mkdir -p /data/scanopy/daemon_config \
+    && mkdir -p /data/scanopy/static \
+    && mkdir -p /var/log/scanopy \
+    && mkdir -p /scripts
 
 # Copy configuration files
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -52,11 +50,6 @@ COPY run.sh /run.sh
 
 # Make scripts executable
 RUN chmod +x /scripts/*.sh /run.sh
-
-# Create data directory structure
-RUN mkdir -p /data/scanopy/postgres_data \
-    && mkdir -p /data/scanopy/daemon_config \
-    && mkdir -p /data/scanopy/static
 
 # Expose ports
 EXPOSE 60072 60073
@@ -71,5 +64,12 @@ ENV POSTGRES_PASSWORD=password
 ENV SCANOPY_DATABASE_URL=postgresql://postgres:password@localhost:5432/scanopy
 ENV SCANOPY_WEB_EXTERNAL_PATH=/app/static
 ENV SCANOPY_INTEGRATED_DAEMON_URL=http://localhost:60073
+
+# Initialize PostgreSQL data directory
+RUN su postgres -c "initdb -D /data/scanopy/postgres_data" \
+    && su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log start" \
+    && sleep 5 \
+    && su postgres -c "createdb -h localhost -p 5432 scanopy" \
+    && su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log stop"
 
 CMD ["/run.sh"]
