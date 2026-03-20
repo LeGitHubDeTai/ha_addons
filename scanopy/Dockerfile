@@ -1,6 +1,9 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
+# Disable s6-overlay by removing the entrypoint
+ENTRYPOINT []
+
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
