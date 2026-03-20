@@ -48,4 +48,5 @@ if [ -n "$ENV_VARS_LIST" ]; then
 fi
 
 # Start Isoman
-exec /usr/local/bin/isoman
+cd /usr/local/bin
+exec ./isoman serve --port 8080 --data-dir "$ISO_STORAGE_PATH"
