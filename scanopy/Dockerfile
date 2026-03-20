@@ -24,8 +24,16 @@ RUN mkdir -p /data/scanopy \
     && mkdir -p /etc/s6-overlay/s6-rc.d/init
 
 # Download and install Scanopy daemon using installation script logic
-RUN PLATFORM="linux" \
-    && ARCH="amd64" \
+RUN ARCH=$(uname -m) \
+    && case "$ARCH" in \
+        x86_64) ARCH="amd64" ;; \
+        aarch64|arm64) ARCH="arm64" ;; \
+        armv7l) ARCH="armv7" ;; \
+        armv6l) ARCH="armhf" ;; \
+        i686) ARCH="i386" ;; \
+        *) echo "Error: Unsupported architecture: $ARCH" && exit 1 ;; \
+    esac \
+    && PLATFORM="linux" \
     && BINARY_NAME="scanopy-daemon-${PLATFORM}-${ARCH}" \
     && BINARY_URL="https://github.com/scanopy/scanopy/releases/latest/download/${BINARY_NAME}" \
     && echo "Installing Scanopy daemon..." \
