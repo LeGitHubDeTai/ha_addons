@@ -1,5 +1,5 @@
 name: Scanopy
-version: "26.3.4.4"
+version: "26.3.4.5"
 slug: scanopy
 panel_icon: "mdi:network-outline"
 description: Network documentation that updates itself - Automatic network discovery and visualization
@@ -36,7 +36,7 @@ ports_description:
   60073/tcp: The port for Scanopy daemon API and health checks
 options:
   log_level: "info"
-  postgres_password: "password"
+  database_url: "postgresql://user:password@host:port/database"
   public_url: "http://localhost:60072"
   enable_docker_discovery: true
   scan_intervals:
@@ -44,7 +44,7 @@ options:
     recurring: "1h"
 schema:
   log_level: "list(info|debug|warn|error)"
-  postgres_password: str
+  database_url: str
   public_url: str
   enable_docker_discovery: bool
   scan_intervals:

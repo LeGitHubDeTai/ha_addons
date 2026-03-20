@@ -8,8 +8,6 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apk add --no-cache \
     curl \
     jq \
-    postgresql \
-    postgresql-client \
     nginx \
     nmap \
     nmap-scripts \
@@ -37,19 +35,17 @@ RUN ARCH=$(uname -m) \
     && echo "✓ Scanopy daemon installed successfully!"
 
 # Create directories
-RUN mkdir -p /data/scanopy/postgres_data \
-    && mkdir -p /data/scanopy/daemon_config \
+RUN mkdir -p /data/scanopy/daemon_config \
     && mkdir -p /data/scanopy/static \
     && mkdir -p /var/log/scanopy \
     && mkdir -p /scripts
 
 # Copy configuration files
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY init-db.sh /scripts/
 COPY run.sh /run.sh
 
 # Make scripts executable
-RUN chmod +x /scripts/*.sh /run.sh
+RUN chmod +x /run.sh
 
 # Expose ports
 EXPOSE 60072 60073
@@ -58,18 +54,7 @@ EXPOSE 60072 60073
 ENV SCANOPY_LOG_LEVEL=info
 ENV SCANOPY_SERVER_URL=http://127.0.0.1:60072
 ENV SCANOPY_PUBLIC_URL=http://localhost:60072
-ENV POSTGRES_DB=scanopy
-ENV POSTGRES_USER=postgres
-ENV POSTGRES_PASSWORD=password
-ENV SCANOPY_DATABASE_URL=postgresql://postgres:password@localhost:5432/scanopy
 ENV SCANOPY_WEB_EXTERNAL_PATH=/app/static
 ENV SCANOPY_INTEGRATED_DAEMON_URL=http://localhost:60073
-
-# Initialize PostgreSQL data directory
-RUN su postgres -c "initdb -D /data/scanopy/postgres_data" \
-    && su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log start" \
-    && sleep 5 \
-    && su postgres -c "createdb -h localhost -p 5432 scanopy" \
-    && su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log stop"
 
 CMD ["/run.sh"]
