@@ -1,5 +1,7 @@
 ARG BUILD_FROM
 ARG BUILD_CONFIG_FILE
+ARG BUILD_VERSION
+ARG BUILD_ARCH
 FROM ${BUILD_FROM}
 
 LABEL \
@@ -11,7 +13,11 @@ LABEL \
 RUN apk add --no-cache \
     git \
     nodejs \
-    npm
+    npm \
+    g++ \
+    make \
+    python3 \
+    libc6-compat
 
 # Clone repo
 RUN git clone https://github.com/plait-board/drawnix.git /app
