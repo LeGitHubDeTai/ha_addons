@@ -7,7 +7,7 @@ if [ -n "$TZ" ]; then
 fi
 
 # Create ISO storage directory if it doesn't exist
-ISO_STORAGE_PATH="${ISO_STORAGE_PATH:-/share/isoman}"
+ISO_STORAGE_PATH="${ISO_STORAGE_PATH:-/data/isoman}"
 mkdir -p "$ISO_STORAGE_PATH"
 
 # Set environment variables for Isoman
@@ -47,6 +47,6 @@ if [ -n "$ENV_VARS_LIST" ]; then
     done
 fi
 
-# Start Isoman
-cd /usr/local/bin
-exec ./isoman serve --port 8080 --data-dir "$ISO_STORAGE_PATH"
+# Start Isoman frontend
+cd /opt/isoman/ui
+exec npm run serve -- --port 8080 --host 0.0.0.0
