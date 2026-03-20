@@ -6,8 +6,6 @@ echo "=== Scanopy Addon Starting ==="
 # Function to handle cleanup
 cleanup() {
     echo "Cleaning up..."
-    # Stop PostgreSQL
-    su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log stop" || true
     # Stop Scanopy server container
     docker stop scanopy-server || true
     docker rm scanopy-server || true
@@ -16,34 +14,6 @@ cleanup() {
 
 # Set up signal handlers
 trap cleanup SIGTERM SIGINT
-
-# Start PostgreSQL
-echo "Starting PostgreSQL..."
-if [ ! -d "/data/scanopy/postgres_data/base" ]; then
-    echo "Initializing PostgreSQL database..."
-    su postgres -c "initdb -D /data/scanopy/postgres_data"
-    su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log start"
-    sleep 5
-    su postgres -c "createdb -h localhost -p 5432 scanopy" || true
-    su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log stop"
-fi
-
-su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log start"
-
-# Wait for PostgreSQL to be ready
-echo "Waiting for PostgreSQL to be ready..."
-until pg_isready -h localhost -p 5432 -U postgres; do
-    echo "PostgreSQL not ready, waiting..."
-    sleep 2
-done
-
-echo "PostgreSQL is ready!"
-
-# Initialize database if needed
-if [ -f "/scripts/init-db.sh" ]; then
-    echo "Running database initialization..."
-    /scripts/init-db.sh
-fi
 
 # Create necessary directories
 mkdir -p /data/scanopy/daemon_config
@@ -65,7 +35,7 @@ docker run -d \
     -p 60072:60072 \
     -v /data/scanopy:/data \
     -e SCANOPY_LOG_LEVEL="${SCANOPY_LOG_LEVEL:-info}" \
-    -e SCANOPY_DATABASE_URL="${SCANOPY_DATABASE_URL}" \
+    -e SCANOPY_DATABASE_URL="${SCANOPY_DATABASE_URL:-${DATABASE_URL:-postgresql://user:password@host:port/database}}" \
     -e SCANOPY_WEB_EXTERNAL_PATH="${SCANOPY_WEB_EXTERNAL_PATH:-/app/static}" \
     -e SCANOPY_PUBLIC_URL="${SCANOPY_PUBLIC_URL:-http://localhost:60072}" \
     -e SCANOPY_INTEGRATED_DAEMON_URL="${SCANOPY_INTEGRATED_DAEMON_URL:-http://localhost:60073}" \
@@ -87,15 +57,10 @@ echo "Starting Scanopy daemon..."
 echo "=== Scanopy Addon Started Successfully ==="
 echo "Web UI: ${SCANOPY_PUBLIC_URL:-http://localhost:60072}"
 echo "Daemon API: ${SCANOPY_INTEGRATED_DAEMON_URL:-http://localhost:60073}"
+echo "Database: ${SCANOPY_DATABASE_URL:-${DATABASE_URL:-Not configured}}"
 
 # Keep the container running and monitor services
 while true; do
-    # Check PostgreSQL
-    if ! pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
-        echo "ERROR: PostgreSQL is not running, restarting..."
-        su postgres -c "pg_ctl -D /data/scanopy/postgres_data -l /var/log/scanopy/postgres.log start"
-    fi
-    
     # Check Scanopy server container
     if ! docker ps | grep scanopy-server >/dev/null 2>&1; then
         echo "ERROR: Scanopy server container is not running, restarting..."
@@ -105,7 +70,7 @@ while true; do
                 -p 60072:60072 \
                 -v /data/scanopy:/data \
                 -e SCANOPY_LOG_LEVEL="${SCANOPY_LOG_LEVEL:-info}" \
-                -e SCANOPY_DATABASE_URL="${SCANOPY_DATABASE_URL}" \
+                -e SCANOPY_DATABASE_URL="${SCANOPY_DATABASE_URL:-${DATABASE_URL:-postgresql://user:password@host:port/database}}" \
                 -e SCANOPY_WEB_EXTERNAL_PATH="${SCANOPY_WEB_EXTERNAL_PATH:-/app/static}" \
                 -e SCANOPY_PUBLIC_URL="${SCANOPY_PUBLIC_URL:-http://localhost:60072}" \
                 -e SCANOPY_INTEGRATED_DAEMON_URL="${SCANOPY_INTEGRATED_DAEMON_URL:-http://localhost:60073}" \
