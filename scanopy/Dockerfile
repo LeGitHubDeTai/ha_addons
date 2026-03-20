@@ -7,18 +7,21 @@ ENTRYPOINT []
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install required packages
+# Install required packages for building
 RUN apk add --no-cache \
     curl \
     jq \
     nginx \
     nmap \
     nmap-scripts \
-    docker \
     bash \
+    git \
+    go \
+    nodejs \
+    npm \
     && rm -rf /var/cache/apk/*
 
-# Download and install Scanopy daemon only
+# Download and install Scanopy daemon, and build server from source
 RUN ARCH=$(uname -m) \
     && case "$ARCH" in \
         x86_64) ARCH="amd64" ;; \
@@ -35,7 +38,20 @@ RUN ARCH=$(uname -m) \
     && echo "Downloading daemon from: $BINARY_URL" \
     && curl -fL "$BINARY_URL" -o /opt/scanopy-daemon \
     && chmod +x /opt/scanopy-daemon \
-    && echo "✓ Scanopy daemon installed successfully!"
+    && echo "✓ Scanopy daemon installed successfully!" \
+    && echo "Building Scanopy server from source..." \
+    && git clone https://github.com/scanopy/scanopy.git /tmp/scanopy \
+    && cd /tmp/scanopy \
+    && git checkout $(git describe --tags --abbrev=0) \
+    && echo "Installing web dependencies..." \
+    && npm ci --prefix web \
+    && echo "Building web interface..." \
+    && npm run build --prefix web \
+    && echo "Building server binary..." \
+    && CGO_ENABLED=0 GOOS=linux GOARCH=$ARCH go build -ldflags="-s -w" -o /opt/scanopy-server ./cmd/server \
+    && echo "✓ Scanopy server built successfully!" \
+    && chmod +x /opt/scanopy-server \
+    && rm -rf /tmp/scanopy
 
 # Create directories
 RUN mkdir -p /data/scanopy/daemon_config \

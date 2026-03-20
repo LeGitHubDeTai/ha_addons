@@ -6,9 +6,6 @@ echo "=== Scanopy Addon Starting ==="
 # Function to handle cleanup
 cleanup() {
     echo "Cleaning up..."
-    # Stop Scanopy server container
-    docker stop scanopy-server || true
-    docker rm scanopy-server || true
     # Kill background processes
     jobs -p | xargs -r kill
     exit 0
@@ -25,25 +22,14 @@ mkdir -p /data/scanopy/static
 echo "Starting nginx..."
 nginx -g "daemon off;" &
 
-# Start Scanopy server container
-echo "Starting Scanopy server container..."
-
-# Remove existing container if it exists
-docker stop scanopy-server 2>/dev/null || true
-docker rm scanopy-server 2>/dev/null || true
-
-docker run -d \
-    --name scanopy-server \
-    -p 60072:60072 \
-    -v /data/scanopy:/data \
-    -e SCANOPY_LOG_LEVEL="${SCANOPY_LOG_LEVEL:-info}" \
-    -e SCANOPY_DATABASE_URL="${SCANOPY_DATABASE_URL:-${DATABASE_URL:-postgresql://user:password@host:port/database}}" \
-    -e SCANOPY_WEB_EXTERNAL_PATH="${SCANOPY_WEB_EXTERNAL_PATH:-/app/static}" \
-    -e SCANOPY_PUBLIC_URL="${SCANOPY_PUBLIC_URL:-http://localhost:60072}" \
-    -e SCANOPY_INTEGRATED_DAEMON_URL="${SCANOPY_INTEGRATED_DAEMON_URL:-http://localhost:60073}" \
-    --add-host=host.docker.internal:host-gateway \
-    --restart unless-stopped \
-    ghcr.io/scanopy/scanopy/server:latest
+# Start Scanopy server (native binary)
+echo "Starting Scanopy server..."
+/opt/scanopy-server \
+    --database-url="${SCANOPY_DATABASE_URL:-${DATABASE_URL:-postgresql://user:password@host:port/database}}" \
+    --web-external-path="${SCANOPY_WEB_EXTERNAL_PATH:-/app/static}" \
+    --public-url="${SCANOPY_PUBLIC_URL:-http://localhost:60072}" \
+    --integrated-daemon-url="${SCANOPY_INTEGRATED_DAEMON_URL:-http://localhost:60073}" \
+    --log-level="${SCANOPY_LOG_LEVEL:-info}" &
 
 # Wait for Scanopy server to be ready
 echo "Waiting for Scanopy server to be ready..."
