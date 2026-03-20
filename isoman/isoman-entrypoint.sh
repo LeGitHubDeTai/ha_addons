@@ -47,6 +47,5 @@ if [ -n "$ENV_VARS_LIST" ]; then
     done
 fi
 
-# Start Isoman frontend
-cd /opt/isoman/ui
-exec npm run serve -- --port 8080 --host 0.0.0.0
+# Start Isoman backend
+exec /usr/local/bin/isoman
