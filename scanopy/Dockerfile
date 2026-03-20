@@ -23,11 +23,21 @@ RUN mkdir -p /data/scanopy \
     && mkdir -p /var/log/scanopy \
     && mkdir -p /etc/s6-overlay/s6-rc.d/init
 
-# Download and install Scanopy daemon
-RUN curl -L -o /tmp/scanopy-daemon "https://github.com/scanopy/scanopy/releases/latest/download/scanopy-daemon-linux-amd64" \
+# Download and install Scanopy daemon using installation script logic
+RUN PLATFORM="linux" \
+    && ARCH="amd64" \
+    && BINARY_NAME="scanopy-daemon-${PLATFORM}-${ARCH}" \
+    && BINARY_URL="https://github.com/scanopy/scanopy/releases/latest/download/${BINARY_NAME}" \
+    && echo "Installing Scanopy daemon..." \
+    && echo "Platform: $PLATFORM" \
+    && echo "Architecture: $ARCH" \
+    && echo "Binary: $BINARY_NAME" \
+    && echo "Downloading from: $BINARY_URL" \
+    && curl -fL "$BINARY_URL" -o /tmp/scanopy-daemon \
+    && chmod +x /tmp/scanopy-daemon \
     && mkdir -p /opt/scanopy \
     && mv /tmp/scanopy-daemon /opt/scanopy/ \
-    && chmod +x /opt/scanopy/scanopy-daemon
+    && echo "✓ Scanopy daemon installed successfully!"
 
 # Copy configuration files
 COPY nginx.conf /etc/nginx/nginx.conf
