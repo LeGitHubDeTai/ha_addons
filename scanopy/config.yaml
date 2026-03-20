@@ -5,12 +5,10 @@ panel_icon: "mdi:network-outline"
 description: Network documentation that updates itself - Automatic network discovery and visualization
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/scanopy
 webui: http://[HOST]:[PORT:60072]/
+image: ghcr.io/legithubdetai/ha_addons/dev-scanopy-{arch}
 arch:
-  - armhf
-  - armv7
   - aarch64
   - amd64
-  - i386
 startup: application
 boot: auto
 hassio_role: "default"
