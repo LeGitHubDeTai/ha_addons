@@ -19,6 +19,7 @@ RUN apk add --no-cache \
     go \
     nodejs \
     npm \
+    unzip \
     && rm -rf /var/cache/apk/*
 
 # Download and install Scanopy daemon, and build server from source
@@ -40,9 +41,11 @@ RUN ARCH=$(uname -m) \
     && chmod +x /opt/scanopy-daemon \
     && echo "✓ Scanopy daemon installed successfully!" \
     && echo "Building Scanopy server from source..." \
-    && git clone https://github.com/scanopy/scanopy.git /tmp/scanopy \
-    && cd /tmp/scanopy \
-    && git checkout $(git describe --tags --abbrev=0) \
+    && curl -L "https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip" -o /tmp/scanopy.zip \
+    && cd /tmp \
+    && unzip scanopy.zip \
+    && mv scanopy-0.14.19 scanopy \
+    && cd scanopy \
     && echo "Installing web dependencies..." \
     && npm install --prefix ui \
     && echo "Building web interface..." \
@@ -51,7 +54,7 @@ RUN ARCH=$(uname -m) \
     && CGO_ENABLED=0 GOOS=linux GOARCH=$ARCH go build -ldflags="-s -w" -o /opt/scanopy-server ./cmd/server \
     && echo "✓ Scanopy server built successfully!" \
     && chmod +x /opt/scanopy-server \
-    && rm -rf /tmp/scanopy
+    && rm -rf /tmp/scanopy /tmp/scanopy.zip
 
 # Create directories
 RUN mkdir -p /data/scanopy/daemon_config \
