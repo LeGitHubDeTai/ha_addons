@@ -19,9 +19,22 @@ RUN apk add --no-cache \
     supervisor \
     jq \
     wget \
-    unzip \
-    nodejs \
-    npm
+    unzip
+
+# Install Node.js 20.0.0
+RUN case "${BUILD_ARCH}" in \
+        "amd64") NODE_ARCH="x64" ;; \
+        "armhf") NODE_ARCH="armv7l" ;; \
+        "armv7") NODE_ARCH="armv7l" ;; \
+        "aarch64") NODE_ARCH="arm64" ;; \
+        "i386") NODE_ARCH="x86" ;; \
+        *) NODE_ARCH="x64" ;; \
+    esac && \
+    wget -O /tmp/node.tar.gz "https://nodejs.org/dist/v20.0.0/node-v20.0.0-linux-${NODE_ARCH}.tar.gz" && \
+    tar -C /usr/local -xzf /tmp/node.tar.gz && \
+    rm /tmp/node.tar.gz && \
+    ln -sf /usr/local/node-v20.0.0-linux-${NODE_ARCH}/bin/node /usr/bin/node && \
+    ln -sf /usr/local/node-v20.0.0-linux-${NODE_ARCH}/bin/npm /usr/bin/npm
 
 # Create directories
 RUN mkdir -p /data/isoman \
