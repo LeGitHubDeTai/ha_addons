@@ -18,8 +18,22 @@ RUN apk add --no-cache \
     tzdata \
     supervisor \
     jq \
-    go \
-    git
+    git \
+    wget
+
+# Install Go 1.23 (newer than Alpine's default)
+RUN case "${BUILD_ARCH}" in \
+        "amd64") GO_ARCH="amd64" ;; \
+        "armhf") GO_ARCH="armv6l" ;; \
+        "armv7") GO_ARCH="armv6l" ;; \
+        "aarch64") GO_ARCH="arm64" ;; \
+        "i386") GO_ARCH="386" ;; \
+        *) GO_ARCH="amd64" ;; \
+    esac && \
+    wget -O /tmp/go.tar.gz "https://go.dev/dl/go1.23.4.linux-${GO_ARCH}.tar.gz" && \
+    tar -C /usr/local -xzf /tmp/go.tar.gz && \
+    rm /tmp/go.tar.gz && \
+    ln -sf /usr/local/go/bin/go /usr/bin/go
 
 # Create directories
 RUN mkdir -p /data/isoman \
@@ -32,8 +46,6 @@ RUN git clone https://github.com/aloks98/isoman.git /tmp/isoman-src && \
     cd /tmp/isoman-src && \
     git checkout v0.3.1 && \
     cd backend && \
-    # Fix Go version compatibility for Alpine
-    sed -i 's/go 1.24.4/go 1.23/' go.mod && \
     go mod download && \
     go build -ldflags="-w -s" -o /usr/local/bin/isoman . && \
     rm -rf /tmp/isoman-src
