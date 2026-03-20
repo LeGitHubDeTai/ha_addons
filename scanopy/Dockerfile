@@ -17,7 +17,7 @@ RUN apk add --no-cache \
     bash \
     git \
     go \
-    nodejs \
+    nodejs-current \
     npm \
     unzip \
     && rm -rf /var/cache/apk/*
