@@ -44,7 +44,7 @@ RUN ARCH=$(uname -m) \
     && cd /tmp/scanopy \
     && git checkout $(git describe --tags --abbrev=0) \
     && echo "Installing web dependencies..." \
-    && npm ci --prefix web \
+    && npm install --prefix web \
     && echo "Building web interface..." \
     && npm run build --prefix web \
     && echo "Building server binary..." \
