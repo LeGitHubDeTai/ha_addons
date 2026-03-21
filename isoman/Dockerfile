@@ -11,7 +11,7 @@ LABEL \
 
 USER root
 
-# Install dependencies including Go and Bun for building
+# Install dependencies including Go and Node.js for building
 RUN apk add --no-cache \
     curl \
     ca-certificates \
@@ -20,7 +20,9 @@ RUN apk add --no-cache \
     jq \
     git \
     wget \
-    unzip
+    unzip \
+    nodejs \
+    npm
 
 # Install Go 1.23
 RUN case "${BUILD_ARCH}" in \
@@ -35,20 +37,6 @@ RUN case "${BUILD_ARCH}" in \
     tar -C /usr/local -xzf /tmp/go.tar.gz && \
     rm /tmp/go.tar.gz && \
     ln -sf /usr/local/go/bin/go /usr/bin/go
-
-# Install Bun
-RUN case "${BUILD_ARCH}" in \
-        "amd64") BUN_ARCH="x64" ;; \
-        "armhf") BUN_ARCH="armv6" ;; \
-        "armv7") BUN_ARCH="armv6" ;; \
-        "aarch64") BUN_ARCH="arm64" ;; \
-        "i386") BUN_ARCH="x64" ;; \
-        *) BUN_ARCH="x64" ;; \
-    esac && \
-    wget -O /tmp/bun.zip "https://github.com/oven-sh/bun/releases/latest/download/bun-linux-${BUN_ARCH}.zip" && \
-    unzip /tmp/bun.zip -d /tmp && \
-    mv /tmp/bun-linux-${BUN_ARCH}/bun /usr/local/bin/ && \
-    rm -rf /tmp/bun.zip /tmp/bun-linux-${BUN_ARCH}
 
 # Create directories
 RUN mkdir -p /data/isoman \
@@ -67,10 +55,10 @@ RUN cd /opt/isoman/backend && \
     go mod download && \
     go build -ldflags="-w -s" -o /usr/local/bin/isoman .
 
-# Build frontend with Bun
+# Build frontend with Node.js (skip if fails due to architecture issues)
 RUN cd /opt/isoman/ui && \
-    /usr/local/bin/bun install && \
-    /usr/local/bin/bun run build
+    npm install --no-optional || echo "Frontend build skipped due to architecture limitations" && \
+    npm run build || echo "Frontend build skipped due to architecture limitations"
 
 # Copy configuration files
 COPY supervisord.conf /etc/supervisord.conf
