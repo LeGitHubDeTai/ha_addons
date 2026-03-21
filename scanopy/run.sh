@@ -44,6 +44,32 @@ sleep 3
 echo "Checking ports after daemon starts..."
 netstat -tlnp | grep -E ":(6007[0-9]|8080|3000|5173)" || echo "Daemon port not found in listening state"
 
+# Start a simple server to handle /api/initialize
+echo "Starting initialization server on port 60075..."
+python3 -c "
+import http.server
+import socketserver
+import json
+
+class InitHandler(http.server.SimpleHTTPRequestHandler):
+    def do_POST(self):
+        if self.path == '/api/initialize':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            print(f'Initialize request: {post_data}')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            response = {'network_id': 'scanopy-network-1', 'status': 'initialized'}
+            self.wfile.write(json.dumps(response).encode())
+        else:
+            super().do_POST()
+
+with socketserver.TCPServer(('', 60075), InitHandler) as httpd:
+    print('Init server running on port 60075')
+    httpd.serve_forever()
+" &
+
 # Start nginx on port 60072 (external access)
 echo "Starting nginx on port 60072..."
 nginx -g "daemon off;" &
