@@ -41,9 +41,14 @@ export SCANOPY_ENABLE_DOCKER_DISCOVERY="$ENABLE_DOCKER_DISCOVERY"
 export SCANOPY_INITIAL_INTERVAL="$INITIAL_INTERVAL"
 export SCANOPY_RECURRING_INTERVAL="$RECURRING_INTERVAL"
 
-# Start daemon (uses default port)
+# Start daemon and check which port it uses
 echo "Starting daemon..."
+echo "Checking available ports before daemon starts..."
+netstat -tlnp | grep -E ":(6007[0-9]|8080|3000|5173)" || echo "No conflicting ports found"
 /opt/scanopy-daemon &
+sleep 3
+echo "Checking ports after daemon starts..."
+netstat -tlnp | grep -E ":(6007[0-9]|8080|3000|5173)" || echo "Daemon port not found in listening state"
 
 # Wait for processes
 wait
