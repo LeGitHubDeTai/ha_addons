@@ -1,6 +1,12 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
+# Disable s6-overlay to avoid PID 1 conflicts
+ENV S6_KEEP_ENV=1
+ENV S6_VERBOSITY=2
+ENV S6_CMD_ARGS="-c"
+ENTRYPOINT []
+
 # Install required packages
 RUN apk add --no-cache \
     curl \
