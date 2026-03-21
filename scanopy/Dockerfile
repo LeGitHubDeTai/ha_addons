@@ -7,7 +7,7 @@ ENTRYPOINT []
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install required packages for building
+# Install required packages
 RUN apk add --no-cache \
     curl \
     jq \
@@ -16,13 +16,23 @@ RUN apk add --no-cache \
     nmap-scripts \
     bash \
     git \
-    go \
-    nodejs-current \
-    npm \
+    ca-certificates \
+    gnupg2 \
+    wget \
     unzip \
     && rm -rf /var/cache/apk/*
 
-# Download and install Scanopy daemon, and build server from source
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:$PATH"
+
+# Install NVM and Node.js 20
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+ENV NVM_DIR="/root/.nvm"
+RUN bash -c '. $NVM_DIR/nvm.sh && nvm install 20 && nvm use 20 && nvm alias default 20'
+ENV PATH="/root/.nvm/versions/node/v20.*/bin:$PATH"
+
+# Download and install Scanopy daemon
 RUN ARCH=$(uname -m) \
     && case "$ARCH" in \
         x86_64) ARCH="amd64" ;; \
@@ -39,20 +49,23 @@ RUN ARCH=$(uname -m) \
     && echo "Downloading daemon from: $BINARY_URL" \
     && curl -fL "$BINARY_URL" -o /opt/scanopy-daemon \
     && chmod +x /opt/scanopy-daemon \
-    && echo "✓ Scanopy daemon installed successfully!" \
-    && echo "Building Scanopy server from source..." \
+    && echo "✓ Scanopy daemon installed successfully!"
+
+# Download and build Scanopy server from source
+RUN echo "Building Scanopy server from source..." \
     && curl -L "https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip" -o /tmp/scanopy.zip \
     && cd /tmp \
     && unzip scanopy.zip \
     && mv scanopy-0.14.19 scanopy \
     && cd scanopy \
-    && echo "Installing web dependencies..." \
-    && npm install --prefix ui --force \
-    && echo "Building web interface..." \
-    && npm run build --prefix ui \
-    && echo "Building server binary..." \
-    && CGO_ENABLED=0 GOOS=linux GOARCH=$ARCH go build -ldflags="-s -w" -o /opt/scanopy-server ./cmd/server \
+    && echo "Installing development dependencies..." \
+    && bash -c '. $NVM_DIR/nvm.sh && nvm use 20 && make install-dev-linux' \
+    && echo "Building server..." \
+    && bash -c '. $NVM_DIR/nvm.sh && nvm use 20 && make build-server' \
+    && echo "Building UI..." \
+    && bash -c '. $NVM_DIR/nvm.sh && nvm use 20 && make build-ui' \
     && echo "✓ Scanopy server built successfully!" \
+    && cp ./bin/scanopy-server /opt/scanopy-server \
     && chmod +x /opt/scanopy-server \
     && rm -rf /tmp/scanopy /tmp/scanopy.zip
 
