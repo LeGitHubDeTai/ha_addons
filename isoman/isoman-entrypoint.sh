@@ -10,7 +10,7 @@ fi
 ISO_STORAGE_PATH="${ISO_STORAGE_PATH:-/data/isoman}"
 mkdir -p "$ISO_STORAGE_PATH"
 
-# Set environment variables for Isoman
+# Set environment variables for Isoman backend
 export DATA_DIR="$ISO_STORAGE_PATH"
 export PORT="8080"
 export CORS_ORIGINS="http://localhost:3000,http://localhost:5173,http://localhost:8080"
@@ -47,5 +47,14 @@ if [ -n "$ENV_VARS_LIST" ]; then
     done
 fi
 
-# Start Isoman backend
-exec /usr/local/bin/isoman
+# Create environment file for supervisor
+cat > /etc/supervisor/conf.d/isoman-env.conf << EOF
+[program:isoman-backend]
+environment=DATA_DIR="$DATA_DIR",PORT="$PORT",CORS_ORIGINS="$CORS_ORIGINS",WORKER_COUNT="$WORKER_COUNT",LOG_LEVEL="$LOG_LEVEL",LOG_FORMAT="$LOG_FORMAT",DB_PATH="$DB_PATH",HOME="/data",USER="root"
+
+[program:isoman-frontend]
+environment=HOME="/data",USER="root"
+EOF
+
+# Start supervisord
+exec /usr/bin/supervisord -c /etc/supervisord.conf
