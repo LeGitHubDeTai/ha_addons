@@ -50,6 +50,9 @@ python3 -c "
 import http.server
 import socketserver
 import json
+import threading
+import time
+import requests
 
 class InitHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
@@ -62,8 +65,32 @@ class InitHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             response = {'network_id': 'scanopy-network-1', 'status': 'initialized'}
             self.wfile.write(json.dumps(response).encode())
+        elif self.path == '/api/work':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            print(f'Work request: {post_data}')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            response = {'status': 'no_work', 'message': 'No work available'}
+            self.wfile.write(json.dumps(response).encode())
         else:
             super().do_POST()
+
+# Auto-initialize the daemon after 5 seconds
+def auto_initialize():
+    time.sleep(5)
+    try:
+        print('Auto-initializing daemon...')
+        response = requests.post('http://localhost:60073/api/initialize', 
+                               json={'network_id': 'scanopy-network-1'}, 
+                               timeout=5)
+        print(f'Initialize response: {response.text}')
+    except Exception as e:
+        print(f'Auto-initialize failed: {e}')
+
+# Start auto-initialize in background
+threading.Thread(target=auto_initialize, daemon=True).start()
 
 with socketserver.TCPServer(('', 60075), InitHandler) as httpd:
     print('Init server running on port 60075')
