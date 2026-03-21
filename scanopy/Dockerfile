@@ -54,7 +54,7 @@ RUN echo "Downloading Scanopy source..." \
 RUN echo "Building Scanopy server..." \
     && cd /opt/scanopy-src \
     && echo "Installing dependencies..." \
-    && npm install --prefix ui \
+    && npm install --prefix ui --force \
     && echo "Building UI..." \
     && npm run build --prefix ui \
     && echo "Building server binary..." \
