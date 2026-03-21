@@ -51,6 +51,7 @@ RUN mkdir -p /data/scanopy/daemon_config \
 # Copy configuration files
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY run.sh /run.sh
+COPY index.html /index.html
 
 # Make scripts executable
 RUN chmod +x /run.sh
