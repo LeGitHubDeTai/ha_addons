@@ -57,6 +57,7 @@ import urllib.error
 
 class InitHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
+        print(f'Received POST request to: {self.path}')
         if self.path == '/api/initialize':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
@@ -66,6 +67,7 @@ class InitHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             response = {'network_id': 'scanopy-network-1', 'status': 'initialized'}
             self.wfile.write(json.dumps(response).encode())
+            print(f'Sent initialize response: {response}')
         elif self.path == '/api/work':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
@@ -75,7 +77,9 @@ class InitHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             response = {'status': 'no_work', 'message': 'No work available'}
             self.wfile.write(json.dumps(response).encode())
+            print(f'Sent work response: {response}')
         else:
+            print(f'Unknown path: {self.path}')
             super().do_POST()
 
 # Auto-initialize the daemon after 5 seconds
@@ -87,15 +91,18 @@ def auto_initialize():
         req = urllib.request.Request('http://localhost:60073/api/initialize', 
                                    data=data, 
                                    headers={'Content-Type': 'application/json'})
+        print('Sending request to daemon...')
         with urllib.request.urlopen(req, timeout=5) as response:
             result = response.read().decode('utf-8')
             print(f'Initialize response: {result}')
     except Exception as e:
         print(f'Auto-initialize failed: {e}')
+        print(f'Exception type: {type(e).__name__}')
 
 # Start auto-initialize in background
 threading.Thread(target=auto_initialize, daemon=True).start()
 
+print('Starting init server...')
 with socketserver.TCPServer(('', 60075), InitHandler) as httpd:
     print('Init server running on port 60075')
     httpd.serve_forever()
