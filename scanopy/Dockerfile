@@ -13,6 +13,7 @@ RUN apk add --no-cache \
     nginx \
     bash \
     unzip \
+    jq \
     && rm -rf /var/cache/apk/*
 
 # Download and install Scanopy daemon
