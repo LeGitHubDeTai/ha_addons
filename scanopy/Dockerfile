@@ -44,6 +44,9 @@ RUN echo "Downloading Scanopy source..." \
     && cd /tmp \
     && unzip scanopy.zip \
     && cd scanopy-0.14.19/ui \
+    && echo "Creating missing billing-plans.json..." \
+    && mkdir -p src/lib/data \
+    && echo '{"plans": []}' > src/lib/data/billing-plans.json \
     && echo "Building UI..." \
     && npm install --force \
     && npm run build \
