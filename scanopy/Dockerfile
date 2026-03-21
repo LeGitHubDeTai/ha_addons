@@ -15,6 +15,8 @@ RUN apk add --no-cache \
     unzip \
     jq \
     python3 \
+    nodejs \
+    npm \
     && rm -rf /var/cache/apk/*
 
 # Download and install Scanopy daemon
@@ -36,13 +38,18 @@ RUN ARCH=$(uname -m) \
     && chmod +x /opt/scanopy-daemon \
     && echo "✓ Scanopy daemon installed successfully!"
 
-# Download and extract Scanopy UI (static only)
-RUN echo "Downloading Scanopy web interface..." \
+# Download and extract Scanopy UI
+RUN echo "Downloading Scanopy source..." \
     && curl -L "https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip" -o /tmp/scanopy.zip \
     && cd /tmp \
     && unzip scanopy.zip \
-    && mv scanopy-0.14.19/ui /opt/scanopy-ui \
-    && rm -rf /tmp/scanopy.zip scanopy-0.14.19
+    && cd scanopy-0.14.19/ui \
+    && echo "Building UI..." \
+    && npm install --force \
+    && npm run build \
+    && mkdir -p /opt/scanopy-ui \
+    && cp -r dist/* /opt/scanopy-ui/ \
+    && rm -rf /tmp/scanopy.zip /tmp/scanopy-0.14.19
 
 # Create directories
 RUN mkdir -p /data/scanopy/daemon_config \
