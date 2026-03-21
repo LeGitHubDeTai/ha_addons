@@ -52,7 +52,8 @@ import socketserver
 import json
 import threading
 import time
-import requests
+import urllib.request
+import urllib.error
 
 class InitHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
@@ -82,10 +83,13 @@ def auto_initialize():
     time.sleep(5)
     try:
         print('Auto-initializing daemon...')
-        response = requests.post('http://localhost:60073/api/initialize', 
-                               json={'network_id': 'scanopy-network-1'}, 
-                               timeout=5)
-        print(f'Initialize response: {response.text}')
+        data = json.dumps({'network_id': 'scanopy-network-1'}).encode('utf-8')
+        req = urllib.request.Request('http://localhost:60073/api/initialize', 
+                                   data=data, 
+                                   headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            result = response.read().decode('utf-8')
+            print(f'Initialize response: {result}')
     except Exception as e:
         print(f'Auto-initialize failed: {e}')
 
