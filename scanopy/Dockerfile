@@ -15,6 +15,12 @@ RUN apk add --no-cache \
     unzip \
     jq \
     python3 \
+    rust \
+    cargo \
+    nodejs \
+    npm \
+    make \
+    go \
     && rm -rf /var/cache/apk/*
 
 # Download and install Scanopy daemon
@@ -36,13 +42,29 @@ RUN ARCH=$(uname -m) \
     && chmod +x /opt/scanopy-daemon \
     && echo "✓ Scanopy daemon installed successfully!"
 
-# Download and extract Scanopy UI
-RUN echo "Downloading Scanopy web interface..." \
+# Download and extract Scanopy source
+RUN echo "Downloading Scanopy source..." \
     && curl -L "https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip" -o /tmp/scanopy.zip \
     && cd /tmp \
     && unzip scanopy.zip \
-    && mv scanopy-0.14.19/ui /opt/scanopy-ui \
-    && rm -rf /tmp/scanopy.zip scanopy-0.14.19
+    && mv scanopy-0.14.19 /opt/scanopy-src \
+    && rm -rf /tmp/scanopy.zip
+
+# Build Scanopy server
+RUN echo "Building Scanopy server..." \
+    && cd /opt/scanopy-src \
+    && echo "Installing dependencies..." \
+    && npm install --prefix ui \
+    && echo "Building UI..." \
+    && npm run build --prefix ui \
+    && echo "Building server binary..." \
+    && CGO_ENABLED=0 GOOS=linux GOARCH=$(uname -m) go build -ldflags="-s -w" -o /opt/scanopy-server ./cmd/server \
+    && echo "✓ Scanopy server built successfully!" \
+    && chmod +x /opt/scanopy-server
+
+# Copy UI to deployment location
+RUN cp -r /opt/scanopy-src/ui /opt/scanopy-ui \
+    && rm -rf /opt/scanopy-src
 
 # Create directories
 RUN mkdir -p /data/scanopy/daemon_config \

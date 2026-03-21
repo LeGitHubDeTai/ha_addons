@@ -48,6 +48,13 @@ echo "Starting daemon..."
 # Wait a moment for daemon to start
 sleep 2
 
+# Start Scanopy server on port 60072
+echo "Starting Scanopy server on port 60072..."
+/opt/scanopy-server &
+
+# Wait a moment for server to start
+sleep 2
+
 # Start a simple HTTP server for the UI on port 8080 (nginx will proxy to it)
 echo "Starting web server on port 8080..."
 cd /opt/scanopy-ui
