@@ -32,7 +32,7 @@ echo "Public URL: $PUBLIC_URL"
 echo "Docker discovery: $ENABLE_DOCKER_DISCOVERY"
 
 # Set required environment variables for daemon
-export SCANOPY_DAEMON_URL="http://localhost:60074"
+export SCANOPY_DAEMON_URL="http://localhost:60073"
 export SCANOPY_SERVER_URL="http://localhost:60072"
 export SCANOPY_PUBLIC_URL="$PUBLIC_URL"
 export SCANOPY_LOG_LEVEL="$LOG_LEVEL"
@@ -41,9 +41,9 @@ export SCANOPY_ENABLE_DOCKER_DISCOVERY="$ENABLE_DOCKER_DISCOVERY"
 export SCANOPY_INITIAL_INTERVAL="$INITIAL_INTERVAL"
 export SCANOPY_RECURRING_INTERVAL="$RECURRING_INTERVAL"
 
-# Start daemon on port 60074 (avoid conflicts)
-echo "Starting daemon on port 60074..."
-/opt/scanopy-daemon --port 60074 &
+# Start daemon (uses default port)
+echo "Starting daemon..."
+/opt/scanopy-daemon &
 
 # Wait for processes
 wait

@@ -1,5 +1,5 @@
 name: Scanopy
-version: "26.3.4.22"
+version: "26.3.4.23"
 slug: scanopy
 panel_icon: "mdi:network-outline"
 description: Network documentation that updates itself - Automatic network discovery and visualization
@@ -30,10 +30,10 @@ map:
   - config:rw
 ports:
   60072/tcp: 60072
-  60074/tcp: 60074
+  60073/tcp: 60073
 ports_description:
   60072/tcp: The main port for Scanopy web interface and API
-  60074/tcp: The port for Scanopy daemon API and health checks
+  60073/tcp: The port for Scanopy daemon API and health checks
 options:
   log_level: "info"
   database_url: "postgresql://user:password@host:port/database"
