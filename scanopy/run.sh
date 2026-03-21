@@ -40,7 +40,7 @@ echo "Docker discovery: $ENABLE_DOCKER_DISCOVERY"
 echo "Checking available ports before daemon starts..."
 netstat -tlnp | grep -E ":(6007[0-9]|8080|3000|5173)" || echo "No conflicting ports found"
 /opt/scanopy-daemon &
-sleep 3
+sleep 5  # Give daemon more time to start
 echo "Checking ports after daemon starts..."
 netstat -tlnp | grep -E ":(6007[0-9]|8080|3000|5173)" || echo "Daemon port not found in listening state"
 
