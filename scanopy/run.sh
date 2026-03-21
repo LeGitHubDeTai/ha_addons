@@ -13,13 +13,13 @@ cleanup() {
 # Set up signal handlers
 trap cleanup SIGTERM SIGINT
 
-# Read configuration from Home Assistant
-LOG_LEVEL=$(bashio::config log_level)
-DATABASE_URL=$(bashio::config database_url)
-PUBLIC_URL=$(bashio::config public_url)
-ENABLE_DOCKER_DISCOVERY=$(bashio::config enable_docker_discovery)
-INITIAL_INTERVAL=$(bashio::config 'scan_intervals.initial')
-RECURRING_INTERVAL=$(bashio::config 'scan_intervals.recurring')
+# Read configuration from Home Assistant environment variables
+LOG_LEVEL="${log_level:-info}"
+DATABASE_URL="${database_url:-}"
+PUBLIC_URL="${public_url:-http://localhost:60072}"
+ENABLE_DOCKER_DISCOVERY="${enable_docker_discovery:-true}"
+INITIAL_INTERVAL="${scan_intervals_initial:-5m}"
+RECURRING_INTERVAL="${scan_intervals_recurring:-1h}"
 
 # Start nginx in background
 nginx
