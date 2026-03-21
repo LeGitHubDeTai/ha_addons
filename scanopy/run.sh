@@ -45,13 +45,5 @@ export SCANOPY_RECURRING_INTERVAL="$RECURRING_INTERVAL"
 echo "Starting daemon..."
 /opt/scanopy-daemon &
 
-# Wait a moment for daemon to start
-sleep 2
-
-# Start a simple HTTP server for the UI on port 8080 (nginx will proxy to it)
-echo "Starting web server on port 8080..."
-cd /opt/scanopy-ui
-python3 -m http.server 8080 &
-
 # Wait for processes
 wait
