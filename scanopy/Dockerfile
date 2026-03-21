@@ -17,7 +17,8 @@ RUN apk add --no-cache \
     python3 \
     git \
     make \
-    docker \
+    nodejs \
+    npm \
     && rm -rf /var/cache/apk/*
 
 # Download and install Scanopy daemon
@@ -39,22 +40,17 @@ RUN ARCH=$(uname -m) \
     && chmod +x /opt/scanopy-daemon \
     && echo "✓ Scanopy daemon installed successfully!"
 
-# Download and build Scanopy using official method
-RUN echo "Downloading and building Scanopy..." \
+# Download and build Scanopy UI directly
+RUN echo "Downloading and building Scanopy UI..." \
     && git clone https://github.com/scanopy/scanopy.git /opt/scanopy-source \
     && cd /opt/scanopy-source \
-    && echo "Installing development dependencies..." \
-    && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash \
-    && export NVM_DIR="$HOME/.nvm" \
-    && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" \
-    && nvm install 20 \
-    && nvm use 20 \
-    && echo "Installing project dependencies..." \
-    && make install-dev-linux \
-    && echo "Building UI..." \
-    && make dev-container-rebuild \
-    && echo "Copying built UI files..." \
-    && cp -r ui/dist/* /opt/scanopy-ui/ \
+    && echo "Building UI with npm..." \
+    && cd ui \
+    && npm install --force \
+    && npm run build \
+    && echo "Build completed, checking dist directory..." \
+    && ls -la dist/ \
+    && mv dist/* /opt/scanopy-ui/ \
     && echo "✓ Scanopy UI built and copied successfully!"
 
 # Create directories
