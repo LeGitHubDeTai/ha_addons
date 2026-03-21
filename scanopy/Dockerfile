@@ -44,6 +44,10 @@ RUN ARCH=$(uname -m) \
 RUN echo "Downloading and building Scanopy UI..." \
     && git clone https://github.com/scanopy/scanopy.git /opt/scanopy-source \
     && cd /opt/scanopy-source \
+    && echo "Creating missing data files..." \
+    && mkdir -p ui/src/lib/data \
+    && echo '[]' > ui/src/lib/data/billing-plans.json \
+    && echo '{"features": []}' > ui/src/lib/data/features.json \
     && echo "Building UI with npm..." \
     && cd ui \
     && npm install --force \
