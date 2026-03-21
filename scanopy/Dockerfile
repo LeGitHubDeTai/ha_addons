@@ -47,7 +47,7 @@ RUN ARCH=$(uname -m) \
     && mv scanopy-0.14.19 scanopy \
     && cd scanopy \
     && echo "Installing web dependencies..." \
-    && npm install --prefix ui --ignore-engines \
+    && npm install --prefix ui --force \
     && echo "Building web interface..." \
     && npm run build --prefix ui \
     && echo "Building server binary..." \
