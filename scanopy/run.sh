@@ -72,6 +72,8 @@ with socketserver.TCPServer(('', 60075), InitHandler) as httpd:
 
 # Start nginx on port 60072 (external access)
 echo "Starting nginx on port 60072..."
+# Copy our custom index.html to UI directory
+cp /index.html /opt/scanopy-ui/
 nginx -g "daemon off;" &
 
 # Wait for processes
