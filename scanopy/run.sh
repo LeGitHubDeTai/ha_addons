@@ -41,7 +41,17 @@ export SCANOPY_ENABLE_DOCKER_DISCOVERY="$ENABLE_DOCKER_DISCOVERY"
 export SCANOPY_INITIAL_INTERVAL="$INITIAL_INTERVAL"
 export SCANOPY_RECURRING_INTERVAL="$RECURRING_INTERVAL"
 
-/opt/scanopy-daemon &
+# Start daemon on port 60073
+echo "Starting daemon on port 60073..."
+/opt/scanopy-daemon --port 60073 &
+
+# Wait a moment for daemon to start
+sleep 2
+
+# Start a simple HTTP server for the UI on port 60072
+echo "Starting web server on port 60072..."
+cd /opt/scanopy-ui
+python3 -m http.server 60072 &
 
 # Wait for processes
 wait

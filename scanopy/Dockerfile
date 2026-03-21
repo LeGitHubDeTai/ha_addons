@@ -14,6 +14,7 @@ RUN apk add --no-cache \
     bash \
     unzip \
     jq \
+    python3 \
     && rm -rf /var/cache/apk/*
 
 # Download and install Scanopy daemon
