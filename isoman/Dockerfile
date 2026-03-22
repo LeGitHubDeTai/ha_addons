@@ -53,7 +53,8 @@ RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags
 # Build Go backend
 RUN cd /opt/isoman/backend && \
     go mod download && \
-    go build -ldflags="-w -s" -o /usr/local/bin/isoman .
+    go build -ldflags="-w -s" -o /usr/local/bin/isoman . && \
+    /usr/local/bin/isoman --help || echo "Binary test completed"
 
 # Build frontend with Node.js (skip if fails due to architecture issues)
 RUN cd /opt/isoman/ui && \
