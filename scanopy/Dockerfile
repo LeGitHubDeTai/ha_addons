@@ -48,6 +48,7 @@ RUN echo "Downloading and building Scanopy UI..." \
     && mkdir -p ui/src/lib/data \
     && echo '[]' > ui/src/lib/data/billing-plans.json \
     && echo '{"features": []}' > ui/src/lib/data/features.json \
+    && echo '{"services": []}' > ui/src/lib/data/service-definitions.json \
     && echo "Building UI with npm..." \
     && cd ui \
     && npm install --force \
