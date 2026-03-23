@@ -40,25 +40,14 @@ RUN ARCH=$(uname -m) \
     && chmod +x /opt/scanopy-daemon \
     && echo "✓ Scanopy daemon installed successfully!"
 
-# Download and build Scanopy UI directly
-RUN echo "Downloading and building Scanopy UI..." \
-    && git clone https://github.com/scanopy/scanopy.git /opt/scanopy-source \
-    && cd /opt/scanopy-source \
-    && echo "Creating missing data files..." \
-    && mkdir -p ui/src/lib/data \
-    && echo '[]' > ui/src/lib/data/billing-plans.json \
-    && echo '{"features": []}' > ui/src/lib/data/features.json \
-    && echo '{"services": []}' > ui/src/lib/data/service-definitions.json \
-    && echo '{"subnetTypes": []}' > ui/src/lib/data/subnet-types.json \
-    && echo '{"edgeTypes": []}' > ui/src/lib/data/edge-types.json \
-    && echo "Building UI with npm..." \
-    && cd ui \
-    && npm install --force \
-    && npm run build \
-    && echo "Build completed, checking dist directory..." \
-    && ls -la dist/ \
-    && mv dist/* /opt/scanopy-ui/ \
-    && echo "✓ Scanopy UI built and copied successfully!"
+# Download Scanopy UI from release instead of building
+RUN echo "Downloading Scanopy UI from release..." \
+    && curl -L "https://github.com/scanopy/scanopy/releases/latest/download/scanopy-ui.tar.gz" -o /tmp/scanopy-ui.tar.gz \
+    && cd /tmp \
+    && tar -xzf scanopy-ui.tar.gz \
+    && cp -r scanopy-ui/* /opt/scanopy-ui/ \
+    && rm -rf /tmp/scanopy-ui.tar.gz scanopy-ui \
+    && echo "✓ Scanopy UI downloaded and copied successfully!"
 
 # Create directories
 RUN mkdir -p /data/scanopy/daemon_config \
