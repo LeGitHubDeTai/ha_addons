@@ -53,6 +53,7 @@ RUN echo "Downloading Scanopy UI from v0.14.19 release..." \
     && echo '{"services": []}' > ui/src/lib/data/service-definitions.json \
     && echo '{"subnetTypes": []}' > ui/src/lib/data/subnet-types.json \
     && echo '{"edgeTypes": []}' > ui/src/lib/data/edge-types.json \
+    && echo '{"groupTypes": []}' > ui/src/lib/data/group-types.json \
     && echo "Building UI with npm..." \
     && cd ui \
     && npm install --force \
