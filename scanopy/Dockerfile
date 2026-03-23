@@ -50,6 +50,7 @@ RUN echo "Downloading and building Scanopy UI..." \
     && echo '{"features": []}' > ui/src/lib/data/features.json \
     && echo '{"services": []}' > ui/src/lib/data/service-definitions.json \
     && echo '{"subnetTypes": []}' > ui/src/lib/data/subnet-types.json \
+    && echo '{"edgeTypes": []}' > ui/src/lib/data/edge-types.json \
     && echo "Building UI with npm..." \
     && cd ui \
     && npm install --force \
