@@ -50,6 +50,9 @@ RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags
     mv /tmp/isoman-0.3.3 /opt/isoman && \
     rm -rf /tmp/isoman.zip
 
+# Copy migrations to working directory
+RUN cp -r /opt/isoman/backend/migrations /data/
+
 # Build Go backend
 RUN cd /opt/isoman/backend && \
     go mod download && \
