@@ -54,8 +54,7 @@ RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags
 RUN cd /opt/isoman/backend && \
     go mod download && \
     go build -ldflags="-w -s" -o /usr/local/bin/isoman . && \
-    ls -la /usr/local/bin/isoman && \
-    file /usr/local/bin/isoman
+    ls -la /usr/local/bin/isoman
 
 # Build frontend with Node.js (skip if fails due to architecture issues)
 RUN cd /opt/isoman/ui && \
