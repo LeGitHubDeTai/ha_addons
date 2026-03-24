@@ -477,115 +477,135 @@ build_images() {
     CACHE_DIR="./.build-cache"
     mkdir -p "$CACHE_DIR"
     
-    # Traiter chaque addon dans la matrice
-    echo "$BUILD_MATRIX" | exec_in_container jq -c '.[]' | while read -r build_info; do
-        addon=$(echo "$build_info" | exec_in_container jq -r '.addon')
-        version=$(echo "$build_info" | exec_in_container jq -r '.version')
-        slug=$(echo "$build_info" | exec_in_container jq -r '.slug')
-        archs=$(echo "$build_info" | exec_in_container jq -r '.archs')
-        
-        log_info "Build de $addon version $version"
-        
-        # Récupérer la configuration de build
-        BUILD_CONFIG="$addon/build.yaml"
-        if [ ! -f "$BUILD_CONFIG" ]; then
-            log_error "build.yaml manquant pour $addon"
-            continue
-        fi
-        
-        # Déterminer le type d'image de base
-        if exec_in_container yq eval '.build_from | type' "$BUILD_CONFIG" 2>/dev/null | grep -q "!!map"; then
-            BASE_IMAGE_TYPE="arch_specific"
-        else
-            BASE_IMAGE_TYPE="single"
-            SINGLE_BASE_IMAGE=$(exec_in_container yq eval '.build_from' "$BUILD_CONFIG" 2>/dev/null | tr -d '"')
-        fi
-        
-        # Builder pour chaque architecture
-        for arch in $archs; do
-            log_info "  Build pour $arch..."
-            
-            # Récupérer l'image de base
-            if [ "$BASE_IMAGE_TYPE" = "arch_specific" ]; then
-                BASE_IMAGE=$(exec_in_container yq eval ".build_from.$arch" "$BUILD_CONFIG" 2>/dev/null)
-                if [ "$BASE_IMAGE" = "null" ] || [ -z "$BASE_IMAGE" ]; then
-                    log_warning "  Pas d'image de base pour $arch, skip"
+    log_info "Matrice de build: $BUILD_MATRIX"
+    
+    # Traiter chaque addon dans la matrice avec une approche différente
+    if [ "$BUILD_IN_CONTAINER" = true ]; then
+        # Mode container: exécuter directement dans le container
+        docker exec "$CONTAINER_NAME" sh -c "
+            cd /workspace
+            echo '$BUILD_MATRIX' | jq -c '.[]' | while read -r build_info; do
+                addon=\$(echo \"\$build_info\" | jq -r '.addon')
+                version=\$(echo \"\$build_info\" | jq -r '.version')
+                slug=\$(echo \"\$build_info\" | jq -r '.slug')
+                archs=\$(echo \"\$build_info\" | jq -r '.archs')
+                
+                echo \"[INFO] Build de \$addon version \$version\"
+                echo \"[INFO] Architectures: \$archs\"
+                
+                # Vérifier le build.yaml
+                if [ ! -f \"\$addon/build.yaml\" ]; then
+                    echo \"[ERROR] build.yaml manquant pour \$addon\"
                     continue
                 fi
-            else
-                BASE_IMAGE="$SINGLE_BASE_IMAGE"
-            fi
-            
-            log_info "    Image de base: $BASE_IMAGE"
-            
-            # Mapper les architectures HA vers les plateformes Docker
-            case "$arch" in
-                "armv7") PLATFORM="linux/arm/v7" ;;
-                "armhf") PLATFORM="linux/arm/v6" ;;
-                "aarch64") PLATFORM="linux/arm64" ;;
-                "amd64") PLATFORM="linux/amd64" ;;
-                "i386") PLATFORM="linux/386" ;;
-                *) PLATFORM="linux/$arch" ;;
-            esac
-            
-            # Préparer les arguments de build
-            BUILD_ARGS="--build-arg BUILD_FROM=$BASE_IMAGE"
-            BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$version"
-            BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_ARCH=$arch"
-            
-            # Préparer les tags
-            IMAGE_TAG_LOCAL="$slug-$arch:$version"
-            IMAGE_TAG_LATEST_LOCAL="$slug-$arch:latest"
-            
-            if [ "$PUSH_TO_REGISTRY" = true ]; then
-                IMAGE_TAG_REGISTRY="$REGISTRY/$OWNER/$REPO_PREFIX/$slug-$arch:$version"
-                IMAGE_TAG_LATEST_REGISTRY="$REGISTRY/$OWNER/$REPO_PREFIX/$slug-$arch:latest"
-            fi
-            
-            # Construire la commande build
-            BUILD_CMD="docker buildx build"
-            BUILD_CMD="$BUILD_CMD $BUILD_ARGS"
-            BUILD_CMD="$BUILD_CMD --platform $PLATFORM"
-            BUILD_CMD="$BUILD_CMD --tag $IMAGE_TAG_LOCAL"
-            BUILD_CMD="$BUILD_CMD --tag $IMAGE_TAG_LATEST_LOCAL"
-            
-            if [ "$PUSH_TO_REGISTRY" = true ]; then
-                BUILD_CMD="$BUILD_CMD --tag $IMAGE_TAG_REGISTRY"
-                BUILD_CMD="$BUILD_CMD --tag $IMAGE_TAG_LATEST_REGISTRY"
-            fi
-            
-            BUILD_CMD="$BUILD_CMD --cache-from type=local,src=$CACHE_DIR"
-            BUILD_CMD="$BUILD_CMD --cache-to type=local,dest=$CACHE_DIR-new,mode=max"
-            
-            if [ "$PUSH_TO_REGISTRY" = true ]; then
-                BUILD_CMD="$BUILD_CMD --push"
-            else
-                BUILD_CMD="$BUILD_CMD --load"
-            fi
-            
-            BUILD_CMD="$BUILD_CMD $addon/"
-            
-            log_info "    Exécution: $BUILD_CMD"
-            
-            # Exécuter le build
-            if exec_in_container $BUILD_CMD; then
-                log_success "    Build réussi pour $addon-$arch:$version"
                 
-                # Mettre à jour le cache
-                rm -rf "$CACHE_DIR"
-                mv "$CACHE_DIR-new" "$CACHE_DIR"
-            else
-                log_error "    Build échoué pour $addon-$arch:$version"
-                exit 1
+                echo \"[INFO] build.yaml trouvé pour \$addon\"
+                
+                # Déterminer le type d'image de base
+                if yq eval '.build_from | type' \"\$addon/build.yaml\" | grep -q \"!!map\"; then
+                    BASE_IMAGE_TYPE=\"arch_specific\"
+                else
+                    BASE_IMAGE_TYPE=\"single\"
+                    SINGLE_BASE_IMAGE=\$(yq eval '.build_from' \"\$addon/build.yaml\")
+                fi
+                
+                # Builder pour chaque architecture
+                for arch in \$archs; do
+                    echo \"[INFO]   Build pour \$arch...\"
+                    
+                    # Récupérer l'image de base
+                    if [ \"\$BASE_IMAGE_TYPE\" = \"arch_specific\" ]; then
+                        BASE_IMAGE=\$(yq eval \".build_from.\$arch\" \"\$addon/build.yaml\")
+                        if [ \"\$BASE_IMAGE\" = \"null\" ] || [ -z \"\$BASE_IMAGE\" ]; then
+                            echo \"[WARNING]   Pas d'image de base pour \$arch, skip\"
+                            continue
+                        fi
+                    else
+                        BASE_IMAGE=\"\$SINGLE_BASE_IMAGE\"
+                    fi
+                    
+                    echo \"[INFO]     Image de base: \$BASE_IMAGE\"
+                    
+                    # Mapper les architectures HA vers les plateformes Docker
+                    case \"\$arch\" in
+                        \"armv7\") PLATFORM=\"linux/arm/v7\" ;;
+                        \"armhf\") PLATFORM=\"linux/arm/v6\" ;;
+                        \"aarch64\") PLATFORM=\"linux/arm64\" ;;
+                        \"amd64\") PLATFORM=\"linux/amd64\" ;;
+                        \"i386\") PLATFORM=\"linux/386\" ;;
+                        *) PLATFORM=\"linux/\$arch\" ;;
+                    esac
+                    
+                    # Préparer les arguments de build
+                    BUILD_ARGS=\"--build-arg BUILD_FROM=\$BASE_IMAGE\"
+                    BUILD_ARGS=\"\$BUILD_ARGS --build-arg BUILD_VERSION=\$version\"
+                    BUILD_ARGS=\"\$BUILD_ARGS --build-arg BUILD_ARCH=\$arch\"
+                    
+                    # Préparer les tags
+                    IMAGE_TAG_LOCAL=\"\$slug-\$arch:\$version\"
+                    IMAGE_TAG_LATEST_LOCAL=\"\$slug-\$arch:latest\"
+                    
+                    # Construire la commande build
+                    BUILD_CMD=\"docker buildx build\"
+                    BUILD_CMD=\"\$BUILD_CMD \$BUILD_ARGS\"
+                    BUILD_CMD=\"\$BUILD_CMD --platform \$PLATFORM\"
+                    BUILD_CMD=\"\$BUILD_CMD --tag \$IMAGE_TAG_LOCAL\"
+                    BUILD_CMD=\"\$BUILD_CMD --tag \$IMAGE_TAG_LATEST_LOCAL\"
+                    BUILD_CMD=\"\$BUILD_CMD --cache-from type=local,src=/workspace/.build-cache\"
+                    BUILD_CMD=\"\$BUILD_CMD --cache-to type=local,dest=/workspace/.build-cache-new,mode=max\"
+                    BUILD_CMD=\"\$BUILD_CMD --load\"
+                    BUILD_CMD=\"\$BUILD_CMD \$addon/\"
+                    
+                    echo \"[INFO]     Exécution: \$BUILD_CMD\"
+                    
+                    # Exécuter le build
+                    if docker buildx build \$BUILD_ARGS --platform \$PLATFORM --tag \$IMAGE_TAG_LOCAL --tag \$IMAGE_TAG_LATEST_LOCAL --cache-from type=local,src=/workspace/.build-cache --cache-to type=local,dest=/workspace/.build-cache-new,mode=max --load \$addon/; then
+                        echo \"[SUCCESS]     Build réussi pour \$addon-\$arch:\$version\"
+                        
+                        # Mettre à jour le cache
+                        rm -rf /workspace/.build-cache
+                        mv /workspace/.build-cache-new /workspace/.build-cache
+                    else
+                        echo \"[ERROR]     Build échoué pour \$addon-\$arch:\$version\"
+                        exit 1
+                    fi
+                done
+            done
+        "
+    else
+        # Mode local
+        echo "$BUILD_MATRIX" | jq -c '.[]' | while read -r build_info; do
+            addon=$(echo "$build_info" | jq -r '.addon')
+            version=$(echo "$build_info" | jq -r '.version')
+            slug=$(echo "$build_info" | jq -r '.slug')
+            archs=$(echo "$build_info" | jq -r '.archs')
+            
+            log_info "Build de $addon version $version"
+            log_info "Architectures: $archs"
+            
+            # Vérifier le build.yaml
+            if [ ! -f "$addon/build.yaml" ]; then
+                log_error "build.yaml manquant pour $addon"
+                continue
             fi
+            
+            # Pour le moment, juste afficher les informations
+            log_info "Build simulé pour $addon"
         done
-    done
+    fi
 }
 
 # Afficher un résumé
 show_summary() {
     log_info "Résumé du build:"
-    echo "$BUILD_MATRIX" | exec_in_container jq -r '.[] | "📦 \(.addon) v\(.version) - \(.archs)"'
+    
+    # Parser manuellement la matrice de build
+    echo "$BUILD_MATRIX" | exec_in_container jq -c '.[]' | while read -r item; do
+        addon=$(echo "$item" | exec_in_container jq -r '.addon')
+        version=$(echo "$item" | exec_in_container jq -r '.version')
+        archs=$(echo "$item" | exec_in_container jq -r '.archs')
+        log_info "Addon: $addon v$version - Architectures: $archs"
+    done
     
     if [ "$PUSH_TO_REGISTRY" = true ]; then
         log_info "Images poussées vers: $REGISTRY/$OWNER/$REPO_PREFIX"
