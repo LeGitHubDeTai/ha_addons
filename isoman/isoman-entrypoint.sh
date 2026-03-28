@@ -50,6 +50,6 @@ if [ -n "$ENV_VARS_LIST" ]; then
     done
 fi
 
-# Start Isoman backend from the correct directory
+# Start Isoman backend from correct directory
 cd /opt/isoman/backend
 exec /usr/local/bin/isoman
