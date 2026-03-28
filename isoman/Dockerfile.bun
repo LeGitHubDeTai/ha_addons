@@ -42,28 +42,25 @@ RUN case "${BUILD_ARCH}" in \
 RUN mkdir -p /data/isoman \
     && mkdir -p /var/log/supervisor
 
-WORKDIR /data
+WORKDIR /opt/isoman
 
-# Download and extract Isoman
+# Download and extract Isoman source
 RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags/v0.3.3.zip" && \
     unzip /tmp/isoman.zip -d /tmp && \
-    mv /tmp/isoman-0.3.3 /opt/isoman && \
-    rm -rf /tmp/isoman.zip
+    mv /tmp/isoman-0.3.3/* . && \
+    rm -rf /tmp/isoman.zip /tmp/isoman-0.3.3
 
-# Copy migrations to working directory and verify
-RUN cp -r /opt/isoman/backend/migrations /data/ && \
-    ls -la /data/migrations/
+# Build frontend with Node.js
+RUN cd ui && \
+    npm install --no-optional && \
+    npm run build || echo "Frontend build skipped on this architecture"
 
 # Build Go backend
-RUN cd /opt/isoman/backend && \
+RUN cd backend && \
     go mod download && \
-    go build -ldflags="-w -s" -o /usr/local/bin/isoman . && \
-    ls -la /usr/local/bin/isoman
-
-# Build frontend with Node.js (skip if fails due to architecture issues)
-RUN cd /opt/isoman/ui && \
-    npm install --no-optional || echo "Frontend build skipped due to architecture limitations" && \
-    npm run build || echo "Frontend build skipped due to architecture limitations"
+    CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-w -s -X main.Version=${BUILD_VERSION}" \
+    -o /usr/local/bin/isoman .
 
 # Copy configuration files
 COPY supervisord.conf /etc/supervisord.conf
