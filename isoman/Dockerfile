@@ -1,17 +1,15 @@
 ARG BUILD_FROM
-FROM $BUILD_FROM
-
+ARG BUILD_CONFIG_FILE
 ARG BUILD_VERSION
 ARG BUILD_ARCH
+FROM ${BUILD_FROM}
 
 LABEL \
   io.hass.version="${BUILD_VERSION}" \
   io.hass.type="addon" \
   io.hass.arch="${BUILD_ARCH}"
 
-USER root
-
-# Install dependencies including Go and Node.js for building
+# Install build dependencies
 RUN apk add --no-cache \
     curl \
     ca-certificates \
@@ -24,25 +22,7 @@ RUN apk add --no-cache \
     nodejs \
     npm
 
-# Install Go 1.23
-RUN case "${BUILD_ARCH}" in \
-        "amd64") GO_ARCH="amd64" ;; \
-        "armhf") GO_ARCH="armv6l" ;; \
-        "armv7") GO_ARCH="armv6l" ;; \
-        "aarch64") GO_ARCH="arm64" ;; \
-        "i386") GO_ARCH="386" ;; \
-        *) GO_ARCH="amd64" ;; \
-    esac && \
-    wget -O /tmp/go.tar.gz "https://go.dev/dl/go1.23.4.linux-${GO_ARCH}.tar.gz" && \
-    tar -C /usr/local -xzf /tmp/go.tar.gz && \
-    rm /tmp/go.tar.gz && \
-    ln -sf /usr/local/go/bin/go /usr/bin/go
-
-# Create directories
-RUN mkdir -p /data/isoman \
-    && mkdir -p /var/log/supervisor
-
-WORKDIR /opt/isoman
+WORKDIR /app
 
 # Download and extract Isoman source
 RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags/v0.3.3.zip" && \
@@ -50,25 +30,106 @@ RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags
     mv /tmp/isoman-0.3.3/* . && \
     rm -rf /tmp/isoman.zip /tmp/isoman-0.3.3
 
-# Build frontend with Node.js
-RUN cd ui && \
-    npm install --no-optional && \
-    npm run build || echo "Frontend build skipped on this architecture"
+# Multi-stage Dockerfile for ISOMan
+# Stage 1: Build frontend with Bun
+# Stage 2: Build backend with Go
+# Stage 3: Create minimal runtime image
 
-# Build Go backend
-RUN cd backend && \
-    go mod download && \
-    CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-w -s -X main.Version=${BUILD_VERSION}" \
-    -o /usr/local/bin/isoman .
+# ============================================
+# Stage 1: Build Frontend
+# ============================================
+FROM oven/bun:1-alpine AS frontend-builder
 
-# Copy configuration files
-COPY supervisord.conf /etc/supervisord.conf
-COPY isoman-entrypoint.sh /app/isoman-entrypoint.sh
+WORKDIR /app/ui
 
-RUN chmod +x /app/isoman-entrypoint.sh
+# Copy package files
+COPY ui/package.json ui/bun.lock ./
+
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
+
+# Copy frontend source
+COPY ui/ ./
+
+# Build frontend
+RUN bun run build
+
+# ============================================
+# Stage 2: Build Backend
+# ============================================
+FROM golang:1.24-alpine AS backend-builder
+
+# Build argument for version
+ARG VERSION=dev
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache git
+
+# Copy go mod files (go.mod is at repo root)
+COPY go.mod go.sum ./
+
+# Download dependencies with cache mount
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+# Copy backend source
+COPY backend/ ./backend/
+
+# Build backend binary (CGO_ENABLED=0 for static binary)
+# Embed version in binary
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-w -s -X main.Version=${VERSION}" \
+    -o server ./backend
+
+# ============================================
+# Stage 3: Runtime Image
+# ============================================
+FROM alpine:3.19
+
+# Install ca-certificates for HTTPS downloads and su-exec for privilege dropping
+RUN apk --no-cache add ca-certificates tzdata su-exec
+
+# Create non-root user
+RUN addgroup -g 1000 isoman && \
+    adduser -D -u 1000 -G isoman isoman
+
+WORKDIR /app
+
+# Copy backend binary from builder
+COPY --from=backend-builder /app/server ./server
+
+# Copy frontend dist from builder
+COPY --from=frontend-builder /app/ui/dist ./ui/dist
+
+# Copy migrations directory from builder
+COPY --from=backend-builder /app/backend/migrations ./migrations
+
+# Copy entrypoint script
+COPY backend/docker-entrypoint.sh /entrypoint.sh
+
+# Create data directory with proper permissions
+RUN mkdir -p /data/isos /data/db && \
+    chown -R isoman:isoman /app /data && \
+    chmod +x /entrypoint.sh
+
+# Set entrypoint (runs as root, then drops to isoman user)
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Expose port
 EXPOSE 8080
 
-ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+# Environment variables
+ENV PORT=8080
+ENV DATA_DIR=/data
+ENV WORKER_COUNT=2
+ENV GIN_MODE=release
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Run the server (passed to entrypoint)
+CMD ["./server"]
