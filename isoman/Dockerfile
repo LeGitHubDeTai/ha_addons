@@ -11,7 +11,7 @@ LABEL \
 
 USER root
 
-# Install dependencies including Go, Bun, and build tools
+# Install dependencies including Go and Node.js for building
 RUN apk add --no-cache \
     curl \
     ca-certificates \
@@ -38,26 +38,6 @@ RUN case "${BUILD_ARCH}" in \
     rm /tmp/go.tar.gz && \
     ln -sf /usr/local/go/bin/go /usr/bin/go
 
-# Install Bun for frontend build (x64 architectures only) or use Node.js for ARM
-RUN case "${BUILD_ARCH}" in \
-        "amd64") \
-            wget -O /tmp/bun.zip "https://github.com/oven-sh/bun/releases/latest/download/bun-linux-x64.zip" && \
-            unzip /tmp/bun.zip -d /tmp && \
-            mv /tmp/bun-linux-x64/bun /usr/local/bin/ && \
-            chmod +x /usr/local/bin/bun && \
-            rm -rf /tmp/bun.zip /tmp/bun-linux-x64 && \
-            echo "BUN_AVAILABLE=true" > /tmp/build_info ;; \
-        "aarch64") \
-            wget -O /tmp/bun.zip "https://github.com/oven-sh/bun/releases/latest/download/bun-linux-arm64.zip" && \
-            unzip /tmp/bun.zip -d /tmp && \
-            mv /tmp/bun-linux-arm64/bun /usr/local/bin/ && \
-            chmod +x /usr/local/bin/bun && \
-            rm -rf /tmp/bun.zip /tmp/bun-linux-arm64 && \
-            echo "BUN_AVAILABLE=true" > /tmp/build_info ;; \
-        *) \
-            echo "BUN_AVAILABLE=false" > /tmp/build_info ;; \
-    esac
-
 # Create directories
 RUN mkdir -p /data/isoman \
     && mkdir -p /var/log/supervisor
@@ -70,17 +50,10 @@ RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags
     mv /tmp/isoman-0.3.3/* . && \
     rm -rf /tmp/isoman.zip /tmp/isoman-0.3.3
 
-# Build frontend with Bun or Node.js based on availability
+# Build frontend with Node.js
 RUN cd ui && \
-    if [ -f /tmp/build_info ] && grep -q "BUN_AVAILABLE=true" /tmp/build_info; then \
-        echo "Building frontend with Bun..." && \
-        bun install --frozen-lockfile && \
-        bun run build; \
-    else \
-        echo "Building frontend with Node.js..." && \
-        npm install --no-optional && \
-        npm run build || echo "Frontend build skipped on ARM architecture"; \
-    fi
+    npm install --no-optional && \
+    npm run build || echo "Frontend build skipped on this architecture"
 
 # Build Go backend
 RUN cd backend && \
