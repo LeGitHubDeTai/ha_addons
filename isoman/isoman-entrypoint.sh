@@ -35,6 +35,9 @@ else
     export LOG_FORMAT="text"
 fi
 
+# Set production mode
+export GIN_MODE="release"
+
 # Database configuration
 export DB_PATH=""  # Will use default in data directory
 
@@ -47,5 +50,6 @@ if [ -n "$ENV_VARS_LIST" ]; then
     done
 fi
 
-# Start Isoman backend
+# Start Isoman backend from the correct directory
+cd /opt/isoman/backend
 exec /usr/local/bin/isoman
