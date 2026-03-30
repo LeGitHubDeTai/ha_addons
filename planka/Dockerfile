@@ -30,12 +30,11 @@ RUN apk add --no-cache \
 # ===============================
 WORKDIR /app
 
-RUN curl -fsSL -o planka.zip \
-        https://github.com/plankanban/planka/releases/download/v2.0.3/planka-prebuild.zip && \
+RUN wget https://github.com/plankanban/planka/releases/download/v2.0.3/planka-prebuild.zip -O planka.zip && \
     unzip planka.zip && \
-    rm planka.zip && \
-    cp -r planka/* ./ && \
-    rm -rf planka
+    rm planka.zip
+
+WORKDIR /app/planka
 
 # IMPORTANT: npm install DOIT créer le venv
 RUN node --version && npm --version && npm install

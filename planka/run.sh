@@ -58,9 +58,23 @@ else
 fi
 
 # ===============================
-# DATABASE_URL (avec socket local)
+# DATABASE_URL (avec détection)
+
 # ===============================
-NEW_DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_NAME}"
+DB_HOST="$(bashio::config 'DATABASE.db_host')"
+
+DB_PORT="$(bashio::config 'DATABASE.db_port')"
+
+DB_USER="$(bashio::config 'DATABASE.db_user')"
+
+DB_PASSWORD="$(bashio::config 'DATABASE.db_password')"
+
+DB_NAME="$(bashio::config 'DATABASE.db_name')"
+
+
+
+NEW_DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+
 
     DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
