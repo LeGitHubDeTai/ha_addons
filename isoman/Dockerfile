@@ -14,10 +14,12 @@ RUN apk add --no-cache \
     wget \
     unzip \
     bash \
-    git \
+    nginx \
     ca-certificates \
     tzdata \
     su-exec
+
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Download and extract ISOMan
 RUN wget https://github.com/aloks98/isoman/archive/refs/tags/v0.3.3.zip -O isoman.zip && \
