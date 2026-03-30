@@ -4,12 +4,12 @@ FROM ${BUILD_FROM}
 ARG BUILD_VERSION
 ARG BUILD_ARCH
 
+ENV ISOMAN_VERSION=0.3.3
+
 LABEL \
   io.hass.version="${BUILD_VERSION}" \
   io.hass.type="addon" \
   io.hass.arch="${BUILD_ARCH}"
-
-USER root
 
 # Install dependencies including Go and Node.js for building
 RUN apk add --no-cache \
@@ -24,20 +24,6 @@ RUN apk add --no-cache \
     nodejs \
     npm
 
-# Install Go 1.23
-RUN case "${BUILD_ARCH}" in \
-        "amd64") GO_ARCH="amd64" ;; \
-        "armhf") GO_ARCH="armv6l" ;; \
-        "armv7") GO_ARCH="armv6l" ;; \
-        "aarch64") GO_ARCH="arm64" ;; \
-        "i386") GO_ARCH="386" ;; \
-        *) GO_ARCH="amd64" ;; \
-    esac && \
-    wget -O /tmp/go.tar.gz "https://go.dev/dl/go1.23.4.linux-${GO_ARCH}.tar.gz" && \
-    tar -C /usr/local -xzf /tmp/go.tar.gz && \
-    rm /tmp/go.tar.gz && \
-    ln -sf /usr/local/go/bin/go /usr/bin/go
-
 # Create directories
 RUN mkdir -p /data/isoman \
     && mkdir -p /var/log/supervisor
@@ -45,10 +31,10 @@ RUN mkdir -p /data/isoman \
 WORKDIR /opt/isoman
 
 # Download and extract Isoman source
-RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags/v0.3.3.zip" && \
+RUN wget -O /tmp/isoman.zip "https://github.com/aloks98/isoman/archive/refs/tags/v$ISOMAN_VERSION.zip" && \
     unzip /tmp/isoman.zip -d /tmp && \
-    mv /tmp/isoman-0.3.3/* . && \
-    rm -rf /tmp/isoman.zip /tmp/isoman-0.3.3
+    mv /tmp/isoman-$ISOMAN_VERSION/* . && \
+    rm -rf /tmp/isoman.zip /tmp/isoman-$ISOMAN_VERSION
 
 # Build frontend with Node.js (compatible with all architectures)
 RUN cd ui && \
