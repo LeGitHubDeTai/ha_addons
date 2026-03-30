@@ -1,6 +1,7 @@
 name: ISOMan
-version: "26.3.1.41"
+version: "26.3.1.42"
 slug: isoman
+panel_title: ISOMan - Linux ISO Manager
 panel_icon: "mdi:disc"
 description: ISO management tool for downloading and managing ISO images with web interface
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/isoman
@@ -18,11 +19,7 @@ backup_exclude:
     - "supervisord.log*"
     - "/data/isos/*.tmp"
 map:
-    - ssl:ro
-    - backup:rw
-    - share:rw
-    - media:rw
-    - config:rw
+    - data:rw
 ports:
     8080/tcp: null
 ports_description:
