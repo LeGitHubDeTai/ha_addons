@@ -1,30 +1,24 @@
-name: Isoman
-version: "26.3.1.17"
+name: ISOMan
+version: "26.3.1.18"
 slug: isoman
 panel_icon: "mdi:disc"
-description: ISO download manager with real-time progress tracking and verification
-url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/isoman
+description: ISO management tool for downloading and managing ISO images with web interface
+url: https://github.com/aloks98/isoman
 webui: http://[HOST]:[PORT:8080]/
 image: ghcr.io/legithubdetai/ha_addons/dev-isoman-{arch}
 arch:
-    - armhf
-    - armv7
-    - aarch64
     - amd64
-    - i386
 startup: application
 boot: auto
 hassio_role: "default"
-hassio_api: true
-homeassistant_api: true
-apparmor: true
 ingress: true
 ingress_port: 8080
 ingress_stream: true
 backup_exclude:
     - "isoman/.cache"
-    - "isoman/logs/*.log"
+    - "isoman/.logs"
     - "supervisord.log*"
+    - "/data/isos/*.tmp"
 map:
     - ssl:ro
     - backup:rw
@@ -32,22 +26,12 @@ map:
     - media:rw
     - config:rw
 ports:
-    8080/tcp: 8080
+    8080/tcp: null
 ports_description:
-    8080/tcp: The port for Isoman web interface and API
+    8080/tcp: The port for ISOMan web interface. Normally not exposed, as Home Assistant Ingress is more secure and is recommended. You may expose this port if you want to bypass the Ingress (not recommended for security reasons).
 options:
-    timezone: "Europe/Berlin"
-    iso_storage_path: "/share/isoman"
-    max_concurrent_downloads: 3
-    log_level: "info"
-    log_format: "text"
     env_vars_list: []
 schema:
-    timezone: str
-    iso_storage_path: str
-    max_concurrent_downloads: int
-    log_level: str
-    log_format: str
     env_vars_list: [
       "match(^[A-Z_0-9]+: .*$)"
     ]
