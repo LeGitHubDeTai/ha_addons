@@ -1,5 +1,5 @@
 name: ISOMan
-version: "26.3.1.21"
+version: "26.3.1.22"
 slug: isoman
 panel_icon: "mdi:disc"
 description: ISO management tool for downloading and managing ISO images with web interface
@@ -24,6 +24,10 @@ map:
     - share:rw
     - media:rw
     - config:rw
+ports:
+    50145/tcp: 50145
+ports_description:
+    50145/tcp: The port for ISOMan web interface. Normally not exposed, as Home Assistant Ingress is more secure and is recommended. You may expose this port if you want to bypass the Ingress (not recommended for security reasons).
 options:
     env_vars_list: []
 schema:
