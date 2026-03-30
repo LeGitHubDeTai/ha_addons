@@ -336,48 +336,6 @@ jobs:
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-      - name: Create and push multi-arch manifest
-        run: |
-          ADDON="${{ matrix.build.addon }}"
-          VERSION="${{ matrix.build.version }}"
-          SLUG="${{ matrix.build.slug }}"
-          ARCHS="${{ matrix.build.archs }}"
-          
-          # Create manifest for all architectures
-          MANIFEST_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG:$VERSION"
-          MANIFEST_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG:latest"
-          
-          echo "Creating multi-arch manifest: $MANIFEST_TAG"
-          
-          # Remove existing manifest if it exists
-          docker manifest rm "$MANIFEST_TAG" 2>/dev/null || true
-          docker manifest rm "$MANIFEST_LATEST" 2>/dev/null || true
-          
-          # Create new manifest
-          MANIFEST_CMD="docker manifest create $MANIFEST_TAG"
-          MANIFEST_LATEST_CMD="docker manifest create $MANIFEST_LATEST"
-          
-          for arch in $ARCHS; do
-            ARCH_IMAGE="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
-            MANIFEST_CMD="$MANIFEST_CMD $ARCH_IMAGE"
-            MANIFEST_LATEST_CMD="$MANIFEST_LATEST_CMD $ARCH_IMAGE"
-          done
-          
-          eval $MANIFEST_CMD
-          eval $MANIFEST_LATEST_CMD
-          
-          # Push manifests
-          docker manifest push "$MANIFEST_TAG"
-          docker manifest push "$MANIFEST_LATEST"
-          
-          echo "Successfully pushed multi-arch manifests"
-
-      - name: Update repository metadata
-        run: |
-          # This step could be extended to update a repository.json file
-          # with the new image information for Home Assistant to use
-          echo "Repository metadata update completed"
-
       - name: Record build status
         id: status
         if: always()
