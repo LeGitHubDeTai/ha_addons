@@ -18,7 +18,10 @@ RUN apk add --no-cache \
     py3-pip \
     nodejs \
     npm \
-    wget
+    wget \
+    bash \
+    tzdata \
+    su-exec
 
 # ===============================
 # INSTALL PLANKA
