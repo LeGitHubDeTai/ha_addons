@@ -1,4 +1,4 @@
-#!/usr/bin/with-contenv bashio
+#!/bin/sh
 
 # Lire l'option ws_force depuis Home Assistant
 WS_FORCE=$(jq -r '.ws_force // "auto"' /data/options.json)
