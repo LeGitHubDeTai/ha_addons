@@ -10,7 +10,6 @@ arch:
     - amd64
 startup: application
 boot: auto
-hassio_role: "default"
 ingress: true
 ingress_port: 50145
 backup_exclude:
@@ -22,10 +21,10 @@ backup_exclude:
 map:
     - share:rw
 environment:
-    DATA_DIR: /share/isoman
-    DB_PATH: /share/isoman/db/isoman.db
-    DB_MAX_OPEN_CONNS: 25
-    WORKER_COUNT: 2
+    - DATA_DIR: /share/isoman
+    - DB_PATH: /share/isoman/db/isoman.db
+    - DB_MAX_OPEN_CONNS: 25
+    - WORKER_COUNT: 2
 ports:
     8080/tcp: null
 ports_description:
