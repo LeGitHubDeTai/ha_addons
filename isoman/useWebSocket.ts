@@ -22,7 +22,7 @@ const getWebSocketURL = () => {
         protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     }
 
-    const basePath = window.location.pathname.replace(/\/$/, "");
+    const basePath = window.location.pathname.replace(/\/$/, "").replace("isos/", "");
 
     return `${protocol}//${window.location.host}${basePath}/ws`;
 
