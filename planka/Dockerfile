@@ -31,8 +31,8 @@ WORKDIR /app
 RUN wget https://github.com/plankanban/planka/archive/refs/tags/v2.1.0.zip -O planka.zip && \
     unzip planka.zip && \
     rm planka.zip && \
-    mv planka/* ./ && \
-    rmdir planka
+    mv planka-2.1.0/* ./ && \
+    rmdir planka-2.1.0
 
 # IMPORTANT: npm install DOIT créer le venv
 RUN npm install
