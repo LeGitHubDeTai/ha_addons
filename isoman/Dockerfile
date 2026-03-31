@@ -94,9 +94,9 @@ RUN chmod +x /etc/supervisord.conf
 
 # Set environment variables
 ENV PORT=8080
-ENV DATA_DIR=/data
+ENV DATA_DIR=/share/isoman
 ENV WORKER_COUNT=2
-ENV GIN_MODE=release
+ENV DB_MAX_OPEN_CONNS=25
 
 EXPOSE 8080
 
