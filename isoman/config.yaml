@@ -1,5 +1,5 @@
 name: ISOMan
-version: "26.3.1.82"
+version: "26.3.1.83"
 slug: isomandev
 panel_title: ISOMan - Linux ISO Manager
 panel_icon: "mdi:disc"
@@ -12,6 +12,7 @@ startup: application
 boot: auto
 hassio_role: "default"
 ingress: true
+ingress_stream: true
 ingress_port: 50145
 backup_exclude:
     - "isoman/.cache"
