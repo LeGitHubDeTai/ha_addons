@@ -84,8 +84,8 @@ COPY --from=backend-builder /app/backend/migrations ./migrations
 COPY --from=0 /builder/backend/docker-entrypoint.sh /entrypoint.sh
 
 # Create data directory with proper permissions
-RUN mkdir -p /data/isos /data/db && \
-    chown -R isoman:isoman /app /data && \
+RUN mkdir -p /data/isos /data/db /share/isoman && \
+    chown -R isoman:isoman /app /data /share && \
     chmod +x /entrypoint.sh
 
 # Copy supervisord configuration
