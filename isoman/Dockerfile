@@ -25,13 +25,13 @@ RUN wget https://github.com/aloks98/isoman/archive/refs/tags/v0.3.3.zip -O isoma
     rm isoman.zip
 
 WORKDIR /builder
+COPY useWebSocket.ts ./ui/src/hooks/useWebSocket.ts
 
 # Multi-stage build following the official Dockerfile pattern
 # Stage 1: Build frontend with Bun
 FROM oven/bun:1-alpine AS frontend-builder
 
 WORKDIR /app/ui
-COPY useWebSocket.ts /app/ui/src/hooks/useWebSocket.ts
 COPY --from=0 /builder/ui/package.json /builder/ui/bun.lock ./
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile

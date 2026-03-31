@@ -7,8 +7,8 @@ import type { WSProgressMessage } from '../types/iso';
  * Can be overridden with PUBLIC_WS_URL environment variable
  */
 const getWebSocketURL = () => {
-    const envUrl = import.meta.env.PUBLIC_WS_URL;
-    if (envUrl) return envUrl;
+    // const envUrl = import.meta.env.PUBLIC_WS_URL;
+    // if (envUrl) return envUrl;
 
     const force = import.meta.env.WS_FORCE ?? "auto";
 
