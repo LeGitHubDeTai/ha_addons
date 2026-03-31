@@ -11,7 +11,6 @@ LABEL \
 # ===============================
 RUN apk add --no-cache \
     ca-certificates \
-    curl \
     unzip \
     build-base \
     python3 \
