@@ -31,6 +31,7 @@ WORKDIR /builder
 FROM oven/bun:1-alpine AS frontend-builder
 
 WORKDIR /app/ui
+COPY useWebSocket.ts /app/ui/src/hooks/useWebSocket.ts
 COPY --from=0 /builder/ui/package.json /builder/ui/bun.lock ./
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
