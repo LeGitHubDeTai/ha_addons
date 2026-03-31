@@ -27,10 +27,11 @@ RUN apk add --no-cache \
 # ===============================
 WORKDIR /app
 
-RUN wget https://github.com/plankanban/planka/archive/refs/tags/v2.1.0.zip -O planka.zip && \
+RUN wget https://github.com/plankanban/planka/releases/download/v2.1.0/planka-prebuild.zip -O planka.zip && \
     unzip planka.zip && \
     rm planka.zip && \
-    mv planka-2.1.0/* ./
+    mv planka/* ./ && \
+    rmdir planka
 
 # IMPORTANT: npm install DOIT créer le venv
 RUN node --version && npm --version && npm install
