@@ -62,7 +62,8 @@ RUN apk add --no-cache \
     su-exec \
     wget \
     supervisor \
-    nginx
+    nginx \
+    jq
 
 COPY nginx.conf /etc/nginx/nginx.conf
 
