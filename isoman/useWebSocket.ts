@@ -10,7 +10,7 @@ const getWebSocketURL = () => {
     const envUrl = import.meta.env.PUBLIC_WS_URL;
     if (envUrl) return envUrl;
 
-    const force = (window as any).WS_FORCE ?? "auto";
+    const force = import.meta.env.WS_FORCE ?? "auto";
 
     let protocol;
 
