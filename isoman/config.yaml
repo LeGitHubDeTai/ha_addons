@@ -1,5 +1,5 @@
 name: ISOMan
-version: "26.3.1.45"
+version: "26.3.1.46"
 slug: isoman
 panel_title: ISOMan - Linux ISO Manager
 panel_icon: "mdi:disc"
@@ -21,11 +21,6 @@ backup_exclude:
     - "/share/isos/*.tmp"
 map:
     - share:rw
-environment:
-    DATA_DIR: /share/isoman
-    DB_PATH: /share/isoman/db/isoman.db
-    DB_MAX_OPEN_CONNS: 25
-    WORKER_COUNT: 2
 ports:
     8080/tcp: null
 ports_description:
