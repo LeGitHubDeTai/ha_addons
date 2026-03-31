@@ -1,5 +1,5 @@
 name: Planka DEV
-version: "26.3.5.21"
+version: "26.3.5.22"
 slug: dev-planka
 panel_icon: "mdi:view-week"
 description: Kanban board open-source (Planka)
@@ -44,7 +44,5 @@ schema:
       password: password
       name: str
 map:
-  - type: addon_config
-    read_only: False
-    path: /config
+  - addon_config: rw
   - data: rw
