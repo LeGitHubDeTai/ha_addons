@@ -1,11 +1,11 @@
 name: ISOMan
 version: "26.3.1.52"
-slug: isoman
+slug: isomandev
 panel_title: ISOMan - Linux ISO Manager
 panel_icon: "mdi:disc"
 description: ISO management tool for downloading and managing ISO images with web interface
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/isoman
-image: ghcr.io/legithubdetai/ha_addons/dev-isoman-{arch}
+image: ghcr.io/legithubdetai/ha_addons/dev-isomandev-{arch}
 arch:
     - amd64
 startup: application
