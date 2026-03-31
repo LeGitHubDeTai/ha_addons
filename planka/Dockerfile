@@ -30,8 +30,8 @@ WORKDIR /app
 RUN wget https://github.com/plankanban/planka/releases/download/v2.1.0/planka-prebuild.zip -O planka.zip && \
     unzip planka.zip && \
     rm planka.zip && \
-    cp -r planka-2.1.0/* ./ && \
-    rm -rf planka-2.1.0
+    cp -r planka/* ./ && \
+    rm -rf planka
 
 # IMPORTANT: npm install DOIT créer le venv
 RUN npm install
