@@ -20,7 +20,8 @@ RUN apk add --no-cache \
     wget \
     bash \
     tzdata \
-    su-exec
+    su-exec \
+    openssl
 
 # ===============================
 # INSTALL PLANKA
