@@ -1,5 +1,5 @@
 name: Planka DEV
-version: "26.3.5.5"
+version: "26.3.5.6"
 slug: dev-planka
 panel_icon: "mdi:view-week"
 description: Kanban board open-source (Planka)
@@ -16,7 +16,7 @@ startup: application
 boot: auto
 init: false
 ingress: true
-ingress_port: 1337
+ingress_port: 1338
 ports:
     1337/tcp: 1337
 ports_description:
