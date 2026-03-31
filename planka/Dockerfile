@@ -45,5 +45,7 @@ RUN npm install
 COPY run.sh /run.sh
 RUN chmod +x /run.sh
 
+EXPOSE 1337
+
 CMD ["/run.sh"]
 
