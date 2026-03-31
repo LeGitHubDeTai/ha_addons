@@ -1,8 +1,6 @@
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
-ENV NODE_MAJOR=22
-
 LABEL \
   io.hass.version="${BUILD_VERSION}" \
   io.hass.type="addon" \
@@ -14,27 +12,23 @@ LABEL \
 RUN apk add --no-cache \
     ca-certificates \
     curl \
-    gnupg \
     unzip \
     build-base \
     python3 \
     py3-pip \
-    openssl \
     nodejs \
-    npm \
-    postgresql \
-    su-exec
+    npm
 
 # ===============================
 # INSTALL PLANKA
 # ===============================
 WORKDIR /app
 
-RUN wget https://github.com/plankanban/planka/releases/download/v2.0.3/planka-prebuild.zip -O planka.zip && \
+RUN wget https://github.com/plankanban/planka/archive/refs/tags/v2.1.0.zip -O planka.zip && \
     unzip planka.zip && \
-    rm planka.zip
-
-WORKDIR /app/planka
+    rm planka.zip && \
+    mv planka/* ./ && \
+    rmdir planka
 
 # IMPORTANT: npm install DOIT créer le venv
 RUN node --version && npm --version && npm install
