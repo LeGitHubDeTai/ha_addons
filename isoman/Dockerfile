@@ -84,8 +84,8 @@ COPY --from=backend-builder /app/backend/migrations ./migrations
 COPY --from=0 /builder/backend/docker-entrypoint.sh /entrypoint.sh
 
 # Create data directory with proper permissions
-RUN mkdir -p /data/isos /data/db && \
-    chown -R isoman:isoman /app /data && \
+RUN mkdir -p /data/isos /data/db /share/isoman && \
+    chown -R isoman:isoman /app /data /share && \
     chmod +x /entrypoint.sh
 
 # Copy supervisord configuration
@@ -94,9 +94,9 @@ RUN chmod +x /etc/supervisord.conf
 
 # Set environment variables
 ENV PORT=8080
-ENV DATA_DIR=/data
+ENV DATA_DIR=/share/isoman
 ENV WORKER_COUNT=2
-ENV GIN_MODE=release
+ENV DB_MAX_OPEN_CONNS=25
 
 EXPOSE 8080
 
