@@ -66,6 +66,7 @@ RUN apk add --no-cache \
     jq
 
 COPY nginx.conf /etc/nginx/nginx.conf
+COPY entrypoint_supervisord.sh /entrypoint_supervisord.sh
 
 # Create non-root user
 RUN addgroup -g 1000 isoman && \
