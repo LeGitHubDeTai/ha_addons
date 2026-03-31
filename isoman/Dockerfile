@@ -98,6 +98,8 @@ ENV DATA_DIR=/share/isoman
 ENV WORKER_COUNT=2
 ENV DB_MAX_OPEN_CONNS=25
 
+RUN mkdir ${DATA_DIR}
+
 EXPOSE 8080
 
 # Health check
