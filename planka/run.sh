@@ -87,9 +87,10 @@ fi
 # ===============================
 # BASE_URL
 # ===============================
-if ! grep -q "^BASE_URL=" "$ENV_FILE"; then
-    bashio::log.info "Configuration BASE_URL (Ingress)"
-    echo "BASE_URL=http://localhost:1337" >> "$ENV_FILE"
+BASE_URL="http://localhost:1337"
+
+if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^BASE_URL=.*|BASE_URL=${BASE_URL}|" "$ENV_FILE"
 else
     bashio::log.info "BASE_URL déjà présent"
 fi
