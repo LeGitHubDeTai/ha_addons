@@ -7,18 +7,36 @@ import type { WSProgressMessage } from '../types/iso';
  * Can be overridden with PUBLIC_WS_URL environment variable
  */
 const getWebSocketURL = () => {
-    const wsUrl = import.meta.env.PUBLIC_WS_URL;
-    if (wsUrl) return wsUrl;
+    const envUrl = import.meta.env.PUBLIC_WS_URL;
+    if (envUrl) return envUrl;
 
-    // In development, connect directly to backend on port 8080
-    if (import.meta.env.DEV) {
-        return 'ws://localhost:8080/ws';
+    const force = import.meta.env.PUBLIC_WS_FORCE;
+
+    let protocol;
+    if (force === "ws") {
+        protocol = "ws:";
+    } else if (force === "wss") {
+        protocol = "wss:";
+    } else {
+        protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     }
 
-    // In production, use same origin
     const basePath = window.location.pathname.replace(/\/$/, "");
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
     return `${protocol}//${window.location.host}${basePath}/ws`;
+
+    // const wsUrl = import.meta.env.PUBLIC_WS_URL;
+    // if (wsUrl) return wsUrl;
+
+    // // In development, connect directly to backend on port 8080
+    // if (import.meta.env.DEV) {
+    //     return 'ws://localhost:8080/ws';
+    // }
+
+    // // In production, use same origin
+    // const basePath = window.location.pathname.replace(/\/$/, "");
+    // const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // return `${protocol}//${window.location.host}${basePath}/ws`;
 };
 
 interface UseWebSocketOptions {
