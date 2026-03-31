@@ -59,4 +59,5 @@ chmod 600 "$ENV_FILE"
 cd /app
 
 bashio::log.info "Démarrage Planka"
-exec npm start --prod
+# exec npm start --prod
+sh ./start.sh
