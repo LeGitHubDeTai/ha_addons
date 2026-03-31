@@ -1,7 +1,7 @@
 #!/usr/bin/with-contenv bashio
 
 # Lire l'option ws_force depuis Home Assistant
-WS_FORCE=$(bashio::config 'ws_force')
+WS_FORCE=$(jq -r '.ws_force // "auto"' /data/options.json)
 
 # Créer les dossiers et fixer les permissions
 mkdir -p /share/isoman/isos /share/isoman/db
