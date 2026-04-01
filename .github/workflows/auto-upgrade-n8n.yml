@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - test-autoupgrade-n8n
+      - test-autoupdate-n8n
 
 jobs:
   auto-upgrade:
