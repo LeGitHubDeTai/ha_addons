@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bashio
 # Scanopy startup script with bashio configuration
 
 CONFIG_PATH=/data/options.json
