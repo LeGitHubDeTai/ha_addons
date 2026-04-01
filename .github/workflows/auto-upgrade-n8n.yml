@@ -25,16 +25,16 @@ jobs:
       - name: Get current versions
         id: current
         run: |
-          # Get version from config.yaml
-          CONFIG_VERSION=$(grep -E '^version:' n8n/config.yaml | sed 's/version: "//' | sed 's/"//')
-          echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
-          
-          # Get version from Dockerfile
+          # Get n8n version from Dockerfile
           DOCKERFILE_VERSION=$(grep -E 'npm install -g n8n@' n8n/Dockerfile | sed 's/.*n8n@//' | sed 's/[[:space:]].*//')
           echo "dockerfile_version=$DOCKERFILE_VERSION" >> $GITHUB_OUTPUT
           
-          echo "Current config version: $CONFIG_VERSION"
-          echo "Current Dockerfile version: $DOCKERFILE_VERSION"
+          # Get addon version from config.yaml
+          CONFIG_VERSION=$(grep -E '^version:' n8n/config.yaml | sed 's/version: "//' | sed 's/"//')
+          echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "Current n8n version: $DOCKERFILE_VERSION"
+          echo "Current addon version: $CONFIG_VERSION"
 
       - name: Get latest n8n release
         id: latest
@@ -55,17 +55,45 @@ jobs:
       - name: Compare versions
         id: compare
         run: |
-          CURRENT_VERSION="${{ steps.current.outputs.config_version }}"
+          CURRENT_N8N_VERSION="${{ steps.current.outputs.dockerfile_version }}"
           LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
           
           # Compare versions using sort -V
-          if [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_VERSION" | sort -V | head -n1)" = "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+          if [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_N8N_VERSION" | sort -V | head -n1)" = "$CURRENT_N8N_VERSION" ] && [ "$CURRENT_N8N_VERSION" != "$LATEST_VERSION" ]; then
             echo "needs_upgrade=true" >> $GITHUB_OUTPUT
-            echo "New version available: $LATEST_VERSION (current: $CURRENT_VERSION)"
+            echo "New n8n version available: $LATEST_VERSION (current: $CURRENT_N8N_VERSION)"
           else
             echo "needs_upgrade=false" >> $GITHUB_OUTPUT
             echo "Already up-to-date or no new version"
           fi
+
+      - name: Generate new addon version
+        id: addon_version
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          # Get current year and month
+          CURRENT_YEAR=$(date +%Y)
+          CURRENT_MONTH=$(date +%m)
+          
+          # Get current addon version and extract the patch number
+          CURRENT_ADDON_VERSION="${{ steps.current.outputs.config_version }}"
+          CURRENT_PATCH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f3)
+          
+          # If year.month changed, reset patch to 1, otherwise increment
+          CURRENT_YEAR_MONTH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f1,2)
+          NEW_YEAR_MONTH="$CURRENT_YEAR.$CURRENT_MONTH"
+          
+          if [ "$CURRENT_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
+            # Same month, increment patch
+            NEW_PATCH=$((CURRENT_PATCH + 1))
+          else
+            # New month, reset patch to 1
+            NEW_PATCH=1
+          fi
+          
+          NEW_ADDON_VERSION="$NEW_YEAR_MONTH.$NEW_PATCH"
+          echo "new_addon_version=$NEW_ADDON_VERSION" >> $GITHUB_OUTPUT
+          echo "New addon version: $NEW_ADDON_VERSION"
 
       - name: Create upgrade branch
         id: branch
@@ -78,9 +106,9 @@ jobs:
       - name: Update config.yaml
         if: steps.compare.outputs.needs_upgrade == 'true'
         run: |
-          # Update version in config.yaml
-          sed -i "s/^version: .*/version: \"${{ steps.latest.outputs.latest_version }}\"/" n8n/config.yaml
-          echo "Updated config.yaml version to ${{ steps.latest.outputs.latest_version }}"
+          # Update version in config.yaml with new addon version
+          sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" n8n/config.yaml
+          echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
 
       - name: Update Dockerfile
         if: steps.compare.outputs.needs_upgrade == 'true'
@@ -95,7 +123,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add n8n/config.yaml n8n/Dockerfile
-          git commit -m "⬆️ Upgrade n8n to ${{ steps.latest.outputs.latest_version }}"
+          git commit -m "⬆️ Upgrade n8n to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
 
       - name: Push branch
         if: steps.compare.outputs.needs_upgrade == 'true'
@@ -108,12 +136,12 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ steps.branch.outputs.branch_name }}
-          title: "⬆️${{ steps.latest.outputs.latest_version }}"
+          title: "⬆️${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
           body: |
             Auto-upgrade n8n to version ${{ steps.latest.outputs.latest_version }}
             
             **Changes:**
-            - Updated config.yaml version to ${{ steps.latest.outputs.latest_version }}
+            - Updated config.yaml addon version to ${{ steps.addon_version.outputs.new_addon_version }}
             - Updated Dockerfile to use n8n@${{ steps.latest.outputs.latest_version }}
             
             **Release:** ${{ steps.latest.outputs.release_url }}
