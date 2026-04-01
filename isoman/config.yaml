@@ -1,0 +1,33 @@
+name: ISOMan
+version: "26.3.2"
+slug: isoman
+panel_title: ISOMan - Linux ISO Manager
+panel_icon: "mdi:disc"
+description: ISO management tool for downloading and managing ISO images with web interface
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/isoman
+image: ghcr.io/legithubdetai/ha_addons/isoman-{arch}
+arch:
+    - amd64
+startup: application
+boot: auto
+hassio_role: "default"
+ingress: true
+ingress_port: 50145
+backup_exclude:
+    - "isoman/.cache"
+    - "isoman/.logs"
+    - "supervisord.log*"
+    - "/data/isos/*.tmp"
+    - "/share/isos/*.tmp"
+map:
+    - share:rw
+ports:
+    8080/tcp: null
+ports_description:
+    8080/tcp: The port for ISOMan web interface. Normally not exposed, as Home Assistant Ingress is more secure and is recommended. You may expose this port if you want to bypass Ingress (not recommended for security reasons).
+options:
+    env_vars_list: []
+schema:
+    env_vars_list: [
+      "match(^[A-Z_0-9]+: .*$)"
+    ]
