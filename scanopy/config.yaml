@@ -1,11 +1,11 @@
 name: Scanopy
-version: "26.3.4.50"
+version: "26.3.4.51"
 slug: scanopy
 panel_title: Scanopy - Network Scanner
 panel_icon: "mdi:network"
 description: Network scanning tool for discovering and analyzing network devices with web interface
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/scanopy
-image: ghcr.io/legithubdetai/ha_addons/scanopy-{arch}
+image: ghcr.io/legithubdetai/ha_addons/dev-scanopy-{arch}
 arch:
     - amd64
 startup: application
