@@ -95,7 +95,7 @@ RUN chmod +x /etc/supervisord.conf
 ENV PORT=60072
 ENV DATA_DIR=/share/scanopy
 
-EXPOSE 60073
+EXPOSE 60072
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
