@@ -25,14 +25,13 @@ RUN apk add --no-cache \
 # ===============================
 # INSTALL NODEJS 22
 # ===============================
-ENV NODE_MAJOR=22
-RUN mkdir -p /etc/apk && \
-    echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
-    echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories
-
-RUN apk add --no-cache \
-    nodejs=${NODE_MAJOR} \
-    npm
+ENV NODE_VERSION=22.9.0
+RUN wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+ENV PATH="/root/.nvm:$PATH"
+RUN . /root/.nvm/nvm.sh && \
+    nvm install $NODE_VERSION && \
+    nvm use $NODE_VERSION && \
+    nvm alias default $NODE_VERSION
 
 # ===============================
 # INSTALL PLANKA
