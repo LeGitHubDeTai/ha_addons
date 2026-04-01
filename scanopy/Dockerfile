@@ -9,60 +9,6 @@ LABEL \
     io.hass.type="addon" \
     io.hass.arch="${BUILD_ARCH}"
 
-# Install build dependencies
-RUN apk add --no-cache \
-    wget \
-    unzip \
-    bash \
-    ca-certificates \
-    tzdata \
-    su-exec \
-    gcc \
-    musl-dev \
-    pkgconfig \
-    openssl-dev \
-    libffi-dev
-
-# Download and extract Scanopy
-RUN wget https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip -O scanopy.zip && \
-    unzip scanopy.zip && \
-    mv scanopy-0.14.19 /builder && \
-    rm scanopy.zip
-
-WORKDIR /builder
-
-# Stage 1: Build Rust backend
-FROM lukemathwalker/cargo-chef:latest-rust-1.90 AS chef
-WORKDIR /app
-
-FROM chef AS planner
-COPY --from=0 /builder/backend/ .
-RUN cargo chef prepare --recipe-path recipe.json
-
-FROM chef AS rust-builder
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
-COPY --from=0 /builder/backend/ .
-RUN cargo build --release --bin server --bin generate-fixtures
-RUN /app/target/release/generate-fixtures --output-dir /fixtures
-
-# Stage 2: Build UI
-FROM node:20-slim AS ui-builder
-WORKDIR /app/ui
-COPY --from=0 /builder/ui/package*.json ./
-RUN npm ci
-COPY --from=0 /builder/ui/ ./
-COPY --from=0 /builder/messages/ ../messages/
-COPY --from=rust-builder /fixtures/ ./src/lib/data/
-ARG PUBLIC_SERVER_HOSTNAME=localhost
-ARG PUBLIC_SERVER_PORT=60072
-ENV PUBLIC_SERVER_HOSTNAME=$PUBLIC_SERVER_HOSTNAME
-ENV PUBLIC_SERVER_PORT=$PUBLIC_SERVER_PORT
-RUN npm run build
-
-# Stage 3: Runtime Image
-FROM ${BUILD_FROM}
-
 # Install runtime dependencies
 RUN apk add --no-cache \
     ca-certificates \
@@ -80,16 +26,6 @@ RUN addgroup -g 1000 scanopy && \
     adduser -D -u 1000 -G scanopy scanopy
 
 WORKDIR /app
-
-# Copy server binary from builder
-COPY --from=rust-builder /app/target/release/server ./server
-
-# Copy UI static files from builder  
-COPY --from=ui-builder /app/ui/build ./static
-
-# Verify server binary exists and is executable
-RUN test -f ./server || (echo "Server binary not found!" && exit 1) && \
-    chmod +x ./server
 
 # Create data directory with proper permissions
 RUN mkdir -p /data/scans /data/db /share/scanopy && \
