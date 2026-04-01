@@ -14,7 +14,7 @@ DB_NAME=$(bashio::config 'DATABASE.db_name')
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
 # Set environment variables for scanopy
-export DATABASE_URL="$DATABASE_URL"
+export SCANOPY_DATABASE_URL="$DATABASE_URL"
 export PORT=60072
 export DATA_DIR=/share/scanopy
 
