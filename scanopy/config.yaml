@@ -1,48 +1,33 @@
 name: Scanopy
-version: "26.3.4.47"
+version: "26.3.4.49"
 slug: scanopy
-panel_icon: "mdi:network-outline"
-description: Network documentation that updates itself - Automatic network discovery and visualization
+panel_title: Scanopy - Network Scanner
+panel_icon: "mdi:network"
+description: Network scanning tool for discovering and analyzing network devices with web interface
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/scanopy
-webui: http://[HOST]:[PORT:60072]/
-image: ghcr.io/legithubdetai/ha_addons/dev-scanopy-{arch}
+image: ghcr.io/legithubdetai/ha_addons/scanopy-{arch}
 arch:
-  - aarch64
-  - amd64
+    - amd64
 startup: application
 boot: auto
 hassio_role: "default"
-hassio_api: true
-homeassistant_api: true
-apparmor: true
 ingress: true
-ingress_port: 60072
-ingress_stream: true
+ingress_port: 50146
 backup_exclude:
-  - "scanopy/.cache"
-  - "scanopy/logs/*.log"
-  - "supervisord.log*"
+    - "scanopy/.cache"
+    - "scanopy/.logs"
+    - "supervisord.log*"
+    - "/data/scans/*.tmp"
+    - "/share/scans/*.tmp"
 map:
-  - ssl:ro
-  - backup:rw
-  - share:rw
-  - media:rw
-  - config:rw
+    - share:rw
 ports:
-  60073/tcp: 60073
+    8080/tcp: null
 ports_description:
-  60073/tcp: The port for Scanopy daemon API and health checks
+    8080/tcp: The port for Scanopy web interface. Normally not exposed, as Home Assistant Ingress is more secure and is recommended. You may expose this port if you want to bypass Ingress (not recommended for security reasons).
 options:
-  log_level: "info"
-  database_url: "postgresql://user:password@host:port/database"
-  enable_docker_discovery: true
-  scan_intervals:
-    initial: "5m"
-    recurring: "1h"
+    env_vars_list: []
 schema:
-  log_level: "list(info|debug|warn|error)"
-  database_url: str
-  enable_docker_discovery: bool
-  scan_intervals:
-    initial: "list(5m|10m|30m|1h|2h|6h|12h|24h)"
-    recurring: "list(30m|1h|2h|6h|12h|24h|3d|7d)"
+    env_vars_list: [
+      "match(^[A-Z_0-9]+: .*$)"
+    ]

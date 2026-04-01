@@ -1,86 +1,108 @@
 ARG BUILD_FROM
-FROM $BUILD_FROM
+ARG BUILD_CONFIG_FILE
+ARG BUILD_VERSION
+ARG BUILD_ARCH
+FROM ${BUILD_FROM}
 
-# Disable s6-overlay to avoid PID 1 conflicts
-ENV S6_KEEP_ENV=1
-ENV S6_VERBOSITY=2
-ENV S6_CMD_ARGS="-c"
-ENTRYPOINT []
+LABEL \
+    io.hass.version="${BUILD_VERSION}" \
+    io.hass.type="addon" \
+    io.hass.arch="${BUILD_ARCH}"
 
-# Install required packages
+# Install build dependencies
 RUN apk add --no-cache \
-    curl \
-    nginx \
-    bash \
+    wget \
     unzip \
-    jq \
-    python3 \
-    git \
-    make \
-    nodejs \
-    npm \
-    && rm -rf /var/cache/apk/*
+    bash \
+    ca-certificates \
+    tzdata \
+    su-exec
 
-# Download and install Scanopy daemon
-RUN ARCH=$(uname -m) \
-    && case "$ARCH" in \
-        x86_64) ARCH="amd64" ;; \
-        aarch64|arm64) ARCH="arm64" ;; \
-        *) echo "Error: Unsupported architecture: $ARCH" && exit 1 ;; \
-    esac \
-    && PLATFORM="linux" \
-    && BINARY_NAME="scanopy-daemon-${PLATFORM}-${ARCH}" \
-    && BINARY_URL="https://github.com/scanopy/scanopy/releases/latest/download/${BINARY_NAME}" \
-    && echo "Installing Scanopy daemon..." \
-    && echo "Platform: $PLATFORM" \
-    && echo "Architecture: $ARCH" \
-    && echo "Daemon Binary: $BINARY_NAME" \
-    && echo "Downloading from: $BINARY_URL" \
-    && curl -fL "$BINARY_URL" -o /opt/scanopy-daemon \
-    && chmod +x /opt/scanopy-daemon \
-    && echo "✓ Scanopy daemon installed successfully!"
+# Download and extract Scanopy
+RUN wget https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip -O scanopy.zip && \
+    unzip scanopy.zip && \
+    mv scanopy-0.14.19 /builder && \
+    rm scanopy.zip
 
-# Download Scanopy UI from specific release
-RUN echo "Downloading Scanopy UI from v0.14.19 release..." \
-    && curl -L "https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip" -o /tmp/scanopy-source.zip \
-    && cd /tmp \
-    && unzip scanopy-source.zip \
-    && cd scanopy-0.14.19 \
-    && echo "Creating missing data files..." \
-    && mkdir -p ui/src/lib/data \
-    && echo '[]' > ui/src/lib/data/billing-plans.json \
-    && echo '{"features": []}' > ui/src/lib/data/features.json \
-    && echo '{"services": []}' > ui/src/lib/data/service-definitions.json \
-    && echo '{"subnetTypes": []}' > ui/src/lib/data/subnet-types.json \
-    && echo '{"edgeTypes": []}' > ui/src/lib/data/edge-types.json \
-    && echo '{"groupTypes": []}' > ui/src/lib/data/group-types.json \
-    && echo '{"entities": []}' > ui/src/lib/data/entities.json \
-    && echo "Building UI with npm..." \
-    && cd ui \
-    && npm install --force \
-    && npm run build \
-    && echo "Build completed, checking dist directory..." \
-    && ls -la dist/ \
-    && mv dist/* /opt/scanopy-ui/ \
-    && rm -rf /tmp/scanopy-source.zip scanopy-0.14.19 \
-    && echo "✓ Scanopy UI built and copied successfully!"
+WORKDIR /builder
 
-# Create directories
-RUN mkdir -p /data/scanopy/daemon_config \
-    && mkdir -p /var/log/nginx
+# Multi-stage build following the official Dockerfile pattern
+# Stage 1: Build frontend with Bun
+FROM oven/bun:1-alpine AS frontend-builder
 
-# Copy configuration files
+WORKDIR /app/ui
+COPY --from=0 /builder/ui/package.json /builder/ui/bun.lock ./
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
+COPY --from=0 /builder/ui/ ./
+RUN bun run build
+
+# Stage 2: Build backend with Go
+FROM golang:1.24-alpine AS backend-builder
+
+ARG VERSION=0.14.19
+WORKDIR /app
+RUN apk add --no-cache git
+COPY --from=0 /builder/go.mod /builder/go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+COPY --from=0 /builder/backend/ ./backend/
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-w -s -X main.Version=${VERSION}" \
+    -o server ./backend
+
+# Stage 3: Runtime Image
+FROM ${BUILD_FROM}
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    su-exec \
+    wget \
+    supervisor \
+    nginx
+
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY run.sh /run.sh
-COPY index.html /index.html
 
-# Make scripts executable
-RUN chmod +x /run.sh
+# Create non-root user
+RUN addgroup -g 1000 scanopy && \
+    adduser -D -u 1000 -G scanopy scanopy
 
-# Expose ports
-EXPOSE 60072
+WORKDIR /app
+
+# Copy backend binary from builder
+COPY --from=backend-builder /app/server ./server
+
+# Copy frontend dist from builder
+COPY --from=frontend-builder /app/ui/dist ./ui/dist
+
+# Copy migrations directory from builder
+COPY --from=backend-builder /app/backend/migrations ./migrations
+
+# Copy entrypoint script
+COPY --from=0 /builder/backend/docker-entrypoint.sh /entrypoint.sh
+
+# Create data directory with proper permissions
+RUN mkdir -p /data/scans /data/db /share/scanopy && \
+    chown -R scanopy:scanopy /app /data /share && \
+    chmod +x /entrypoint.sh
+
+# Copy supervisord configuration
+COPY supervisord.conf /etc/supervisord.conf
+RUN chmod +x /etc/supervisord.conf
 
 # Set environment variables
-ENV SCANOPY_LOG_LEVEL=info
+ENV PORT=8080
+ENV DATA_DIR=/share/scanopy
+ENV WORKER_COUNT=2
+ENV DB_MAX_OPEN_CONNS=25
 
-CMD ["/run.sh"]
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Set supervisord as entrypoint
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
