@@ -50,7 +50,7 @@ COPY --from=0 /builder/ui/ ./
 COPY --from=0 /builder/messages/ ../messages/
 COPY --from=rust-builder /fixtures/ ./src/lib/data/
 ARG PUBLIC_SERVER_HOSTNAME=localhost
-ARG PUBLIC_SERVER_PORT=8080
+ARG PUBLIC_SERVER_PORT=60072
 ENV PUBLIC_SERVER_HOSTNAME=$PUBLIC_SERVER_HOSTNAME
 ENV PUBLIC_SERVER_PORT=$PUBLIC_SERVER_PORT
 RUN npm run build
@@ -92,14 +92,14 @@ COPY supervisord.conf /etc/supervisord.conf
 RUN chmod +x /etc/supervisord.conf
 
 # Set environment variables
-ENV PORT=8080
+ENV PORT=60072
 ENV DATA_DIR=/share/scanopy
 
-EXPOSE 8080
+EXPOSE 60073
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/api/health || exit 1
+    CMD curl -f http://localhost:60072/api/health || exit 1
 
 # Set supervisord as entrypoint
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
