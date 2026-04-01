@@ -71,9 +71,10 @@ jobs:
         id: addon_version
         if: steps.compare.outputs.needs_upgrade == 'true'
         run: |
-          # Get current year and month
-          CURRENT_YEAR=$(date +%Y)
-          CURRENT_MONTH=$(date +%m)
+          # Get current year and month in correct format
+          CURRENT_YEAR=$(date +%y)  # YY format (26 for 2026)
+          CURRENT_MONTH=$(date +%m)  # MM format
+          CURRENT_MONTH=${CURRENT_MONTH#0}  # Remove leading zero
           
           # Get current addon version and extract the patch number
           CURRENT_ADDON_VERSION="${{ steps.current.outputs.config_version }}"
