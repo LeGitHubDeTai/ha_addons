@@ -31,7 +31,7 @@ RUN mkdir -p /etc/apk && \
     echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories
 
 RUN apk add --no-cache \
-    nodejs=${NODE_MAJOR}.* \
+    nodejs=${NODE_MAJOR} \
     npm
 
 # ===============================
