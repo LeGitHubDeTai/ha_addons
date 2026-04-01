@@ -132,25 +132,47 @@ jobs:
         run: |
           git push origin "${{ steps.branch.outputs.branch_name }}"
 
+      - name: Setup GitHub CLI
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          # Install GitHub CLI
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh -y
+          
+          # Authenticate
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          
+          # Verify installation
+          gh --version
+
       - name: Create Pull Request
         if: steps.compare.outputs.needs_upgrade == 'true'
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          base: main
-          branch: ${{ steps.branch.outputs.branch_name }}
-          title: "⬆️${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
-          body: |
-            Auto-upgrade n8n to version ${{ steps.latest.outputs.latest_version }}
-            
+        run: |
+          # Debug: show current branch and repo info
+          echo "Current branch: $(git branch --show-current)"
+          echo "Remote URL: $(git remote get-url origin)"
+          
+          # Check if PR already exists
+          if gh pr list --head "${{ steps.branch.outputs.branch_name }}" --base main | grep -q "${{ steps.branch.outputs.branch_name }}"; then
+            echo "PR already exists, skipping creation"
+          else
+            # Create pull request using gh CLI
+            gh pr create \
+              --base main \
+              --head "${{ steps.branch.outputs.branch_name }}" \
+              --title "⬆️${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})" \
+              --body "Auto-upgrade n8n to version ${{ steps.latest.outputs.latest_version }}
+
             **Changes:**
             - Updated config.yaml addon version to ${{ steps.addon_version.outputs.new_addon_version }}
             - Updated Dockerfile to use n8n@${{ steps.latest.outputs.latest_version }}
-            
+
             **Release:** ${{ steps.latest.outputs.release_url }}
+
+            This PR was created automatically by the auto-upgrade workflow." \
+              --label "auto-upgrade,dependencies"
             
-            This PR was created automatically by the auto-upgrade workflow.
-          labels: |
-            auto-upgrade
-            dependencies
-          draft: false
+            echo "PR created successfully"
+          fi
