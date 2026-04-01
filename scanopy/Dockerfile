@@ -1,5 +1,5 @@
 ARG BUILD_FROM
-FROM ${BUILD_FROM}
+FROM $BUILD_FROM
 
 # Disable s6-overlay to avoid PID 1 conflicts
 ENV S6_KEEP_ENV=1
@@ -78,7 +78,7 @@ COPY index.html /index.html
 RUN chmod +x /run.sh
 
 # Expose ports
-EXPOSE 60072 60073
+EXPOSE 60072
 
 # Set environment variables
 ENV SCANOPY_LOG_LEVEL=info
