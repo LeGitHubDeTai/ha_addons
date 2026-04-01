@@ -1,16 +1,14 @@
 name: Scanopy
-version: "26.3.4"
+version: "26.3.4.46"
 slug: scanopy
 panel_icon: "mdi:network-outline"
 description: Network documentation that updates itself - Automatic network discovery and visualization
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/scanopy
 webui: http://[HOST]:[PORT:60072]/
+image: ghcr.io/legithubdetai/ha_addons/dev-scanopy-{arch}
 arch:
-  - armhf
-  - armv7
   - aarch64
   - amd64
-  - i386
 startup: application
 boot: auto
 hassio_role: "default"
@@ -38,7 +36,7 @@ ports_description:
   60073/tcp: The port for Scanopy daemon API and health checks
 options:
   log_level: "info"
-  postgres_password: "password"
+  database_url: "postgresql://user:password@host:port/database"
   public_url: "http://localhost:60072"
   enable_docker_discovery: true
   scan_intervals:
@@ -46,7 +44,7 @@ options:
     recurring: "1h"
 schema:
   log_level: "list(info|debug|warn|error)"
-  postgres_password: str
+  database_url: str
   public_url: str
   enable_docker_discovery: bool
   scan_intervals:
