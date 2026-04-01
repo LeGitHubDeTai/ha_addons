@@ -21,21 +21,8 @@ RUN apk add --no-cache \
     su-exec \
     openssl \
     gnupg \
-    curl \
-    libstdc++ \
-    libgcc \
-    linux-headers
-
-# ===============================
-# INSTALL NODEJS 22
-# ===============================
-ENV NODE_VERSION=22.9.0
-RUN wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-ENV PATH="/root/.nvm:$PATH"
-RUN . /root/.nvm/nvm.sh && \
-    nvm install $NODE_VERSION && \
-    nvm use $NODE_VERSION && \
-    nvm alias default $NODE_VERSION
+    nodejs \
+    npm
 
 # ===============================
 # INSTALL PLANKA
