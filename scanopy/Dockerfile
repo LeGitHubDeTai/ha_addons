@@ -126,6 +126,10 @@ RUN mkdir -p /data/scans /data/db /share/scanopy && \
 COPY supervisord.conf /etc/supervisord.conf
 RUN chmod +x /etc/supervisord.conf
 
+# Copy startup script
+COPY run.sh /app/run.sh
+RUN chmod +x /app/run.sh
+
 # Set environment variables
 ENV PORT=60072
 ENV DATA_DIR=/share/scanopy

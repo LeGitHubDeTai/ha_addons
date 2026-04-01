@@ -1,5 +1,5 @@
 name: Scanopy
-version: "26.3.4.55"
+version: "26.3.4.56"
 slug: scanopy
 panel_title: Scanopy - Network Scanner
 panel_icon: "mdi:network"
@@ -26,8 +26,20 @@ ports:
 ports_description:
     60072/tcp: The port for Scanopy web interface. Normally not exposed, as Home Assistant Ingress is more secure and is recommended. You may expose this port if you want to bypass Ingress (not recommended for security reasons).
 options:
+    DATABASE:
+      db_host: localhost
+      db_port: 5432
+      db_user: scanopy
+      db_password: homeassistant
+      db_name: scanopy
     env_vars_list: []
 schema:
+    DATABASE:
+      db_host: str
+      db_port: int
+      db_user: str
+      db_password: password
+      db_name: str
     env_vars_list: [
       "match(^[A-Z_0-9]+: .*$)"
     ]
