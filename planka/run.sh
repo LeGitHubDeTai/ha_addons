@@ -33,7 +33,8 @@ if ! grep -q "^DATABASE_URL=" "$ENV_FILE"; then
     DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
     echo "DATABASE_URL=${DATABASE_URL}" >> "$ENV_FILE"
-    exec npm run db:init
+    . /root/.nvm/nvm.sh
+    npm run db:init
 else
     bashio::log.info "DATABASE_URL déjà présente"
 fi
