@@ -1,5 +1,6 @@
 name: Auto-upgrade n8n
 
+# Workflow to automatically upgrade n8n addon when new releases are available
 on:
   schedule:
     # Run daily at 9:00 AM UTC
