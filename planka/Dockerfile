@@ -21,8 +21,19 @@ RUN apk add --no-cache \
     su-exec \
     openssl \
     gnupg \
-    nodejs \
-    npm \
+    curl \
+
+# ===============================
+# INSTALL NODEJS 22
+# ===============================
+ENV NODE_MAJOR=22
+RUN mkdir -p /etc/apk && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories
+
+RUN apk add --no-cache \
+    nodejs=${NODE_MAJOR}.* \
+    npm
 
 # ===============================
 # INSTALL PLANKA
