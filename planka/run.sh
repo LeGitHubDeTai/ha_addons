@@ -33,7 +33,6 @@ if ! grep -q "^DATABASE_URL=" "$ENV_FILE"; then
     DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
     echo "DATABASE_URL=${DATABASE_URL}" >> "$ENV_FILE"
-    . /root/.nvm/nvm.sh
     npm run db:init
 else
     bashio::log.info "DATABASE_URL déjà présente"
@@ -57,7 +56,6 @@ chmod 600 "$ENV_FILE"
 # ===============================
 # START PLANKA
 # ===============================
-. /root/.nvm/nvm.sh
 cd /app
 
 bashio::log.info "Démarrage Planka"
