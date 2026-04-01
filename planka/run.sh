@@ -56,6 +56,7 @@ chmod 600 "$ENV_FILE"
 # ===============================
 # START PLANKA
 # ===============================
+. /root/.nvm/nvm.sh
 cd /app
 
 bashio::log.info "Démarrage Planka"
