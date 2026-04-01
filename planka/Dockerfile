@@ -36,7 +36,7 @@ RUN wget https://github.com/plankanban/planka/releases/download/v2.1.0/planka-pr
     rm -rf planka
 
 # IMPORTANT: npm install DOIT créer le venv
-RUN npm install
+RUN node --version && npm --version && npm install
 
 # ===============================
 # START SCRIPT
