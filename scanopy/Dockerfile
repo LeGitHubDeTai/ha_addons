@@ -16,7 +16,12 @@ RUN apk add --no-cache \
     bash \
     ca-certificates \
     tzdata \
-    su-exec
+    su-exec \
+    gcc \
+    musl-dev \
+    pkgconfig \
+    openssl-dev \
+    libffi-dev
 
 # Download and extract Scanopy
 RUN wget https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip -O scanopy.zip && \
@@ -79,13 +84,16 @@ WORKDIR /app
 # Copy server binary from builder
 COPY --from=rust-builder /app/target/release/server ./server
 
-# Copy UI static files from builder
+# Copy UI static files from builder  
 COPY --from=ui-builder /app/ui/build ./static
+
+# Verify server binary exists and is executable
+RUN test -f ./server || (echo "Server binary not found!" && exit 1) && \
+    chmod +x ./server
 
 # Create data directory with proper permissions
 RUN mkdir -p /data/scans /data/db /share/scanopy && \
-    chown -R scanopy:scanopy /app /data /share && \
-    chmod +x ./server
+    chown -R scanopy:scanopy /app /data /share
 
 # Copy supervisord configuration
 COPY supervisord.conf /etc/supervisord.conf
