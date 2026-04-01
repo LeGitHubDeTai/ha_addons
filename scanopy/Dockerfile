@@ -9,6 +9,87 @@ LABEL \
     io.hass.type="addon" \
     io.hass.arch="${BUILD_ARCH}"
 
+# Install build dependencies
+RUN apk add --no-cache \
+    wget \
+    unzip \
+    bash \
+    ca-certificates \
+    tzdata \
+    su-exec \
+    gcc \
+    musl-dev \
+    pkgconfig \
+    openssl-dev \
+    libffi-dev \
+    python3 \
+    make \
+    g++
+
+# Download and extract Scanopy
+RUN wget https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip -O scanopy.zip && \
+    unzip scanopy.zip && \
+    mv scanopy-0.14.19 /builder && \
+    rm scanopy.zip
+
+WORKDIR /builder
+
+# Install Rust
+RUN wget --quiet -O- https://sh.rustup.rs | bash -s -- -y && \
+    . "$HOME/.cargo/env" && \
+    rustup default stable
+
+# Stage 1: Build backend
+FROM ${BUILD_FROM} AS backend-builder
+
+# Install build dependencies for Rust
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    pkgconfig \
+    openssl-dev \
+    libffi-dev \
+    python3 \
+    make \
+    g++
+
+# Install Rust
+RUN wget --quiet -O- https://sh.rustup.rs | bash -s -- -y && \
+    . "$HOME/.cargo/env" && \
+    rustup default stable
+
+# Copy source from first stage
+COPY --from=0 /builder /builder
+WORKDIR /builder
+
+# Build backend
+RUN . "$HOME/.cargo/env" && \
+    cargo build --release --bin server && \
+    cargo build --release --bin generate-fixtures
+
+# Generate fixtures for UI
+RUN . "$HOME/.cargo/env" && \
+    ./target/release/generate-fixtures --output-dir /fixtures
+
+# Stage 2: Build UI
+FROM node:20-slim AS ui-builder
+
+WORKDIR /app/ui
+
+# Copy UI source
+COPY --from=backend-builder /builder/ui/ ./
+
+# Copy messages and fixtures
+COPY --from=backend-builder /builder/messages/ ../messages/
+COPY --from=backend-builder /fixtures/ ./src/lib/data/
+
+# Install dependencies and build
+RUN npm ci && \
+    npm run build
+
+# Stage 3: Runtime Image
+FROM ${BUILD_FROM}
+
 # Install runtime dependencies
 RUN apk add --no-cache \
     ca-certificates \
@@ -26,6 +107,16 @@ RUN addgroup -g 1000 scanopy && \
     adduser -D -u 1000 -G scanopy scanopy
 
 WORKDIR /app
+
+# Copy server binary from builder
+COPY --from=backend-builder /builder/target/release/server ./server
+
+# Copy UI static files from builder
+COPY --from=ui-builder /app/ui/build ./static
+
+# Verify server binary exists
+RUN test -f ./server || (echo "Server binary not found!" && exit 1) && \
+    chmod +x ./server
 
 # Create data directory with proper permissions
 RUN mkdir -p /data/scans /data/db /share/scanopy && \
