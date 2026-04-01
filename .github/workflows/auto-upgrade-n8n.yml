@@ -97,6 +97,13 @@ jobs:
           echo "new_addon_version=$NEW_ADDON_VERSION" >> $GITHUB_OUTPUT
           echo "New addon version: $NEW_ADDON_VERSION"
 
+      - name: Switch to main branch
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          # Switch to main branch before creating upgrade branch
+          git checkout main
+          git pull origin main
+
       - name: Create upgrade branch
         id: branch
         if: steps.compare.outputs.needs_upgrade == 'true'
