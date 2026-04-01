@@ -26,30 +26,34 @@ RUN wget https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip -O sc
 
 WORKDIR /builder
 
-# Multi-stage build following the official Dockerfile pattern
-# Stage 1: Build frontend with Bun
-FROM oven/bun:1-alpine AS frontend-builder
-
-WORKDIR /app/ui
-COPY --from=0 /builder/ui/package.json /builder/ui/bun.lock ./
-RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile
-COPY --from=0 /builder/ui/ ./
-RUN bun run build
-
-# Stage 2: Build backend with Go
-FROM golang:1.24-alpine AS backend-builder
-
-ARG VERSION=0.14.19
+# Stage 1: Build Rust backend
+FROM lukemathwalker/cargo-chef:latest-rust-1.90 AS chef
 WORKDIR /app
-RUN apk add --no-cache git
-COPY --from=0 /builder/go.mod /builder/go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
-COPY --from=0 /builder/backend/ ./backend/
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-w -s -X main.Version=${VERSION}" \
-    -o server ./backend
+
+FROM chef AS planner
+COPY --from=0 /builder/backend/ .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS rust-builder
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+COPY --from=0 /builder/backend/ .
+RUN cargo build --release --bin server --bin generate-fixtures
+RUN /app/target/release/generate-fixtures --output-dir /fixtures
+
+# Stage 2: Build UI
+FROM node:20-slim AS ui-builder
+WORKDIR /app/ui
+COPY --from=0 /builder/ui/package*.json ./
+RUN npm ci
+COPY --from=0 /builder/ui/ ./
+COPY --from=0 /builder/messages/ ../messages/
+COPY --from=rust-builder /fixtures/ ./src/lib/data/
+ARG PUBLIC_SERVER_HOSTNAME=localhost
+ARG PUBLIC_SERVER_PORT=8080
+ENV PUBLIC_SERVER_HOSTNAME=$PUBLIC_SERVER_HOSTNAME
+ENV PUBLIC_SERVER_PORT=$PUBLIC_SERVER_PORT
+RUN npm run build
 
 # Stage 3: Runtime Image
 FROM ${BUILD_FROM}
@@ -61,7 +65,8 @@ RUN apk add --no-cache \
     su-exec \
     wget \
     supervisor \
-    nginx
+    nginx \
+    curl
 
 COPY nginx.conf /etc/nginx/nginx.conf
 
@@ -71,22 +76,16 @@ RUN addgroup -g 1000 scanopy && \
 
 WORKDIR /app
 
-# Copy backend binary from builder
-COPY --from=backend-builder /app/server ./server
+# Copy server binary from builder
+COPY --from=rust-builder /app/target/release/server ./server
 
-# Copy frontend dist from builder
-COPY --from=frontend-builder /app/ui/dist ./ui/dist
-
-# Copy migrations directory from builder
-COPY --from=backend-builder /app/backend/migrations ./migrations
-
-# Copy entrypoint script
-COPY --from=0 /builder/backend/docker-entrypoint.sh /entrypoint.sh
+# Copy UI static files from builder
+COPY --from=ui-builder /app/ui/build ./static
 
 # Create data directory with proper permissions
 RUN mkdir -p /data/scans /data/db /share/scanopy && \
     chown -R scanopy:scanopy /app /data /share && \
-    chmod +x /entrypoint.sh
+    chmod +x ./server
 
 # Copy supervisord configuration
 COPY supervisord.conf /etc/supervisord.conf
@@ -95,14 +94,12 @@ RUN chmod +x /etc/supervisord.conf
 # Set environment variables
 ENV PORT=8080
 ENV DATA_DIR=/share/scanopy
-ENV WORKER_COUNT=2
-ENV DB_MAX_OPEN_CONNS=25
 
 EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:8080/api/health || exit 1
 
 # Set supervisord as entrypoint
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
