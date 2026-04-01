@@ -1,5 +1,5 @@
 name: Scanopy
-version: "26.3.4.59"
+version: "26.3.4.60"
 slug: scanopy
 panel_title: Scanopy - Network Scanner
 panel_icon: "mdi:network"
@@ -12,7 +12,7 @@ startup: application
 boot: auto
 hassio_role: "default"
 ingress: true
-ingress_port: 60072
+ingress_port: 60079
 backup_exclude:
     - "scanopy/.cache"
     - "scanopy/.logs"
