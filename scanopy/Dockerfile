@@ -60,7 +60,7 @@ RUN wget --quiet -O- https://sh.rustup.rs | bash -s -- -y && \
 
 # Copy source from first stage
 COPY --from=0 /builder /builder
-WORKDIR /builder
+WORKDIR /builder/backend
 
 # Build backend
 RUN . "$HOME/.cargo/env" && \
@@ -109,7 +109,7 @@ RUN addgroup -g 1000 scanopy && \
 WORKDIR /app
 
 # Copy server binary from builder
-COPY --from=backend-builder /builder/target/release/server ./server
+COPY --from=backend-builder /builder/backend/target/release/server ./server
 
 # Copy UI static files from builder
 COPY --from=ui-builder /app/ui/build ./static
