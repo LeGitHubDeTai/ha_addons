@@ -20,7 +20,11 @@ RUN apk add --no-cache \
     tzdata \
     su-exec \
     openssl \
-    gnupg 
+    gnupg \
+    curl \
+    libstdc++ \
+    libgcc \
+    linux-headers
 
 # ===============================
 # INSTALL NODEJS 22
