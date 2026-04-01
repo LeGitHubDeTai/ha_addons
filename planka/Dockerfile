@@ -1,5 +1,5 @@
 ARG BUILD_FROM
-FROM ${BUILD_FROM}
+FROM $BUILD_FROM
 
 LABEL \
   io.hass.version="${BUILD_VERSION}" \
@@ -20,8 +20,7 @@ RUN apk add --no-cache \
     tzdata \
     su-exec \
     openssl \
-    gnupg \
-    curl \
+    gnupg 
 
 # ===============================
 # INSTALL NODEJS 22
