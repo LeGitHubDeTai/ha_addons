@@ -33,9 +33,9 @@ export DATABASE_NAME="$DB_NAME"
 export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
 # Admin configuration
-export ADMIN_EMAIL="$ADMIN_EMAIL"
-export ADMIN_PASSWORD="$ADMIN_PASSWORD"
-export ADMIN_NAME="$ADMIN_NAME"
+export DEFAULT_ADMIN_EMAIL="$ADMIN_EMAIL"
+export DEFAULT_ADMIN_PASSWORD="$ADMIN_PASSWORD"
+export DEFAULT_ADMIN_NAME="$ADMIN_NAME"
 
 # Secret key
 if [ -n "$SECRET_KEY" ]; then
@@ -62,6 +62,7 @@ echo "  Admin Email: ${ADMIN_EMAIL}"
 echo "  Base URL: ${BASE_URL}"
 echo "  Port: ${PORT}"
 
-# Start Planka
+# Initialize database and start Planka
 cd /app
-exec npm start
+node db/init.js
+exec node app.js --prod
