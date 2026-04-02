@@ -143,6 +143,10 @@ RUN chmod +x /etc/supervisord.conf
 COPY run.sh /app/run.sh
 RUN chmod +x /app/run.sh
 
+# Copy initialization script
+COPY init.sh /app/init.sh
+RUN chmod +x /app/init.sh
+
 # Set environment variables
 ENV SCANOPY_SERVER_PORT=60072
 ENV DATA_DIR=/share/scanopy
