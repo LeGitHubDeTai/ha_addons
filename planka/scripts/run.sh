@@ -1,22 +1,41 @@
-#!/bin/bash
+#!/usr/bin/env bashio
+# Planka startup script with bashio configuration
 
-# Set environment variables from configuration
+CONFIG_PATH=/data/options.json
+
+# Get database configuration from options using bashio
+DB_HOST=$(bashio::config 'DATABASE.db_host')
+DB_PORT=$(bashio::config 'DATABASE.db_port')
+DB_USER=$(bashio::config 'DATABASE.db_user')
+DB_PASSWORD=$(bashio::config 'DATABASE.db_password')
+DB_NAME=$(bashio::config 'DATABASE.db_name')
+
+# Get admin configuration from options using bashio
+ADMIN_EMAIL=$(bashio::config 'ADMIN.email')
+ADMIN_PASSWORD=$(bashio::config 'ADMIN.password')
+ADMIN_NAME=$(bashio::config 'ADMIN.name')
+
+# Get other configuration
+BASE_URL=$(bashio::config 'BASE_URL')
+SECRET_KEY=$(bashio::config 'SECRET_KEY')
+
+# Set environment variables for Planka
 export NODE_ENV=production
 export PORT=1337
 export BASE_URL="${BASE_URL:-/}"
 
 # Database configuration
-export DATABASE_HOST="${DATABASE_DB_HOST:-postgres}"
-export DATABASE_PORT="${DATABASE_DB_PORT:-5432}"
-export DATABASE_USER="${DATABASE_DB_USER:-planka}"
-export DATABASE_PASSWORD="${DATABASE_DB_PASSWORD:-homeassistant}"
-export DATABASE_NAME="${DATABASE_DB_NAME:-planka}"
-export DATABASE_URL="postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}"
+export DATABASE_HOST="$DB_HOST"
+export DATABASE_PORT="$DB_PORT"
+export DATABASE_USER="$DB_USER"
+export DATABASE_PASSWORD="$DB_PASSWORD"
+export DATABASE_NAME="$DB_NAME"
+export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
 # Admin configuration
-export ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
-export ADMIN_PASSWORD="${ADMIN_PASSWORD:-homeassistant}"
-export ADMIN_NAME="${ADMIN_NAME:-Admin}"
+export ADMIN_EMAIL="$ADMIN_EMAIL"
+export ADMIN_PASSWORD="$ADMIN_PASSWORD"
+export ADMIN_NAME="$ADMIN_NAME"
 
 # Secret key
 if [ -n "$SECRET_KEY" ]; then
@@ -32,6 +51,16 @@ mkdir -p /data/user-avatars /data/project-background-images /data/attachments
 # Set permissions
 chown -R root:root /app /data
 chmod -R 755 /data
+
+# Log configuration (without password)
+echo "Starting Planka with configuration:"
+echo "  Database Host: ${DB_HOST}"
+echo "  Database Port: ${DB_PORT}"
+echo "  Database User: ${DB_USER}"
+echo "  Database Name: ${DB_NAME}"
+echo "  Admin Email: ${ADMIN_EMAIL}"
+echo "  Base URL: ${BASE_URL}"
+echo "  Port: ${PORT}"
 
 # Start Planka
 cd /app
