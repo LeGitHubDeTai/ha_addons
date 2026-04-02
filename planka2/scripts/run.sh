@@ -1,7 +1,7 @@
 #!/usr/bin/env bashio
 # Planka startup script with bashio configuration
 
-CONFIG_PATH=/data/options.json
+echo "Starting Planka startup script..."
 
 # Get database configuration from options using bashio
 DB_HOST=$(bashio::config 'DATABASE.db_host')
@@ -62,7 +62,36 @@ echo "  Admin Email: ${ADMIN_EMAIL}"
 echo "  Base URL: ${BASE_URL}"
 echo "  Port: ${PORT}"
 
+# Check if database is accessible
+echo "Checking database connection..."
+node -e "
+const { Pool } = require('pg');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+pool.query('SELECT NOW()')
+  .then(() => {
+    console.log('Database connection successful');
+    process.exit(0);
+  })
+  .catch(err => {
+    console.error('Database connection failed:', err.message);
+    process.exit(1);
+  });
+"
+
+if [ $? -ne 0 ]; then
+    echo "Database connection failed, exiting..."
+    exit 1
+fi
+
 # Initialize database and start Planka
 cd /app
-node db/init.js
+echo "Initializing database..."
+node db/init.js || {
+    echo "Database initialization failed"
+    exit 1
+}
+
+echo "Starting Planka server..."
 exec node app.js --prod
