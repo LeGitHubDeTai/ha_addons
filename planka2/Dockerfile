@@ -17,7 +17,6 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
-    build-essential \
     && rm -rf /var/cache/apk/*
 
 # Create app directory
