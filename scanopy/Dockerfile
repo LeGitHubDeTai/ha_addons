@@ -65,6 +65,7 @@ WORKDIR /builder/backend
 # Build backend
 RUN . "$HOME/.cargo/env" && \
     cargo build --release --bin server && \
+    cargo build --release --bin daemon && \
     cargo build --release --bin generate-fixtures
 
 # Generate fixtures for UI
