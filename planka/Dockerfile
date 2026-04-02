@@ -32,8 +32,9 @@ RUN if [ -f "package.json" ]; then npm install --production; fi
 # Create data directories
 RUN mkdir -p /data/user-avatars /data/project-background-images /data/attachments
 
-# Copy configuration files
+# Copy configuration files and scripts
 COPY root/ /
+COPY scripts/ /scripts/
 
 # Set permissions
 RUN chmod +x /scripts/*.sh
