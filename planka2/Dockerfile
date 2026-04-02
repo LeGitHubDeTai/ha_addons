@@ -14,6 +14,9 @@ RUN apk add --no-cache \
     npm \
     curl \
     supervisor \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/cache/apk/*
 
 # Create app directory
