@@ -16,8 +16,8 @@ DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_
 # Set environment variables for scanopy
 export SCANOPY_DATABASE_URL="$DATABASE_URL"
 export SCANOPY_PUBLIC_URL="http://localhost:60072"
-export SCANOPY_WEB_UI_DIR="/app/static"
-export PORT=60072
+export SCANOPY_WEB_EXTERNAL_PATH="/app/static"
+export SCANOPY_SERVER_PORT=60072
 export DATA_DIR=/share/scanopy
 
 # Create data directories

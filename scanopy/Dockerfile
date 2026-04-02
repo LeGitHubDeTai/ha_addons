@@ -131,7 +131,7 @@ COPY run.sh /app/run.sh
 RUN chmod +x /app/run.sh
 
 # Set environment variables
-ENV PORT=60072
+ENV SCANOPY_SERVER_PORT=60072
 ENV DATA_DIR=/share/scanopy
 
 EXPOSE 60072
