@@ -1,5 +1,7 @@
-# Use the official Home Assistant base image
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.22
+ARG BUILD_FROM
+ARG BUILD_CONFIG_FILE
+ARG BUILD_VERSION
+ARG BUILD_ARCH
 FROM ${BUILD_FROM}
 
 # Set environment variables
