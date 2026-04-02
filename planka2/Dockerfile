@@ -36,17 +36,21 @@ RUN mkdir -p /data/user-avatars /data/project-background-images /data/attachment
 # Copy configuration files and scripts
 COPY root/ /
 COPY scripts/ /scripts/
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY supervisord.conf /etc/supervisord.conf
+RUN chmod +x /etc/supervisord.conf
 
 # Set permissions
 RUN chmod +x /scripts/*.sh
 
-# Expose port
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=1337
+
 EXPOSE 1337
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:1337/api/health || exit 1
 
-# Start supervisor
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Set supervisord as entrypoint
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
