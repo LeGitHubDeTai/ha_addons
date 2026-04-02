@@ -1,120 +1,96 @@
-# 🗂️ Planka – Home Assistant Add-on
+# Planka Home Assistant Add-on
 
-Cet add-on permet d’exécuter **Planka**, un outil Kanban open-source moderne, **directement dans Home Assistant** sous forme d’extension.
+## Description
 
-Il fournit une intégration simple et fiable de Planka dans l’écosystème Home Assistant, avec une configuration centralisée et un démarrage automatisé.
+Planka is an open-source kanban board for project management and collaboration. This add-on provides an easy way to deploy Planka within Home Assistant.
 
----
+## Features
 
-## ✨ Présentation
+- **Kanban Boards**: Create and manage kanban boards for projects
+- **Real-time Collaboration**: Work together with your team in real-time
+- **File Attachments**: Upload and manage files within cards
+- **User Management**: Admin and user role management
+- **Home Assistant Integration**: Seamless integration through Home Assistant Ingress
 
-**Planka** est une application de gestion de projets de type Kanban, inspirée de Trello, permettant d’organiser :
+## Installation
 
-* tableaux
-* listes
-* cartes
-* tâches collaboratives
+1. Add this repository to your Home Assistant Supervisor
+2. Install the Planka add-on
+3. Configure the add-on settings
+4. Start the add-on
 
-Cette adaptation permet de l’utiliser facilement dans Home Assistant, sans installation manuelle complexe.
+## Configuration
 
----
+### Database Configuration
 
-## ⚙️ Fonctionnalités de l’add-on
+The add-on requires a PostgreSQL database. You can either:
 
-* 🚀 Exécution de Planka comme add-on Home Assistant
-* 🧩 Configuration via l’interface Home Assistant
-* 🔐 Génération automatique des variables sensibles
-* 🗄️ Initialisation automatique de la base de données
-* 👤 Création automatique du compte administrateur au premier démarrage
-* 🔄 Mise à jour automatique de la configuration lors des changements
-* 📁 Données persistantes stockées dans `/config`
+1. Use the official PostgreSQL add-on
+2. Use an external PostgreSQL instance
 
----
+### Required Settings
 
-## 🏗️ Architecture
+- **Database Host**: PostgreSQL server hostname
+- **Database Port**: PostgreSQL server port (default: 5432)
+- **Database User**: PostgreSQL username
+- **Database Password**: PostgreSQL password
+- **Database Name**: PostgreSQL database name
 
-* **Application** : Planka (Node.js)
-* **Base de données** : PostgreSQL
-* **Environnement** : Home Assistant OS / Supervised
-* **Configuration** : `config.yaml`
+### Admin Account
 
----
+- **Admin Email**: Administrator email address
+- **Admin Password**: Administrator password
+- **Admin Name**: Administrator display name
 
-## ⚠️ Prérequis
+### Optional Settings
 
-* Home Assistant OS ou Home Assistant Supervised
-* Une base de données PostgreSQL disponible (locale ou distante)
+- **Base URL**: Base URL for the application (default: /)
+- **Secret Key**: Secret key for session management (auto-generated if not provided)
 
----
+## Usage
 
-## 🔧 Configuration
+1. Access Planka through Home Assistant Ingress or directly on port 1337
+2. Log in with the admin credentials configured in the add-on
+3. Create your first project and kanban board
+4. Invite team members and start collaborating
 
-### Base de données
+## Data Persistence
 
-```yaml
-DATABASE:
-  db_host: localhost
-  db_port: 5432
-  db_user: planka
-  db_password: homeassistant
-  db_name: planka
-```
+The following data is persisted:
 
-### Compte administrateur
+- User avatars: `/data/user-avatars`
+- Project background images: `/data/project-background-images`
+- File attachments: `/data/attachments`
 
-```yaml
-ADMIN:
-  email: admin@example.com
-  password: homeassistant
-  name: Admin
-```
+## Security Considerations
 
-> ℹ️ Le compte administrateur est créé automatiquement lors du premier démarrage.
+- Use strong passwords for the database and admin accounts
+- Consider using Home Assistant Ingress instead of exposing the port directly
+- Regularly update the add-on to receive security patches
+- Back up your PostgreSQL database regularly
 
----
+## Troubleshooting
 
-## 🚀 Installation
+### Common Issues
 
-1. Ajouter le dépôt d’add-ons personnalisé
-2. Installer l’add-on **Planka**
-3. Renseigner la configuration
-4. Démarrer l’add-on
-5. Accéder à Planka via l’interface Home Assistant
+1. **Database Connection Failed**: Verify database credentials and network connectivity
+2. **Application Won't Start**: Check the add-on logs for error messages
+3. **Cannot Access Web UI**: Ensure the port is not blocked by firewall
 
----
+### Logs
 
-## 🔐 Sécurité
+Access the add-on logs through Home Assistant Supervisor to troubleshoot issues.
 
-* Les secrets sont générés automatiquement
-* Les fichiers de configuration utilisent des permissions restrictives
-* Aucune configuration manuelle requise dans le conteneur
+## Support
 
----
+For issues related to:
+- **Add-on Installation**: Report issues in this repository
+- **Planka Functionality**: Report issues at [plankanban/planka](https://github.com/plankanban/planka)
 
-## 📦 Compatibilité
+## Version
 
-* Architectures supportées :
+This add-on uses Planka version 2.1.0.
 
-  * `amd64`
-  * `aarch64`
-  * `armv7`
-  * `armhf`
-  * `i386`
+## License
 
-* Version Node.js : **22**
-
-* Version Planka : dernière version stable
-
----
-
-## 🧑‍💻 Auteur
-
-Adaptation Home Assistant par **LeGitHubDeTai**
-Planka est un projet open-source maintenu par ses auteurs respectifs.
-
----
-
-## 📄 Licence
-
-* Planka : licence d’origine
-* Add-on Home Assistant : licence de ce dépôt
+This add-on is released under the MIT License. Planka itself is released under the AGPL-3.0 License.
