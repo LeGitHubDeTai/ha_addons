@@ -1,6 +1,6 @@
 name: Planka2DEV
-version: "2.1.0"
-slug: planka
+version: "26.4.1.1"
+slug: planka2
 panel_title: Planka - Kanban Board
 panel_icon: "mdi:view-week"
 description: Open-source kanban board for project management and collaboration
