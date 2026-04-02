@@ -62,10 +62,17 @@ echo "  Admin Email: ${ADMIN_EMAIL}"
 echo "  Base URL: ${BASE_URL}"
 echo "  Port: ${PORT}"
 
+# Check if Node.js and app files exist
+echo "Checking Node.js and app files..."
+node --version
+ls -la /app/app.js
+
 # Initialize database and start Planka
 cd /app
 echo "Initializing database..."
 node db/init.js
+echo "Database initialization completed."
 
 echo "Starting Planka server..."
+echo "Server will be available at http://localhost:${PORT}${BASE_URL}"
 exec node app.js --prod
