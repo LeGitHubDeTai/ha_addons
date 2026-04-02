@@ -22,10 +22,12 @@ WORKDIR /app
 RUN curl -L -o planka.zip https://github.com/plankanban/planka/releases/download/v2.1.0/planka-prebuild.zip \
     && unzip planka.zip \
     && rm planka.zip \
+    && find . -maxdepth 1 -type d -name "planka-*" -exec mv {}/* . \; \
+    && find . -maxdepth 1 -type d -name "planka-*" -exec rmdir {} \; \
     && chown -R root:root /app
 
-# Install dependencies
-RUN npm install --production
+# Install dependencies (only if package.json exists)
+RUN if [ -f "package.json" ]; then npm install --production; fi
 
 # Create data directories
 RUN mkdir -p /data/user-avatars /data/project-background-images /data/attachments
