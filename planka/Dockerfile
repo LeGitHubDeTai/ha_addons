@@ -1,43 +1,45 @@
-ARG BUILD_FROM
+# Use the official Home Assistant base image
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.22
 FROM ${BUILD_FROM}
 
-LABEL \
-  io.hass.version="${BUILD_VERSION}" \
-  io.hass.type="addon" \
-  io.hass.arch="${BUILD_ARCH}"
+# Set environment variables
+ENV NODE_VERSION=18
+ENV PORT=1337
 
-# ===============================
-# BASE DEPENDENCIES
-# ===============================
+# Install required packages
 RUN apk add --no-cache \
-    ca-certificates \
-    curl \
-    unzip \
-    build-base \
-    python3 \
-    py3-pip \
     nodejs \
-    npm
+    npm \
+    curl \
+    && rm -rf /var/cache/apk/*
 
-# ===============================
-# INSTALL PLANKA
-# ===============================
-WORKDIR /opt
+# Create app directory
+WORKDIR /app
 
-RUN curl -fsSL -o planka.zip \
-        https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
-    unzip planka.zip && \
-    rm planka.zip
+# Download and extract Planka
+RUN curl -L -o planka.zip https://github.com/plankanban/planka/releases/download/v2.1.0/planka-prebuild.zip \
+    && unzip planka.zip \
+    && rm planka.zip \
+    && chown -R root:root /app
 
-WORKDIR /opt/planka
+# Install dependencies
+RUN npm install --production
 
-# IMPORTANT: npm install DOIT créer le venv
-RUN npm install
+# Create data directories
+RUN mkdir -p /data/user-avatars /data/project-background-images /data/attachments
 
-# ===============================
-# START SCRIPT
-# ===============================
-COPY run.sh /run.sh
-RUN chmod +x /run.sh
+# Copy configuration files
+COPY root/ /
 
-CMD ["/run.sh"]
+# Set permissions
+RUN chmod +x /scripts/*.sh
+
+# Expose port
+EXPOSE 1337
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:1337/api/health || exit 1
+
+# Start the application
+CMD ["/scripts/run.sh"]
