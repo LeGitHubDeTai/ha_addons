@@ -65,10 +65,7 @@ echo "  Port: ${PORT}"
 # Initialize database and start Planka
 cd /app
 echo "Initializing database..."
-node db/init.js || {
-    echo "Database initialization failed"
-    exit 1
-}
+node db/init.js
 
 echo "Starting Planka server..."
 exec node app.js --prod
