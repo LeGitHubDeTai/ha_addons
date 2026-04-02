@@ -5,7 +5,7 @@ panel_title: Planka - Kanban Board
 panel_icon: "mdi:view-week"
 description: Open-source kanban board for project management and collaboration
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/planka
-image: ghcr.io/legithubdetai/ha_addons/planka-{arch}
+image: ghcr.io/legithubdetai/ha_addons/dev-planka2-{arch}
 arch:
   - amd64
   - aarch64
