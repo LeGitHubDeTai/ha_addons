@@ -32,6 +32,16 @@ RUN wget https://github.com/scanopy/scanopy/archive/refs/tags/v0.14.19.zip -O sc
     mv scanopy-0.14.19 /builder && \
     rm scanopy.zip
 
+# Run install script if it exists
+RUN cd /builder && \
+    if [ -f "install.sh" ]; then \
+        echo "Running install.sh..." && \
+        chmod +x install.sh && \
+        ./install.sh || echo "install.sh completed with warnings"; \
+    else \
+        echo "install.sh not found, continuing..."; \
+    fi
+
 WORKDIR /builder
 
 # Install Rust
