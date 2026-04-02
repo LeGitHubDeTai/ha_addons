@@ -17,17 +17,18 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
+    build-essential \
     && rm -rf /var/cache/apk/*
 
 # Create app directory
 WORKDIR /app
 
 # Download and extract Planka
-RUN wget -O planka.zip https://github.com/plankanban/planka/archive/refs/tags/v2.1.0.zip \
-    && unzip planka.zip \
+RUN wget -O planka.zip https://github.com/plankanban/planka/releases/download/v2.1.0/planka-prebuild.zip \
+    && unzip planka.zip -d /var/www/ \
     && rm planka.zip \
-    && mv planka-2.1.0/* . \
-    && rm -rf planka-2.1.0 \
+    && mv /var/www/planka/* /app/ \
+    && rmdir /var/www/planka \
     && chown -R root:root /app
 
 # Install dependencies
