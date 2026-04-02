@@ -110,13 +110,15 @@ WORKDIR /app
 
 # Copy server binary from builder
 COPY --from=backend-builder /builder/backend/target/release/server ./server
+COPY --from=backend-builder /builder/backend/target/release/daemon ./daemon
 
 # Copy UI static files from builder
 COPY --from=ui-builder /app/ui/build ./static
 
 # Verify server binary exists
 RUN test -f ./server || (echo "Server binary not found!" && exit 1) && \
-    chmod +x ./server
+    test -f ./daemon || (echo "Daemon binary not found!" && exit 1) && \
+    chmod +x ./server ./daemon
 
 # Create data directory with proper permissions
 RUN mkdir -p /data/scans /data/db /share/scanopy && \
