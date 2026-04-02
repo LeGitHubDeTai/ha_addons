@@ -35,7 +35,7 @@ echo "  Database Host: ${DB_HOST}"
 echo "  Database Port: ${DB_PORT}"
 echo "  Database User: ${DB_USER}"
 echo "  Database Name: ${DB_NAME}"
-echo "  Port: ${PORT}"
+echo "  Port: ${SCANOPY_SERVER_PORT}"
 echo "  Data Directory: ${DATA_DIR}"
 
 # Start scanopy server
