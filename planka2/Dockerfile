@@ -24,10 +24,10 @@ WORKDIR /app
 
 # Download and extract Planka
 RUN wget -O planka.zip https://github.com/plankanban/planka/releases/download/v2.1.0/planka-prebuild.zip \
-    && unzip planka.zip -d /var/www/ \
+    && unzip planka.zip \
     && rm planka.zip \
-    && mv /var/www/planka/* /app/ \
-    && rmdir /var/www/planka \
+    && mv planka/* /app/ \
+    && rm -rf planka \
     && chown -R root:root /app
 
 # Install dependencies
