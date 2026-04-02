@@ -1,0 +1,45 @@
+name: Scanopy
+version: "26.4.1.9"
+slug: scanopy
+panel_title: Scanopy - Network Scanner
+panel_icon: "mdi:network"
+description: Network scanning tool for discovering and analyzing network devices with web interface
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/scanopy
+image: ghcr.io/legithubdetai/ha_addons/dev-scanopy-{arch}
+arch:
+    - amd64
+startup: application
+boot: auto
+hassio_role: "default"
+ingress: true
+ingress_port: 60079
+backup_exclude:
+    - "scanopy/.cache"
+    - "scanopy/.logs"
+    - "supervisord.log*"
+    - "/data/scans/*.tmp"
+    - "/share/scans/*.tmp"
+map:
+    - share:rw
+ports:
+    60072/tcp: null
+ports_description:
+    60072/tcp: The port for Scanopy web interface. Normally not exposed, as Home Assistant Ingress is more secure and is recommended. You may expose this port if you want to bypass Ingress (not recommended for security reasons).
+options:
+    DATABASE:
+      db_host: localhost
+      db_port: 5432
+      db_user: scanopy
+      db_password: homeassistant
+      db_name: scanopy
+    env_vars_list: []
+schema:
+    DATABASE:
+      db_host: str
+      db_port: int
+      db_user: str
+      db_password: password
+      db_name: str
+    env_vars_list: [
+      "match(^[A-Z_0-9]+: .*$)"
+    ]
