@@ -27,11 +27,11 @@ RUN wget -O planka.zip https://github.com/plankanban/planka/archive/refs/tags/v2
     && unzip planka.zip \
     && rm planka.zip \
     && mv planka-2.1.0/* . \
-    && rmdir planka-2.1.0 \
+    && rm -rf planka-2.1.0 \
     && chown -R root:root /app
 
 # Install dependencies
-RUN npm install --production
+RUN npm install
 
 # Create data directories
 RUN mkdir -p /data/user-avatars /data/project-background-images /data/attachments
