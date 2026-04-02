@@ -48,7 +48,7 @@ ENV PORT=1337
 EXPOSE 1337
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:1337/api/health || exit 1
 
 # Set supervisord as entrypoint
