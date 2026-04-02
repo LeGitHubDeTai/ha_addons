@@ -62,29 +62,6 @@ echo "  Admin Email: ${ADMIN_EMAIL}"
 echo "  Base URL: ${BASE_URL}"
 echo "  Port: ${PORT}"
 
-# Check if database is accessible
-echo "Checking database connection..."
-node -e "
-const { Pool } = require('pg');
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-pool.query('SELECT NOW()')
-  .then(() => {
-    console.log('Database connection successful');
-    process.exit(0);
-  })
-  .catch(err => {
-    console.error('Database connection failed:', err.message);
-    process.exit(1);
-  });
-"
-
-if [ $? -ne 0 ]; then
-    echo "Database connection failed, exiting..."
-    exit 1
-fi
-
 # Initialize database and start Planka
 cd /app
 echo "Initializing database..."

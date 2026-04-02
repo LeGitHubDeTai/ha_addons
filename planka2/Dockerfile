@@ -5,7 +5,7 @@ ARG BUILD_ARCH
 FROM ${BUILD_FROM}
 
 # Set environment variables
-ENV NODE_VERSION=18
+ENV NODE_VERSION=22
 ENV PORT=1337
 
 # Install required packages
@@ -23,11 +23,11 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Download and extract Planka
-RUN wget -O planka.zip https://github.com/plankanban/planka/releases/download/v2.1.0/planka-prebuild.zip \
+RUN wget -O planka.zip https://github.com/plankanban/planka/archive/refs/tags/v2.1.0.zip \
     && unzip planka.zip \
     && rm planka.zip \
-    && cp -r planka/* . \
-    && rm -rf planka \
+    && mv planka-2.1.0/* . \
+    && rmdir planka-2.1.0 \
     && chown -R root:root /app
 
 # Install dependencies
@@ -36,14 +36,10 @@ RUN npm install --production
 # Create data directories
 RUN mkdir -p /data/user-avatars /data/project-background-images /data/attachments
 
-# Copy configuration files and scripts
-COPY root/ /
-COPY scripts/ /scripts/
+# Copy run script
+COPY run.sh /run.sh
 COPY supervisord.conf /etc/supervisord.conf
-RUN chmod +x /etc/supervisord.conf
-
-# Set permissions
-RUN chmod +x /scripts/*.sh
+RUN chmod +x /etc/supervisord.conf /run.sh
 
 # Set environment variables
 ENV NODE_ENV=production
