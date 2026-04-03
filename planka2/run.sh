@@ -70,7 +70,7 @@ ls -la /app/app.js
 # Initialize database and start Planka
 cd /app
 echo "Initializing database..."
-npm run db:init
+node db/init.js
 echo "Database initialization completed."
 
 echo "Creating admin user if not exists..."
