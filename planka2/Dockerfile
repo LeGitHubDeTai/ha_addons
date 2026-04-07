@@ -20,14 +20,14 @@ RUN apk add --no-cache \
 # ===============================
 # INSTALL PLANKA
 # ===============================
-WORKDIR /opt
+WORKDIR /app
 
 RUN curl -fsSL -o planka.zip \
         https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
     unzip planka.zip && \
     rm planka.zip
 
-WORKDIR /opt/planka
+WORKDIR /app/planka
 
 # IMPORTANT: npm install DOIT créer le venv
 RUN npm install
