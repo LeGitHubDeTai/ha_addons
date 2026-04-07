@@ -16,6 +16,7 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     supervisor \
+    openssl \
     && rm -rf /var/cache/apk/*
 
 # ===============================
