@@ -4,27 +4,37 @@
 echo "Starting Planka startup script..."
 echo "Script is running..."
 
-# Test if bashio is available
-echo "Testing bashio..."
-which bashio || echo "bashio not found"
-bashio --version || echo "bashio version failed"
+# Source bashio properly
+echo "Sourcing bashio..."
+source /usr/lib/bashio/bashio || {
+    echo "Failed to source bashio, using fallback values"
+    # Fallback values if bashio is not available
+    DB_HOST="postgres"
+    DB_PORT="5432"
+    DB_USER="planka"
+    DB_PASSWORD="homeassistant"
+    DB_NAME="planka"
+    ADMIN_EMAIL="admin@example.com"
+    ADMIN_PASSWORD="homeassistant"
+    ADMIN_NAME="Admin"
+    BASE_URL="/"
+    SECRET_KEY=""
+}
 
 # Get database configuration from options using bashio
 echo "Reading configuration..."
-DB_HOST=$(bashio::config 'DATABASE.db_host')
-DB_PORT=$(bashio::config 'DATABASE.db_port')
-DB_USER=$(bashio::config 'DATABASE.db_user')
-DB_PASSWORD=$(bashio::config 'DATABASE.db_password')
-DB_NAME=$(bashio::config 'DATABASE.db_name')
-
-# Get admin configuration from options using bashio
-ADMIN_EMAIL=$(bashio::config 'ADMIN.email')
-ADMIN_PASSWORD=$(bashio::config 'ADMIN.password')
-ADMIN_NAME=$(bashio::config 'ADMIN.name')
-
-# Get other configuration
-BASE_URL=$(bashio::config 'BASE_URL')
-SECRET_KEY=$(bashio::config 'SECRET_KEY')
+if command -v bashio &> /dev/null; then
+    DB_HOST=$(bashio::config 'DATABASE.db_host')
+    DB_PORT=$(bashio::config 'DATABASE.db_port')
+    DB_USER=$(bashio::config 'DATABASE.db_user')
+    DB_PASSWORD=$(bashio::config 'DATABASE.db_password')
+    DB_NAME=$(bashio::config 'DATABASE.db_name')
+    ADMIN_EMAIL=$(bashio::config 'ADMIN.email')
+    ADMIN_PASSWORD=$(bashio::config 'ADMIN.password')
+    ADMIN_NAME=$(bashio::config 'ADMIN.name')
+    BASE_URL=$(bashio::config 'BASE_URL')
+    SECRET_KEY=$(bashio::config 'SECRET_KEY')
+fi
 
 echo "Configuration read successfully"
 
@@ -51,7 +61,12 @@ if [ -n "$SECRET_KEY" ]; then
     export SECRET_KEY="$SECRET_KEY"
 else
     # Generate a random secret key if not provided
-    export SECRET_KEY=$(openssl rand -hex 32)
+    if command -v openssl &> /dev/null; then
+        export SECRET_KEY=$(openssl rand -hex 32)
+    else
+        # Fallback if openssl is not available
+        export SECRET_KEY=$(date +%s | sha256sum | base64 | head -c 32)
+    fi
 fi
 
 # Create necessary directories

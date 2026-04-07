@@ -17,6 +17,7 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
+    openssl \
     && rm -rf /var/cache/apk/*
 
 # Create app directory
