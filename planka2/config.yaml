@@ -1,5 +1,5 @@
 name: Planka2DEV
-version: "26.4.1.39"
+version: "26.4.1.40"
 slug: planka2
 panel_title: Planka - Kanban Board
 panel_icon: "mdi:view-week"
@@ -42,7 +42,6 @@ options:
     email: admin@example.com
     password: homeassistant
     name: Admin
-  BASE_URL: /
   SECRET_KEY: null
 schema:
   DATABASE:
@@ -55,5 +54,4 @@ schema:
     email: email
     password: password
     name: str
-  BASE_URL: str
   SECRET_KEY: str?
