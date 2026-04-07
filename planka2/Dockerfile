@@ -15,6 +15,7 @@ RUN apk add --no-cache \
     py3-pip \
     nodejs \
     npm \
+    supervisor \
     && rm -rf /var/cache/apk/*
 
 # ===============================
@@ -36,6 +37,8 @@ RUN npm install
 # START SCRIPT
 # ===============================
 COPY run.sh /run.sh
+COPY supervisord.conf /etc/supervisord.conf
 RUN chmod +x /run.sh
 
-CMD ["/run.sh"]
+# Set supervisord as entrypoint
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

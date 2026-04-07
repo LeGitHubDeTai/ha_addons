@@ -312,7 +312,7 @@ jobs:
               IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:latest"
             else
               IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/dev-$SLUG-$arch:$VERSION"
-              IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/dev-$SLUG-$arch:latest"
+              IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/dev-$SLUG-$arch:dev"
             fi
             
             echo "Building image: $IMAGE_TAG"
