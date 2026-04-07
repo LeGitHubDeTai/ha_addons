@@ -65,7 +65,7 @@ fi
 
 # CORS origins
 if grep -q "^CORS_ORIGIN=" "$ENV_FILE" 2>/dev/null; then
-    sed -i "s|^CORS_ORIGIN=.*|CORS_ORIGIN=*" "$ENV_FILE"
+    sed -i "s|^CORS_ORIGIN=.*|CORS_ORIGIN=*|" "$ENV_FILE"
 else
     echo "CORS_ORIGIN=*" >> "$ENV_FILE"
 fi
