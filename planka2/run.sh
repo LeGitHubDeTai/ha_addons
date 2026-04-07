@@ -45,12 +45,36 @@ fi
 # ===============================
 # BASE_URL
 # ===============================
-BASE_URL="http://localhost:1338"
+BASE_URL="$(bashio::config 'BASE_URL')"
 
 if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
     sed -i "s|^BASE_URL=.*|BASE_URL=${BASE_URL}|" "$ENV_FILE"
 else
     echo "BASE_URL=${BASE_URL}" >> "$ENV_FILE"
+fi
+
+# ===============================
+# ADDITIONAL PLANKA ENV VARS
+# ===============================
+# Trust proxy for ingress
+if grep -q "^TRUST_PROXY=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^TRUST_PROXY=.*|TRUST_PROXY=1|" "$ENV_FILE"
+else
+    echo "TRUST_PROXY=1" >> "$ENV_FILE"
+fi
+
+# CORS origins
+if grep -q "^CORS_ORIGIN=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^CORS_ORIGIN=.*|CORS_ORIGIN=*" "$ENV_FILE"
+else
+    echo "CORS_ORIGIN=*" >> "$ENV_FILE"
+fi
+
+# Node environment
+if grep -q "^NODE_ENV=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^NODE_ENV=.*|NODE_ENV=production|" "$ENV_FILE"
+else
+    echo "NODE_ENV=production" >> "$ENV_FILE"
 fi
 
 # ===============================
