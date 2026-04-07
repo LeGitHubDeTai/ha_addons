@@ -27,7 +27,7 @@ WORKDIR /app
 RUN curl -fsSL -o planka.zip \
         https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
     unzip planka.zip && \
-    mv planka/* . && \
+    cp -r planka/. . && \
     rm -rf planka && \
     rm planka.zip
 
