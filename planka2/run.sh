@@ -1,9 +1,16 @@
-#!/usr/bin/env bashio
+#!/usr/bin/env bash
 # Planka startup script with bashio configuration
 
 echo "Starting Planka startup script..."
+echo "Script is running..."
+
+# Test if bashio is available
+echo "Testing bashio..."
+which bashio || echo "bashio not found"
+bashio --version || echo "bashio version failed"
 
 # Get database configuration from options using bashio
+echo "Reading configuration..."
 DB_HOST=$(bashio::config 'DATABASE.db_host')
 DB_PORT=$(bashio::config 'DATABASE.db_port')
 DB_USER=$(bashio::config 'DATABASE.db_user')
@@ -18,6 +25,8 @@ ADMIN_NAME=$(bashio::config 'ADMIN.name')
 # Get other configuration
 BASE_URL=$(bashio::config 'BASE_URL')
 SECRET_KEY=$(bashio::config 'SECRET_KEY')
+
+echo "Configuration read successfully"
 
 # Set environment variables for Planka
 export NODE_ENV=production
