@@ -26,7 +26,7 @@ RUN curl -fsSL -o planka.zip \
         https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
     unzip planka.zip && \
     mv planka/* . && \
-    rmdir planka && \
+    rm -rf planka && \
     rm planka.zip
 
 # IMPORTANT: npm install DOIT créer le venv
