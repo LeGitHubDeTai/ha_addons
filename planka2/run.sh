@@ -1,107 +1,90 @@
 #!/usr/bin/env bashio
-# Planka startup script with bashio configuration
+set -euo pipefail
 
-echo "Starting Planka startup script..."
+ENV_FILE="/config/.env"
 
-# Get database configuration from options using bashio
-DB_HOST=$(bashio::config 'DATABASE.db_host')
-DB_PORT=$(bashio::config 'DATABASE.db_port')
-DB_USER=$(bashio::config 'DATABASE.db_user')
-DB_PASSWORD=$(bashio::config 'DATABASE.db_password')
-DB_NAME=$(bashio::config 'DATABASE.db_name')
+bashio::log.info "Initialisation Planka"
 
-# Get admin configuration from options using bashio
-ADMIN_EMAIL=$(bashio::config 'ADMIN.email')
-ADMIN_PASSWORD=$(bashio::config 'ADMIN.password')
-ADMIN_NAME=$(bashio::config 'ADMIN.name')
+# ===============================
+# SECRET (jamais modifié)
+# ===============================
+if [[ ! -f "$ENV_FILE" ]] || ! grep -q "^SECRET_KEY=" "$ENV_FILE"; then
+    bashio::log.info "Génération du SECRET"
+    SECRET="$(openssl rand -hex 64)"
+    echo "SECRET_KEY=${SECRET}" >> "$ENV_FILE"
+fi
 
-# Get other configuration
-BASE_URL=$(bashio::config 'BASE_URL')
-SECRET_KEY=$(bashio::config 'SECRET_KEY')
+# ===============================
+# DATABASE_URL (avec détection)
+# ===============================
+DB_HOST="$(bashio::config 'DATABASE.db_host')"
+DB_PORT="$(bashio::config 'DATABASE.db_port')"
+DB_USER="$(bashio::config 'DATABASE.db_user')"
+DB_PASSWORD="$(bashio::config 'DATABASE.db_password')"
+DB_NAME="$(bashio::config 'DATABASE.db_name')"
 
-# Set environment variables for Planka
-export NODE_ENV=production
-export PORT=1337
-export BASE_URL="${BASE_URL:-/}"
+NEW_DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
-# Database configuration
-export DATABASE_HOST="$DB_HOST"
-export DATABASE_PORT="$DB_PORT"
-export DATABASE_USER="$DB_USER"
-export DATABASE_PASSWORD="$DB_PASSWORD"
-export DATABASE_NAME="$DB_NAME"
-export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+DB_CHANGED=false
 
-# Admin configuration
-export DEFAULT_ADMIN_EMAIL="$ADMIN_EMAIL"
-export DEFAULT_ADMIN_PASSWORD="$ADMIN_PASSWORD"
-export DEFAULT_ADMIN_NAME="$ADMIN_NAME"
-
-# Secret key
-if [ -n "$SECRET_KEY" ]; then
-    export SECRET_KEY="$SECRET_KEY"
+if grep -q "^DATABASE_URL=" "$ENV_FILE" 2>/dev/null; then
+    CURRENT_DATABASE_URL="$(grep "^DATABASE_URL=" "$ENV_FILE" | cut -d'=' -f2-)"
+    if [[ "$CURRENT_DATABASE_URL" != "$NEW_DATABASE_URL" ]]; then
+        bashio::log.warning "DATABASE_URL modifiée"
+        sed -i "s|^DATABASE_URL=.*|DATABASE_URL=${NEW_DATABASE_URL}|" "$ENV_FILE"
+        DB_CHANGED=true
+    else
+        bashio::log.info "DATABASE_URL inchangée"
+    fi
 else
-    # Generate a random secret key if not provided
-    export SECRET_KEY=$(openssl rand -hex 32)
+    bashio::log.info "Ajout DATABASE_URL"
+    echo "DATABASE_URL=${NEW_DATABASE_URL}" >> "$ENV_FILE"
+    DB_CHANGED=true
 fi
 
-# Create necessary directories
-mkdir -p /data/user-avatars /data/project-background-images /data/attachments
+# ===============================
+# BASE_URL
+# ===============================
+BASE_URL="http://localhost:1338"
 
-# Set permissions
-chown -R root:root /app /data
-chmod -R 755 /data
-
-# Log configuration (without password)
-echo "Starting Planka with configuration:"
-echo "  Database Host: ${DB_HOST}"
-echo "  Database Port: ${DB_PORT}"
-echo "  Database User: ${DB_USER}"
-echo "  Database Name: ${DB_NAME}"
-echo "  Admin Email: ${ADMIN_EMAIL}"
-echo "  Base URL: ${BASE_URL}"
-echo "  Port: ${PORT}"
-
-# Check if Node.js and app files exist
-echo "Checking Node.js and app files..."
-node --version
-ls -la /app/app.js
-
-# Initialize database and start Planka
-cd /app
-echo "Initializing database..."
-
-# Test database connection first
-echo "Testing database connection..."
-node -e "
-const { Pool } = require('pg');
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-pool.query('SELECT NOW()')
-  .then(res => {
-    console.log('Database connection successful:', res.rows[0]);
-    process.exit(0);
-  })
-  .catch(err => {
-    console.error('Database connection failed:', err.message);
-    process.exit(1);
-  });
-"
-
-if [ $? -ne 0 ]; then
-    echo "Database connection failed. Please check your database configuration."
-    echo "DATABASE_URL: ${DATABASE_URL}"
-    exit 1
+if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^BASE_URL=.*|BASE_URL=${BASE_URL}|" "$ENV_FILE"
+else
+    echo "BASE_URL=${BASE_URL}" >> "$ENV_FILE"
 fi
 
-echo "Database connection OK, initializing database..."
-node db/init.js
-echo "Database initialization completed."
+# ===============================
+# ADMIN (premier démarrage uniquement)
+# ===============================
+if ! grep -q "^DEFAULT_ADMIN_EMAIL=" "$ENV_FILE" 2>/dev/null; then
+    ADMIN_EMAIL="$(bashio::config 'ADMIN.email')"
+    ADMIN_PASSWORD="$(bashio::config 'ADMIN.password')"
+    ADMIN_NAME="$(bashio::config 'ADMIN.name')"
 
-echo "Creating admin user if not exists..."
-npm run db:create-admin-user || echo "Admin user may already exist"
+    bashio::log.info "Création admin initial"
+    echo "DEFAULT_ADMIN_EMAIL=${ADMIN_EMAIL}" >> "$ENV_FILE"
+    echo "DEFAULT_ADMIN_PASSWORD=${ADMIN_PASSWORD}" >> "$ENV_FILE"
+    echo "DEFAULT_ADMIN_NAME=${ADMIN_NAME}" >> "$ENV_FILE"
+fi
 
-echo "Starting Planka server..."
-echo "Server will be available at http://localhost:${PORT}${BASE_URL}"
-exec npm start --prod
+# ===============================
+# PERMISSIONS
+# ===============================
+cd /opt/planka
+cp $ENV_FILE ./
+chmod 600 "$ENV_FILE"
+chmod 600 "./.env"
+
+# ===============================
+# DB INIT SI NECESSAIRE
+# ===============================
+if [[ "$DB_CHANGED" == "true" ]]; then
+    bashio::log.warning "Initialisation / migration base de données"
+    npm run db:init
+fi
+
+# ===============================
+# START PLANKA
+# ===============================
+bashio::log.info "Démarrage Planka"
+exec node app.js 

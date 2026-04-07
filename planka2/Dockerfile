@@ -1,56 +1,56 @@
 ARG BUILD_FROM
-ARG BUILD_CONFIG_FILE
-ARG BUILD_VERSION
-ARG BUILD_ARCH
 FROM ${BUILD_FROM}
 
-# Set environment variables
-ENV NODE_VERSION=22
-ENV PORT=1337
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Install required packages
-RUN apk add --no-cache \
-    nodejs \
-    npm \
-    curl \
-    supervisor \
-    python3 \
-    make \
-    g++ \
-    openssl \
-    && rm -rf /var/cache/apk/*
+# ===============================
+# BASE DEPENDENCIES
+# ===============================
+RUN apt-get update && \
+    apt-get install -y \
+        ca-certificates \
+        curl \
+        gnupg \
+        unzip \
+        build-essential \
+        python3 \
+        python3-venv \
+        python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
-WORKDIR /app
+# ===============================
+# INSTALL NODEJS 22
+# ===============================
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+    | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
 
-# Download and extract Planka
-RUN wget -O planka.zip https://github.com/plankanban/planka/releases/download/v2.1.0/planka-prebuild.zip \
-    && unzip planka.zip \
-    && rm planka.zip \
-    && mv planka/* /app/ \
-    && rm -rf planka \
-    && chown -R root:root /app
+RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+    > /etc/apt/sources.list.d/nodesource.list
 
-# Install dependencies
+RUN apt-get update && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+# ===============================
+# INSTALL PLANKA
+# ===============================
+WORKDIR /opt
+
+RUN curl -fsSL -o planka.zip \
+        https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
+    unzip planka.zip && \
+    rm planka.zip
+
+WORKDIR /opt/planka
+
+# IMPORTANT: npm install DOIT créer le venv
 RUN npm install
 
-# Create data directories
-RUN mkdir -p /data/user-avatars /data/project-background-images /data/attachments
-
-# Copy run script
+# ===============================
+# START SCRIPT
+# ===============================
 COPY run.sh /run.sh
-COPY supervisord.conf /etc/supervisord.conf
-RUN chmod +x /etc/supervisord.conf /run.sh
+RUN chmod +x /run.sh
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=1337
-
-EXPOSE 1337
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:1337/api/health || exit 1
-
-# Set supervisord as entrypoint
-ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+CMD ["/run.sh"]
