@@ -32,6 +32,9 @@ module.exports = {
     trustProxy: process.env.TRUST_PROXY === '1'
   },
 
+  // Explicit host to prevent EADDRINUSE errors
+  host: process.env.EXPLICIT_HOST || 'localhost',
+
   // Admin user creation
   admin: {
     email: process.env.DEFAULT_ADMIN_EMAIL,
