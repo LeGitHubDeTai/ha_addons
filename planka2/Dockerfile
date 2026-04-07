@@ -43,6 +43,7 @@ RUN npm install
 COPY run.sh /run.sh
 COPY supervisord.conf /etc/supervisord.conf
 COPY nginx.conf /etc/nginx/nginx.conf
+COPY config/custom.js /app/config/custom.js
 RUN chmod +x /run.sh
 
 # Set supervisord as entrypoint

@@ -63,18 +63,18 @@ else
     echo "TRUST_PROXY=1" >> "$ENV_FILE"
 fi
 
+# CORS origins
+if grep -q "^CORS_ORIGIN=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^CORS_ORIGIN=.*|CORS_ORIGIN=*" "$ENV_FILE"
+else
+    echo "CORS_ORIGIN=*" >> "$ENV_FILE"
+fi
+
 # Node environment
 if grep -q "^NODE_ENV=" "$ENV_FILE" 2>/dev/null; then
     sed -i "s|^NODE_ENV=.*|NODE_ENV=production|" "$ENV_FILE"
 else
     echo "NODE_ENV=production" >> "$ENV_FILE"
-fi
-
-# Port (ensure it's set)
-if grep -q "^PORT=" "$ENV_FILE" 2>/dev/null; then
-    sed -i "s|^PORT=.*|PORT=1337|" "$ENV_FILE"
-else
-    echo "PORT=1337" >> "$ENV_FILE"
 fi
 
 # ===============================
