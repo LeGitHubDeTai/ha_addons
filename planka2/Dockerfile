@@ -16,6 +16,7 @@ RUN apt-get update && \
         python3 \
         python3-venv \
         python3-pip \
+        openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # ===============================
@@ -38,13 +39,13 @@ RUN apt-get update && \
 WORKDIR /opt
 
 RUN curl -fsSL -o planka.zip \
-        https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
+        https://github.com/plankanban/planka/releases/download/v2.1.0/planka-prebuild.zip && \
     unzip planka.zip && \
     rm planka.zip
 
 WORKDIR /opt/planka
 
-# IMPORTANT: npm install DOIT créer le venv
+# IMPORTANT: npm install
 RUN npm install
 
 # ===============================
