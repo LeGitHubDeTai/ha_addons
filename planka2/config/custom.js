@@ -32,8 +32,18 @@ module.exports = {
     trustProxy: process.env.TRUST_PROXY === '1'
   },
 
-  // Explicit host to prevent EADDRINUSE errors
-  host: process.env.EXPLICIT_HOST || 'localhost',
+  // Explicit host to prevent EADDRINUSE errors (Sails 1.0+)
+  explicitHost: process.env.EXPLICIT_HOST || 'localhost',
+
+  // Socket.io configuration for WebSocket
+  sockets: {
+    onlyAllowOrigins: [
+      'http://localhost:1337',
+      'http://localhost:1338',
+      'http://127.0.0.1:1337',
+      'http://127.0.0.1:1338'
+    ]
+  },
 
   // Admin user creation
   admin: {

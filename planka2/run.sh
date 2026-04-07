@@ -111,4 +111,4 @@ fi
 # START PLANKA
 # ===============================
 bashio::log.info "Démarrage Planka"
-exec npm start --prod
+exec node app.js
