@@ -1,37 +1,21 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
-ENV DEBIAN_FRONTEND=noninteractive
-
 # ===============================
-# BASE DEPENDENCIES
+# BASE DEPENDENCIES (Alpine)
 # ===============================
-RUN apt-get update && \
-    apt-get install -y \
-        ca-certificates \
-        curl \
-        gnupg \
-        unzip \
-        build-essential \
-        python3 \
-        python3-venv \
-        python3-pip \
-        openssl \
-    && rm -rf /var/lib/apt/lists/*
-
-# ===============================
-# INSTALL NODEJS 22
-# ===============================
-RUN mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
-    | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-
-RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
-    > /etc/apt/sources.list.d/nodesource.list
-
-RUN apt-get update && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache \
+    ca-certificates \
+    curl \
+    gnupg \
+    unzip \
+    build-base \
+    python3 \
+    python3-dev \
+    py3-pip \
+    nodejs \
+    npm \
+    && rm -rf /var/cache/apk/*
 
 # ===============================
 # INSTALL PLANKA
@@ -39,13 +23,13 @@ RUN apt-get update && \
 WORKDIR /opt
 
 RUN curl -fsSL -o planka.zip \
-        https://github.com/plankanban/planka/releases/download/v2.1.0/planka-prebuild.zip && \
+        https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
     unzip planka.zip && \
     rm planka.zip
 
 WORKDIR /opt/planka
 
-# IMPORTANT: npm install
+# IMPORTANT: npm install DOIT créer le venv
 RUN npm install
 
 # ===============================
