@@ -1,6 +1,8 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
+ENV PLANKA_VERSION="v2.1.0"
+
 # ===============================
 # BASE DEPENDENCIES (Alpine)
 # ===============================
@@ -26,7 +28,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 RUN curl -fsSL -o planka.zip \
-        https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
+        https://github.com/plankanban/planka/releases/download/$PLANKA_VERSION/planka-prebuild.zip && \
     unzip planka.zip && \
     cp -r planka/. . && \
     rm -rf planka && \
