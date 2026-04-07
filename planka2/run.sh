@@ -70,7 +70,7 @@ fi
 # ===============================
 # PERMISSIONS
 # ===============================
-cd /opt/planka
+cd /app
 cp $ENV_FILE ./
 chmod 600 "$ENV_FILE"
 chmod 600 "./.env"
