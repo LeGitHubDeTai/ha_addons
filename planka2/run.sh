@@ -56,26 +56,12 @@ fi
 # ===============================
 # ADDITIONAL PLANKA ENV VARS
 # ===============================
-# Trust proxy for ingress
-if grep -q "^TRUST_PROXY=" "$ENV_FILE" 2>/dev/null; then
-    sed -i "s|^TRUST_PROXY=.*|TRUST_PROXY=1|" "$ENV_FILE"
-else
-    echo "TRUST_PROXY=1" >> "$ENV_FILE"
-fi
-
-# CORS origins
-if grep -q "^CORS_ORIGIN=" "$ENV_FILE" 2>/dev/null; then
-    sed -i "s|^CORS_ORIGIN=.*|CORS_ORIGIN=\*|" "$ENV_FILE"
-else
-    echo "CORS_ORIGIN=\*" >> "$ENV_FILE"
-fi
-
-# Node environment
-if grep -q "^NODE_ENV=" "$ENV_FILE" 2>/dev/null; then
-    sed -i "s|^NODE_ENV=.*|NODE_ENV=production|" "$ENV_FILE"
-else
-    echo "NODE_ENV=production" >> "$ENV_FILE"
-fi
+echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
+echo "PORT=${PORT:-1337}" >> "$ENV_FILE"
+echo "EXPLICIT_HOST=${EXPLICIT_HOST:-localhost}" >> "$ENV_FILE"
+echo "TRUST_PROXY=1" >> "$ENV_FILE"
+echo "CLIENT_BASE_URL=http://localhost:1338" >> "$ENV_FILE"
+echo "SERVER_BASE_URL=http://localhost:1337" >> "$ENV_FILE"
 
 # ===============================
 # ADMIN (premier démarrage uniquement)
