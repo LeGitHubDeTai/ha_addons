@@ -40,6 +40,9 @@ RUN npm install
 # ===============================
 # START SCRIPT
 # ===============================
+# Create log directories
+RUN mkdir -p /var/log/supervisor /var/log/nginx
+
 # Copy configuration files
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
