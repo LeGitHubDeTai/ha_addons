@@ -1,5 +1,5 @@
 name: Planka2DEV
-version: "26.4.1.53"
+version: "26.4.1.54"
 slug: planka2
 panel_title: Planka - Kanban Board
 panel_icon: "mdi:view-week"
@@ -15,7 +15,7 @@ arch:
 startup: application
 boot: auto
 ingress: true
-ingress_port: 1338
+ingress_port: 1339
 backup_exclude:
   - "planka/node_modules"
   - "planka/.cache"
@@ -30,7 +30,7 @@ map:
 ports:
   1338/tcp: 1338
 ports_description:
-  1338/tcp: The port for Planka web interface. Normally not exposed, as Home Assistant Ingress is more secure and is recommended. You may expose this port if you want to bypass Ingress (not recommended for security reasons).
+  1338/tcp: The port for Planka web interface. Direct access to Planka on port 1338. Ingress uses port 1339 for Home Assistant integration.
 options:
   DATABASE:
     db_host: postgres
