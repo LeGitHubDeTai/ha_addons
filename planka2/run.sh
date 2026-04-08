@@ -65,6 +65,8 @@ echo "SERVER_BASE_URL=http://localhost:1338" >> "$ENV_FILE"
 echo "CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "SOCKETS_CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
+echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
+echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
 
 # ===============================
 # ADMIN (premier démarrage uniquement)
@@ -100,4 +102,4 @@ fi
 # START PLANKA
 # ===============================
 bashio::log.info "Démarrage Planka"
-exec npm start --prod
+exec npm start --prod --hookTimeout=120000
