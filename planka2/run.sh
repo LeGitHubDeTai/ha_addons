@@ -99,13 +99,7 @@ if [[ "$DB_CHANGED" == "true" ]]; then
 fi
 
 # ===============================
-# TEST CONNEXION BASE DE DONNÉES
-# ===============================
-bashio::log.info "Test de connexion à la base de données..."
-timeout 30s npm run db:migrate || bashio::log.error "Erreur de connexion à la base de données"
-
-# ===============================
 # START PLANKA
 # ===============================
 bashio::log.info "Démarrage Planka"
-exec node app.js
+exec node app.js --hookTimeout=120000
