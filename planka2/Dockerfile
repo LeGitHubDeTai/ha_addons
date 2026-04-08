@@ -51,4 +51,4 @@ COPY config/sails.js /app/config/sails.js
 RUN chmod +x /run.sh
 
 # Set supervisord as entrypoint
-ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
