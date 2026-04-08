@@ -40,9 +40,11 @@ RUN npm install
 # ===============================
 # START SCRIPT
 # ===============================
-COPY run.sh /run.sh
-COPY supervisord.conf /etc/supervisord.conf
+# Copy configuration files
 COPY nginx.conf /etc/nginx/nginx.conf
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY run.sh /run.sh
+COPY config/sails.js /app/config/sails.js
 RUN chmod +x /run.sh
 
 # Set supervisord as entrypoint
