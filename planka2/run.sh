@@ -45,7 +45,7 @@ fi
 # ===============================
 # BASE_URL
 # ===============================
-BASE_URL="http://localhost:1337"
+BASE_URL="http://localhost:1338"
 
 if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
     sed -i "s|^BASE_URL=.*|BASE_URL=${BASE_URL}|" "$ENV_FILE"
@@ -57,11 +57,11 @@ fi
 # ADDITIONAL PLANKA ENV VARS
 # ===============================
 echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
-echo "PORT=${PORT:-1337}" >> "$ENV_FILE"
+echo "PORT=${PORT:-1338}" >> "$ENV_FILE"
 echo "EXPLICIT_HOST=${EXPLICIT_HOST:-localhost}" >> "$ENV_FILE"
 echo "TRUST_PROXY=1" >> "$ENV_FILE"
 echo "CLIENT_BASE_URL=http://localhost:1338" >> "$ENV_FILE"
-echo "SERVER_BASE_URL=http://localhost:1337" >> "$ENV_FILE"
+echo "SERVER_BASE_URL=http://localhost:1338" >> "$ENV_FILE"
 
 # ===============================
 # ADMIN (premier démarrage uniquement)
