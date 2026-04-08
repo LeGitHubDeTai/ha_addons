@@ -58,10 +58,13 @@ fi
 # ===============================
 echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
 echo "PORT=${PORT:-1338}" >> "$ENV_FILE"
-echo "EXPLICIT_HOST=${EXPLICIT_HOST:-localhost}" >> "$ENV_FILE"
+echo "EXPLICIT_HOST=0.0.0.0" >> "$ENV_FILE"
 echo "TRUST_PROXY=1" >> "$ENV_FILE"
 echo "CLIENT_BASE_URL=http://localhost:1338" >> "$ENV_FILE"
 echo "SERVER_BASE_URL=http://localhost:1338" >> "$ENV_FILE"
+echo "CORS_ORIGIN=*" >> "$ENV_FILE"
+echo "SOCKETS_CORS_ORIGIN=*" >> "$ENV_FILE"
+echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 
 # ===============================
 # ADMIN (premier démarrage uniquement)
