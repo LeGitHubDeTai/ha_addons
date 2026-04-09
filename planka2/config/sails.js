@@ -3,11 +3,6 @@
  */
 
 module.exports = {
-  // Allow all origins for WebSocket connections
-  sockets: {
-    onlyAllowOrigins: ['*']
-  },
-  
   // HTTP settings
   http: {
     trustProxy: true

@@ -8,11 +8,6 @@ module.exports = {
   clientUrl: process.env.EXTERNAL_URL || 'http://localhost:1339',
   serverUrl: process.env.SERVER_BASE_URL || 'http://localhost:1338',
   
-  // WebSocket configuration - minimal
-  sockets: {
-    onlyAllowOrigins: ['*']
-  },
-  
   // HTTP configuration
   http: {
     trustProxy: true,
