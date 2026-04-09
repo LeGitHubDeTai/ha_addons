@@ -1,5 +1,13 @@
 ARG BUILD_FROM
+ARG BUILD_CONFIG_FILE
+ARG BUILD_VERSION
+ARG BUILD_ARCH
 FROM ${BUILD_FROM}
+
+LABEL \
+    io.hass.version="${BUILD_VERSION}" \
+    io.hass.type="addon" \
+    io.hass.arch="${BUILD_ARCH}"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PLANKA_VERSION="v2.1.0"
