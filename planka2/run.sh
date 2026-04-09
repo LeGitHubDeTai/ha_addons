@@ -76,7 +76,7 @@ echo "External Planka URL: ${EXTERNAL_PLANKA_URL}"
 echo "External Hostname: ${EXTERNAL_HOSTNAME}"
 
 # ===============================
-# BASE_URL
+# BASE_URL (officiel Planka)
 # ===============================
 BASE_URL="http://localhost:1337"
 
@@ -87,12 +87,12 @@ else
 fi
 
 # ===============================
-# ADDITIONAL PLANKA ENV VARS
+# ADDITIONAL PLANKA ENV VARS (officiel)
 # ===============================
 echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
 echo "PORT=${PORT:-1337}" >> "$ENV_FILE"
 echo "EXPLICIT_HOST=0.0.0.0" >> "$ENV_FILE"
-echo "TRUST_PROXY=1" >> "$ENV_FILE"
+echo "TRUST_PROXY=true" >> "$ENV_FILE"
 echo "CLIENT_BASE_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
 echo "SERVER_BASE_URL=http://localhost:1337" >> "$ENV_FILE"
 echo "PUBLIC_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
@@ -100,6 +100,11 @@ echo "REACT_APP_BASE_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
 echo "CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
 echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
+
+# Variables officielles Planka depuis docker-compose
+echo "BASE_URL=http://localhost:1337" >> "$ENV_FILE"
+echo "DATABASE_URL=postgresql://planka:homeassistant@postgres:5432/planka" >> "$ENV_FILE"
+echo "SECRET_KEY=${SECRET_KEY:-notsecretkey}" >> "$ENV_FILE"
 
 # Force Planka to use correct URLs
 echo "EXTERNAL_HOST=$(bashio::info 'hostname')" >> "$ENV_FILE"
