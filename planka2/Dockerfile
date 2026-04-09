@@ -38,6 +38,15 @@ RUN curl -fsSL -o planka.zip \
 RUN npm install
 
 # ===============================
+# PLANKA ENVIRONMENT (official)
+# ===============================
+ENV BASE_URL=http://localhost:1337
+ENV NODE_ENV=production
+ENV TRUST_PROXY=true
+ENV PORT=1337
+ENV EXPLICIT_HOST=0.0.0.0
+
+# ===============================
 # START SCRIPT
 # ===============================
 # Create log directories
