@@ -102,4 +102,4 @@ fi
 # START PLANKA
 # ===============================
 bashio::log.info "Démarrage Planka"
-exec node app.js --hookTimeout=120000
+exec npm run start --prod
