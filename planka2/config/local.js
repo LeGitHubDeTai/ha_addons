@@ -8,15 +8,11 @@ module.exports = {
   clientUrl: process.env.EXTERNAL_URL || 'http://localhost:1339',
   serverUrl: process.env.SERVER_BASE_URL || 'http://localhost:1338',
   
-  // WebSocket configuration
+  // WebSocket configuration - fix CORS error
   sockets: {
     baseUrl: process.env.EXTERNAL_URL || 'http://localhost:1339',
     url: process.env.EXTERNAL_URL || 'http://localhost:1339',
-    onlyAllowOrigins: ['*'],
-    cors: {
-      origin: '*',
-      credentials: true
-    }
+    onlyAllowOrigins: ['*']
   },
   
   // HTTP configuration
