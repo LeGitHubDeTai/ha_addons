@@ -14,6 +14,7 @@ RUN apk add --no-cache \
         build-base \
         python3 \
         py3-pip \
+        supervisord \
     && rm -rf /var/cache/apk/*
 
 # ===============================

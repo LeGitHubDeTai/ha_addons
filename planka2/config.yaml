@@ -1,5 +1,5 @@
 name: Planka2DEV
-version: "26.4.2.0"
+version: "26.4.2.1"
 slug: planka2
 panel_title: Planka - Kanban Board
 panel_icon: "mdi:view-week"
@@ -16,7 +16,7 @@ arch:
 startup: application
 boot: auto
 ingress: true
-ingress_port: 1339
+ingress_port: 1337
 backup_exclude:
   - "planka/node_modules"
   - "planka/.cache"
