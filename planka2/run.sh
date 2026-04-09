@@ -45,7 +45,7 @@ fi
 # ===============================
 # BASE_URL
 # ===============================
-BASE_URL="http://localhost:1338"
+BASE_URL="http://localhost:1339"
 
 if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
     sed -i "s|^BASE_URL=.*|BASE_URL=${BASE_URL}|" "$ENV_FILE"
@@ -60,7 +60,7 @@ echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
 echo "PORT=${PORT:-1338}" >> "$ENV_FILE"
 echo "EXPLICIT_HOST=0.0.0.0" >> "$ENV_FILE"
 echo "TRUST_PROXY=1" >> "$ENV_FILE"
-echo "CLIENT_BASE_URL=http://localhost:1338" >> "$ENV_FILE"
+echo "CLIENT_BASE_URL=http://localhost:1339" >> "$ENV_FILE"
 echo "SERVER_BASE_URL=http://localhost:1338" >> "$ENV_FILE"
 echo "CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "SOCKETS_CORS_ORIGIN=*" >> "$ENV_FILE"
