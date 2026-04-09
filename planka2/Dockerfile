@@ -1,6 +1,7 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.18
-ARG BUILD_VERSION=dev
-ARG BUILD_ARCH=amd64
+ARG BUILD_FROM
+ARG BUILD_CONFIG_FILE
+ARG BUILD_VERSION
+ARG BUILD_ARCH
 FROM ${BUILD_FROM}
 
 LABEL \
@@ -27,7 +28,7 @@ RUN apk add --no-cache \
 # ===============================
 # INSTALL SUPERVISORD
 # ===============================
-RUN pip3 install --break-system-packages supervisor
+RUN pip3 install supervisor
 
 # ===============================
 # INSTALL NODEJS 22
@@ -55,6 +56,10 @@ RUN npm install
 # START SCRIPT
 # ===============================
 COPY run.sh /run.sh
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 RUN chmod +x /run.sh
 
-CMD ["/run.sh"]
+# Create log directories
+RUN mkdir -p /var/log/supervisor /var/run
+
+ENTRYPOINT ["/usr/local/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
