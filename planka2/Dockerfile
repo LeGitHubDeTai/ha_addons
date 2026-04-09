@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PLANKA_VERSION="v2.1.0"
 
 # ===============================
-# BASE DEPENDENCIES
+# BASE DEPENDENCIES (Alpine)
 # ===============================
 RUN apk add --no-cache \
         ca-certificates \
@@ -15,8 +15,12 @@ RUN apk add --no-cache \
         build-base \
         python3 \
         py3-pip \
-        supervisord \
     && rm -rf /var/cache/apk/*
+
+# ===============================
+# INSTALL SUPERVISORD
+# ===============================
+RUN pip3 install supervisor
 
 # ===============================
 # INSTALL NODEJS 22
