@@ -43,6 +43,29 @@ else
 fi
 
 # ===============================
+# GET EXTERNAL URL LIKE N8N
+# ===============================
+INFO=$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/info || echo '{}')
+INFO=${INFO:-'{}'}
+
+CONFIG=$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/core/api/config || echo '{}')
+CONFIG=${CONFIG:-'{}'}
+
+ADDON_INFO=$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/addons/self/info || echo '{}')
+ADDON_INFO=${ADDON_INFO:-'{}'}
+
+# Get the Home Assistant hostname from the supervisor info
+LOCAL_HA_HOSTNAME=$(echo "$INFO" | jq -r '.data.hostname // "localhost"')
+LOCAL_PLANKA_PORT=1337
+
+# Get external URL if configured, otherwise use hostname and port
+EXTERNAL_PLANKA_URL=${EXTERNAL_URL:-$(echo "$CONFIG" | jq -r ".external_url // \"http://$LOCAL_HA_HOSTNAME:1339\"")}
+EXTERNAL_HOSTNAME=$(echo "$EXTERNAL_PLANKA_URL" | sed -e "s/https\?:\/\///" | cut -d':' -f1)
+
+echo "External Planka URL: ${EXTERNAL_PLANKA_URL}"
+echo "External Hostname: ${EXTERNAL_HOSTNAME}"
+
+# ===============================
 # BASE_URL
 # ===============================
 BASE_URL="http://localhost:1337"
@@ -60,17 +83,17 @@ echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
 echo "PORT=${PORT:-1337}" >> "$ENV_FILE"
 echo "EXPLICIT_HOST=0.0.0.0" >> "$ENV_FILE"
 echo "TRUST_PROXY=1" >> "$ENV_FILE"
-echo "CLIENT_BASE_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
+echo "CLIENT_BASE_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
 echo "SERVER_BASE_URL=http://localhost:1337" >> "$ENV_FILE"
-echo "EXTERNAL_HOST=$(bashio::info 'hostname')" >> "$ENV_FILE"
-echo "EXTERNAL_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
+echo "PUBLIC_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
+echo "REACT_APP_BASE_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
 echo "CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
 echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
 
 # Force Planka to use correct URLs
-echo "PUBLIC_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
-echo "REACT_APP_BASE_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
+echo "EXTERNAL_HOST=$(bashio::info 'hostname')" >> "$ENV_FILE"
+echo "EXTERNAL_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
 
 # ===============================
 # ADMIN (premier démarrage uniquement)
