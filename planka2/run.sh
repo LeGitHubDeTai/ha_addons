@@ -82,10 +82,7 @@ echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
 echo "PORT=${PORT:-1337}" >> "$ENV_FILE"
 echo "EXPLICIT_HOST=0.0.0.0" >> "$ENV_FILE"
 echo "TRUST_PROXY=true" >> "$ENV_FILE"
-echo "CLIENT_BASE_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
 echo "SERVER_BASE_URL=http://localhost:1337" >> "$ENV_FILE"
-echo "PUBLIC_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
-echo "REACT_APP_BASE_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
 echo "CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
 echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
@@ -133,4 +130,4 @@ fi
 # START PLANKA
 # ===============================
 bashio::log.info "Démarrage Planka"
-exec npm run start --production
+exec node app.js
