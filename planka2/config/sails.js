@@ -5,22 +5,7 @@
 module.exports = {
   // Allow all origins for WebSocket connections
   sockets: {
-    onlyAllowOrigins: ['*'],
-    cors: {
-      origin: '*',
-      credentials: true
-    },
-    // Force WebSocket URL to use nginx proxy
-    url: 'http://localhost:1339',
-    transports: ['websocket', 'polling']
-  },
-  
-  // Security settings
-  security: {
-    cors: {
-      allowOrigins: '*',
-      allowCredentials: true
-    }
+    onlyAllowOrigins: ['*']
   },
   
   // HTTP settings
