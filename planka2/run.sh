@@ -60,8 +60,37 @@ echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 echo "SOCKETS_CORS_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 
 # ===============================
-# BASE_URL
+# GET EXTERNAL URL LIKE N8N
 # ===============================
+# Try to get Supervisor info, but handle errors gracefully
+SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN:-}
+INFO='{}'
+CONFIG='{}'
+ADDON_INFO='{}'
+
+if [[ -n "$SUPERVISOR_TOKEN" ]]; then
+    INFO=$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/info 2>/dev/null || echo '{}')
+    CONFIG=$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/core/api/config 2>/dev/null || echo '{}')
+    ADDON_INFO=$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/addons/self/info 2>/dev/null || echo '{}')
+else
+    bashio::log.warning "SUPERVISOR_TOKEN not set, using fallback hostname detection"
+fi
+
+# Ensure valid JSON
+INFO=${INFO:-'{}'}
+CONFIG=${CONFIG:-'{}'}
+ADDON_INFO=${ADDON_INFO:-'{}'}
+
+# Get the Home Assistant hostname from the supervisor info or fallback
+LOCAL_HA_HOSTNAME=$(echo "$INFO" | jq -r '.data.hostname // "localhost"' 2>/dev/null || echo "localhost")
+LOCAL_PLANKA_PORT=1337
+
+# Get external URL if configured, otherwise use hostname and port
+EXTERNAL_PLANKA_URL=$(echo "$CONFIG" | jq -r ".external_url // \"http://$LOCAL_HA_HOSTNAME:1337\"" 2>/dev/null || echo "http://$LOCAL_HA_HOSTNAME:1337")
+EXTERNAL_HOSTNAME=$(echo "$EXTERNAL_PLANKA_URL" | sed -e "s/https\?:\/\///" | cut -d':' -f1)
+
+echo "External Planka URL: ${EXTERNAL_PLANKA_URL}"
+echo "External Hostname: ${EXTERNAL_HOSTNAME}"
 BASE_URL="http://localhost:1337"
 
 if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
