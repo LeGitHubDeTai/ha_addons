@@ -3,15 +3,15 @@
  */
 
 module.exports = {
-  // Force all URLs to use nginx proxy
-  baseUrl: 'http://localhost:1339',
-  clientUrl: 'http://localhost:1339',
-  serverUrl: 'http://localhost:1339',
+  // Force all URLs to use nginx proxy with dynamic host
+  baseUrl: process.env.EXTERNAL_URL || 'http://localhost:1339',
+  clientUrl: process.env.EXTERNAL_URL || 'http://localhost:1339',
+  serverUrl: process.env.SERVER_BASE_URL || 'http://localhost:1338',
   
   // WebSocket configuration
   sockets: {
-    baseUrl: 'http://localhost:1339',
-    url: 'http://localhost:1339',
+    baseUrl: process.env.EXTERNAL_URL || 'http://localhost:1339',
+    url: process.env.EXTERNAL_URL || 'http://localhost:1339',
     onlyAllowOrigins: ['*'],
     cors: {
       origin: '*',
