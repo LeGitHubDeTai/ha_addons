@@ -67,6 +67,8 @@ echo "EXTERNAL_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
 echo "CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "SOCKETS_CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
+echo "WEBSOCKET_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
+echo "SOCKET_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
 echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
 echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
 
