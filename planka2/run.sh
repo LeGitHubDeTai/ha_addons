@@ -102,4 +102,4 @@ fi
 # START PLANKA
 # ===============================
 bashio::log.info "Démarrage Planka"
-exec npm run start --prod
+exec npm run start --production

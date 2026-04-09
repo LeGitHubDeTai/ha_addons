@@ -9,7 +9,10 @@ module.exports = {
     cors: {
       origin: '*',
       credentials: true
-    }
+    },
+    // Force WebSocket URL to use nginx proxy
+    url: 'http://localhost:1339',
+    transports: ['websocket', 'polling']
   },
   
   // Security settings
@@ -27,6 +30,11 @@ module.exports = {
   
   // Explicit host binding
   host: '0.0.0.0',
+  
+  // Force URLs for client
+  urls: {
+    base: 'http://localhost:1339'
+  },
   
   // Environment
   environment: 'production'
