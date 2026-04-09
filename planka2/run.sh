@@ -45,7 +45,7 @@ fi
 # ===============================
 # BASE_URL
 # ===============================
-BASE_URL="http://localhost:1339"
+BASE_URL="http://localhost:1337"
 
 if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
     sed -i "s|^BASE_URL=.*|BASE_URL=${BASE_URL}|" "$ENV_FILE"
@@ -57,18 +57,14 @@ fi
 # ADDITIONAL PLANKA ENV VARS
 # ===============================
 echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
-echo "PORT=${PORT:-1338}" >> "$ENV_FILE"
+echo "PORT=${PORT:-1337}" >> "$ENV_FILE"
 echo "EXPLICIT_HOST=0.0.0.0" >> "$ENV_FILE"
 echo "TRUST_PROXY=1" >> "$ENV_FILE"
 echo "CLIENT_BASE_URL=http://localhost:1339" >> "$ENV_FILE"
-echo "SERVER_BASE_URL=http://localhost:1338" >> "$ENV_FILE"
+echo "SERVER_BASE_URL=http://localhost:1337" >> "$ENV_FILE"
 echo "EXTERNAL_HOST=$(bashio::info 'hostname')" >> "$ENV_FILE"
 echo "EXTERNAL_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
 echo "CORS_ORIGIN=*" >> "$ENV_FILE"
-echo "SOCKETS_CORS_ORIGIN=*" >> "$ENV_FILE"
-echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
-echo "WEBSOCKET_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
-echo "SOCKET_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
 echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
 echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
 

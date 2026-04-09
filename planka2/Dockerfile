@@ -47,8 +47,6 @@ RUN mkdir -p /var/log/supervisor /var/log/nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY run.sh /run.sh
-COPY config/sails.js /app/config/sails.js
-COPY config/local.js /app/config/local.js
 RUN chmod +x /run.sh
 
 # Set supervisord as entrypoint
