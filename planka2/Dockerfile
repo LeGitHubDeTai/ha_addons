@@ -6,8 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # ===============================
 # BASE DEPENDENCIES
 # ===============================
-RUN apt-get update && \
-    apt-get install -y \
+RUN apk add \
         ca-certificates \
         curl \
         gnupg \
