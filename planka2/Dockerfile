@@ -27,7 +27,8 @@ RUN apk add --no-cache \
 # ===============================
 # INSTALL SUPERVISORD
 # ===============================
-RUN pip3 install --break-system-packages supervisor
+RUN pip3 install --break-system-packages supervisor && \
+    which supervisord
 
 # ===============================
 # INSTALL NODEJS 22
@@ -61,4 +62,7 @@ RUN chmod +x /run.sh
 # Create log directories
 RUN mkdir -p /var/log/supervisor /var/run
 
-ENTRYPOINT ["/usr/local/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Verify supervisord installation
+RUN which supervisord && ls -la $(which supervisord)
+
+ENTRYPOINT ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
