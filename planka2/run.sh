@@ -101,9 +101,8 @@ echo "CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
 echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
 
-# Variables officielles Planka depuis docker-compose
+# Variables officielles Planka depuis docker-compose (sans BDD hardcodée)
 echo "BASE_URL=http://localhost:1337" >> "$ENV_FILE"
-echo "DATABASE_URL=postgresql://planka:homeassistant@postgres:5432/planka" >> "$ENV_FILE"
 echo "SECRET_KEY=${SECRET_KEY:-notsecretkey}" >> "$ENV_FILE"
 
 # Force Planka to use correct URLs
