@@ -1,7 +1,6 @@
-ARG BUILD_FROM
-ARG BUILD_CONFIG_FILE
-ARG BUILD_VERSION
-ARG BUILD_ARCH
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.18
+ARG BUILD_VERSION=dev
+ARG BUILD_ARCH=amd64
 FROM ${BUILD_FROM}
 
 LABEL \
@@ -28,7 +27,7 @@ RUN apk add --no-cache \
 # ===============================
 # INSTALL SUPERVISORD
 # ===============================
-RUN pip3 install supervisor
+RUN pip3 install --break-system-packages supervisor
 
 # ===============================
 # INSTALL NODEJS 22
