@@ -43,23 +43,6 @@ else
 fi
 
 # ===============================
-# ADDITIONAL PLANKA ENV VARS (officiel)
-# ===============================
-echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
-echo "PORT=${PORT:-1337}" >> "$ENV_FILE"
-echo "EXPLICIT_HOST=0.0.0.0" >> "$ENV_FILE"
-echo "TRUST_PROXY=true" >> "$ENV_FILE"
-echo "CLIENT_BASE_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
-echo "SERVER_BASE_URL=http://localhost:1337" >> "$ENV_FILE"
-echo "PUBLIC_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
-echo "REACT_APP_BASE_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
-echo "CORS_ORIGIN=*" >> "$ENV_FILE"
-echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
-echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
-echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
-echo "SOCKETS_CORS_ALLOW_ORIGINS=*" >> "$ENV_FILE"
-
-# ===============================
 # GET EXTERNAL URL LIKE N8N
 # ===============================
 # Try to get Supervisor info, but handle errors gracefully
@@ -91,6 +74,23 @@ EXTERNAL_HOSTNAME=$(echo "$EXTERNAL_PLANKA_URL" | sed -e "s/https\?:\/\///" | cu
 
 echo "External Planka URL: ${EXTERNAL_PLANKA_URL}"
 echo "External Hostname: ${EXTERNAL_HOSTNAME}"
+
+# ===============================
+# ADDITIONAL PLANKA ENV VARS (officiel)
+# ===============================
+echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
+echo "PORT=${PORT:-1337}" >> "$ENV_FILE"
+echo "EXPLICIT_HOST=0.0.0.0" >> "$ENV_FILE"
+echo "TRUST_PROXY=true" >> "$ENV_FILE"
+echo "CLIENT_BASE_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
+echo "SERVER_BASE_URL=http://localhost:1337" >> "$ENV_FILE"
+echo "PUBLIC_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
+echo "REACT_APP_BASE_URL=${EXTERNAL_PLANKA_URL}" >> "$ENV_FILE"
+echo "CORS_ORIGIN=*" >> "$ENV_FILE"
+echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
+echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
+echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
+echo "SOCKETS_CORS_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 BASE_URL="http://localhost:1337"
 
 if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
