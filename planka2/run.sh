@@ -68,6 +68,10 @@ echo "CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
 echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
 
+# Force Planka to use correct URLs
+echo "PUBLIC_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
+echo "REACT_APP_BASE_URL=http://$(bashio::info 'hostname'):1339" >> "$ENV_FILE"
+
 # ===============================
 # ADMIN (premier démarrage uniquement)
 # ===============================
