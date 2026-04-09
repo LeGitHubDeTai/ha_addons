@@ -47,6 +47,7 @@ WORKDIR /opt
 RUN curl -fsSL -o planka.zip \
     https://github.com/plankanban/planka/archive/refs/tags/$PLANKA_VERSION.zip && \
     unzip planka.zip && \
+    mv planka-2.1.0 planka && \
     rm planka.zip
 
 WORKDIR /opt/planka
