@@ -2,6 +2,7 @@ ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PLANKA_VERSION="v2.1.0"
 
 # ===============================
 # BASE DEPENDENCIES
@@ -30,7 +31,7 @@ RUN apk add --no-cache \
 WORKDIR /opt
 
 RUN curl -fsSL -o planka.zip \
-        https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
+    https://github.com/plankanban/planka/releases/download/$PLANKA_VERSION/planka-prebuild.zip && \
     unzip planka.zip && \
     rm planka.zip
 
