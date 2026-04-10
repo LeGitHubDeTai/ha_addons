@@ -1,5 +1,5 @@
-ARG BUILD_FROM
-ARG BUILD_VERSION
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
+ARG BUILD_VERSION=26.4.2.27
 FROM ${BUILD_FROM}
 
 LABEL \
@@ -73,9 +73,9 @@ RUN cp -r /tmp/planka-source/* . \
     && npm install \
     && python3 -m venv .venv \
     && .venv/bin/pip3 install --upgrade pip \
-    && .venv/bin/pip3 install -r requirements.txt --no-cache-dir \
-    && mv .env.sample .env \
-    && mv public/index.ejs views \
+    && (if [ -f requirements.txt ]; then .venv/bin/pip3 install -r requirements.txt --no-cache-dir; else echo "No requirements.txt found, skipping Python dependencies"; fi) \
+    && (if [ -f .env.sample ]; then mv .env.sample .env; else echo "No .env.sample found, creating empty .env"; touch .env; fi) \
+    && (if [ -f public/index.ejs ]; then mv public/index.ejs views; else echo "No public/index.ejs found, skipping move"; fi) \
     && npm config set update-notifier false \
     && rm -rf /tmp/planka-source
 
