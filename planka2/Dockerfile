@@ -75,7 +75,8 @@ RUN cp -r /tmp/planka-source/* . \
     && .venv/bin/pip3 install --upgrade pip \
     && (if [ -f requirements.txt ]; then .venv/bin/pip3 install -r requirements.txt --no-cache-dir; else echo "No requirements.txt found, skipping Python dependencies"; fi) \
     && (if [ -f .env.sample ]; then mv .env.sample .env; else echo "No .env.sample found, creating empty .env"; touch .env; fi) \
-    && (if [ -f public/index.ejs ]; then mkdir -p server/views && cp public/index.ejs server/views/; else echo "No public/index.ejs found, skipping move"; fi) \
+    && mkdir -p server/views \
+    && (if [ -f client/dist/index.ejs ]; then cp client/dist/index.ejs server/views/; elif [ -f client/public/index.ejs ]; then cp client/public/index.ejs server/views/; else echo "Creating basic index.ejs template"; echo '<!DOCTYPE html><html><head><title>Planka</title></head><body><div id="root"></div></body></html>' > server/views/index.ejs; fi) \
     && npm config set update-notifier false \
     && rm -rf /tmp/planka-source
 
