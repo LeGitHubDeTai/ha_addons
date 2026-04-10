@@ -90,7 +90,7 @@ COPY run.sh /opt/planka/run.sh
 # PERMISSIONS
 # ===============================
 RUN chmod +x /opt/planka/run.sh && \
-    chown -R node:node /opt/planka && \
+    chown -R root:root /opt/planka && \
     chown -R nginx:nginx /var/log/nginx
 
 # ===============================
@@ -102,7 +102,7 @@ WORKDIR /opt/planka
 # CREATE LOGS DIRECTORY
 # ===============================
 RUN mkdir -p /var/log/supervisor /var/log/nginx && \
-    chown -R node:node /var/log/supervisor && \
+    chown -R root:root /var/log/supervisor && \
     chown -R nginx:nginx /var/log/nginx
 
 # ===============================
