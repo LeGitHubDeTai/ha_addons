@@ -24,11 +24,11 @@ if [ -n "$OUTGOING_BLOCKED_HOSTS" ] || [ -n "$OUTGOING_BLOCKED_IPS" ] || [ -n "$
 fi
 
 # Initialize database
-if [ -f "./db/init.js" ]; then
+if [ -f "./server/db/init.js" ]; then
     echo "Initializing database..."
-    node ./db/init.js
+    cd server && node ./db/init.js && cd ..
 fi
 
 # Start Planka
 echo "Starting Planka..."
-exec node app.js --prod
+cd server && exec npm start
