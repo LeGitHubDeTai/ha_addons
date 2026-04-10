@@ -24,6 +24,7 @@ RUN apk add --no-cache \
         py3-pip \
         openssl \
         nginx \
+        squid \
     && rm -rf /var/cache/apk/*
 
 # ===============================
