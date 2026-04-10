@@ -58,6 +58,8 @@ echo "ALLOWED_ORIGINS=*" >> "$ENV_FILE"
 echo "SOCKET_ORIGINS=*" >> "$ENV_FILE"
 echo "HOOK_TIMEOUT=80000" >> "$ENV_FILE"
 echo "NODE_ENV=production" >> "$ENV_FILE"
+echo "SESSION_COOKIE_SECURE=false" >> "$ENV_FILE"
+echo "SESSION_STORE=memory" >> "$ENV_FILE"
 # ===============================
 # ADMIN (premier démarrage uniquement)
 # ===============================
@@ -73,7 +75,16 @@ if ! grep -q "^DEFAULT_ADMIN_EMAIL=" "$ENV_FILE" 2>/dev/null; then
 fi
 
 # ===============================
-# PERMISSIONS
+# CREATE REQUIRED DIRECTORIES
+# ===============================
+mkdir -p /opt/planka/.tmp/public/preloaded-favicons
+mkdir -p /opt/planka/.tmp/public/preloaded-logos
+mkdir -p /opt/planka/.tmp/public/preloaded-background-images
+mkdir -p /opt/planka/data/uploads
+mkdir -p /opt/planka/data/avatars
+
+# ===============================
+# INITIALIZE ENVIRONMENT
 # ===============================
 cd /opt/planka
 cp $ENV_FILE ./
