@@ -40,30 +40,13 @@ RUN apk add --no-cache nodejs npm
 RUN mkdir -p /opt/planka /var/log/supervisor /var/log/nginx
 
 # ===============================
-# DOWNLOAD PLANKA SOURCE
+# DOWNLOAD PLANKA PREBUILD
 # ===============================
 ARG PLANKA_VERSION=2.1.0
-RUN wget -O planka-source.zip "https://github.com/plankanban/planka/archive/refs/tags/v${PLANKA_VERSION}.zip" \
-    && unzip planka-source.zip \
-    && rm planka-source.zip \
-    && mv planka-${PLANKA_VERSION} /tmp/planka-source
-
-# ===============================
-# BUILD PLANKA SERVER
-# ===============================
-WORKDIR /tmp/planka-source/server
-RUN npm install npm --global \
-    && npm install \
-    && npm run build \
-    && npm prune --production
-
-# ===============================
-# BUILD PLANKA CLIENT
-# ===============================
-WORKDIR /tmp/planka-source/client
-RUN npm install npm --global \
-    && npm install --omit=dev \
-    && INDEX_FORMAT=ejs DISABLE_ESLINT_PLUGIN=true npm run build
+RUN wget -O planka-prebuild.zip "https://github.com/plankanban/planka/releases/download/v${PLANKA_VERSION}/planka-prebuild.zip" \
+    && unzip planka-prebuild.zip \
+    && rm planka-prebuild.zip \
+    && mv planka /tmp/planka-source
 
 # ===============================
 # SETUP PLANKA FINAL
@@ -76,7 +59,7 @@ RUN cp -r /tmp/planka-source/* . \
     && (if [ -f requirements.txt ]; then .venv/bin/pip3 install -r requirements.txt --no-cache-dir; else echo "No requirements.txt found, skipping Python dependencies"; fi) \
     && (if [ -f .env.sample ]; then mv .env.sample .env; else echo "No .env.sample found, creating empty .env"; touch .env; fi) \
     && mkdir -p server/views \
-    && (if [ -f client/dist/index.ejs ]; then cp client/dist/index.ejs server/views/; elif [ -f client/public/index.ejs ]; then cp client/public/index.ejs server/views/; else echo "Creating basic index.ejs template"; echo '<!DOCTYPE html><html><head><title>Planka</title></head><body><div id="root"></div></body></html>' > server/views/index.ejs; fi) \
+    && (if [ -f public/index.ejs ]; then cp public/index.ejs server/views/; elif [ -f client/dist/index.ejs ]; then cp client/dist/index.ejs server/views/; else echo "Creating basic index.ejs template"; echo '<!DOCTYPE html><html><head><title>Planka</title></head><body><div id="root"></div></body></html>' > server/views/index.ejs; fi) \
     && npm config set update-notifier false \
     && rm -rf /tmp/planka-source
 
