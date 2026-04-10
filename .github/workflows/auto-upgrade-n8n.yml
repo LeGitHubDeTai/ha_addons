@@ -37,15 +37,26 @@ jobs:
       - name: Get latest n8n release
         id: latest
         run: |
-          # Fetch latest release from GitHub API
-          LATEST_RELEASE=$(curl -s https://api.github.com/repos/n8n-io/n8n/releases/latest | jq -r '.tag_name')
+          # Get all releases
+          RELEASES=$(curl -s https://api.github.com/repos/n8n-io/n8n/releases | jq -r '.[].tag_name')
+          
+          # Check if the first release is "stable" or "latest"
+          FIRST_RELEASE=$(echo "$RELEASES" | head -n1)
+          VERSION=$(echo $FIRST_RELEASE | sed 's/n8n@//')
+          
+          # If first release is "stable" or "latest", get the second one
+          if [[ "$VERSION" == "stable" || "$VERSION" == "latest" ]]; then
+            LATEST_RELEASE=$(echo "$RELEASES" | sed -n '2p')
+          else
+            LATEST_RELEASE="$FIRST_RELEASE"
+          fi
           
           # Extract version number from tag (format: n8n@X.Y.Z)
           LATEST_VERSION=$(echo $LATEST_RELEASE | sed 's/n8n@//')
           
           echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-          echo "release_url=$(curl -s https://api.github.com/repos/n8n-io/n8n/releases/latest | jq -r '.html_url')" >> $GITHUB_OUTPUT
+          echo "release_url=$(curl -s https://api.github.com/repos/n8n-io/n8n/releases | jq -r ".[] | select(.tag_name==\"$LATEST_RELEASE\") | .html_url")" >> $GITHUB_OUTPUT
           
           echo "Latest release: $LATEST_RELEASE"
           echo "Latest version: $LATEST_VERSION"
@@ -159,7 +170,7 @@ jobs:
             gh pr create \
               --base main \
               --head "${{ steps.branch.outputs.branch_name }}" \
-              --title "⬆️${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})" \
+              --title "⬆️ n8n ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})" \
               --body "Auto-upgrade n8n to version ${{ steps.latest.outputs.latest_version }}
 
             **Changes:**
