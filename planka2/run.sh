@@ -102,6 +102,11 @@ chmod +x "./start.sh"
 # Check if database needs reset due to missing migrations
 if [ "$DB_CHANGED" = true ] || [ ! -f "/opt/planka/server/db/migrations/20260312000000_add_ability_to_display_card_ages.js" ]; then
     bashio::log.warning "Réinitialisation de la base de données (migration manquante)"
+    
+    # Create missing migration file
+    cd /opt/planka
+    node /opt/planka/create-migration.js
+    
     # Drop and recreate database
     export PGPASSWORD="$DB_PASSWORD"
     psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "DROP DATABASE IF EXISTS $DB_NAME;" 2>/dev/null || true
