@@ -54,6 +54,8 @@ echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
 echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
 echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 echo "SOCKETS_CORS_ALLOW_ORIGINS=*" >> "$ENV_FILE"
+echo "ALLOWED_ORIGINS=*" >> "$ENV_FILE"
+echo "SOCKET_ORIGINS=*" >> "$ENV_FILE"
 # ===============================
 # ADMIN (premier démarrage uniquement)
 # ===============================
