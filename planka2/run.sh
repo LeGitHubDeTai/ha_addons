@@ -97,6 +97,19 @@ chmod 600 "./.env"
 chmod +x "./start.sh"
 
 # ===============================
+# DATABASE RESET IF NEEDED
+# ===============================
+# Check if database needs reset due to missing migrations
+if [ "$DB_CHANGED" = true ] || [ ! -f "/opt/planka/server/db/migrations/20260312000000_add_ability_to_display_card_ages.js" ]; then
+    bashio::log.warning "Réinitialisation de la base de données (migration manquante)"
+    # Drop and recreate database
+    export PGPASSWORD="$DB_PASSWORD"
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "DROP DATABASE IF EXISTS $DB_NAME;" 2>/dev/null || true
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "CREATE DATABASE $DB_NAME;" 2>/dev/null || true
+    unset PGPASSWORD
+fi
+
+# ===============================
 # EXPORT VARIABLES FOR START.SH
 # ===============================
 # Export all variables to environment for start.sh
