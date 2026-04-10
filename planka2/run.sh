@@ -87,6 +87,11 @@ while IFS= read -r line; do
     fi
 done < "$ENV_FILE"
 
+# Ensure WebSocket variables are directly exported
+export SOCKETS_ONLY_ALLOW_ORIGINS="*"
+export SOCKETS_CORS_ALLOW_ORIGINS="*"
+export CORS_ORIGIN="*"
+
 # ===============================
 # START PLANKA
 # ===============================
