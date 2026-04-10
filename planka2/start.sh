@@ -31,4 +31,4 @@ fi
 
 # Start Planka
 echo "Starting Planka..."
-cd server && exec npm start
+cd server && exec npm run start:prod
