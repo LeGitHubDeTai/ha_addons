@@ -42,7 +42,7 @@ RUN mkdir -p /opt/planka /var/log/supervisor /var/log/nginx
 # ===============================
 # DOWNLOAD PLANKA PREBUILD
 # ===============================
-ARG PLANKA_VERSION=2.1.0
+ARG PLANKA_VERSION=2.0.3
 RUN wget -O planka-prebuild.zip "https://github.com/plankanban/planka/releases/download/v${PLANKA_VERSION}/planka-prebuild.zip" \
     && unzip planka-prebuild.zip \
     && rm planka-prebuild.zip \
