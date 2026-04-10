@@ -56,6 +56,8 @@ echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 echo "SOCKETS_CORS_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 echo "ALLOWED_ORIGINS=*" >> "$ENV_FILE"
 echo "SOCKET_ORIGINS=*" >> "$ENV_FILE"
+echo "HOOK_TIMEOUT=80000" >> "$ENV_FILE"
+echo "NODE_ENV=production" >> "$ENV_FILE"
 # ===============================
 # ADMIN (premier démarrage uniquement)
 # ===============================
@@ -93,6 +95,12 @@ done < "$ENV_FILE"
 export SOCKETS_ONLY_ALLOW_ORIGINS="*"
 export SOCKETS_CORS_ALLOW_ORIGINS="*"
 export CORS_ORIGIN="*"
+export ALLOWED_ORIGINS="*"
+export SOCKET_ORIGINS="*"
+export HOOK_TIMEOUT=80000
+export NODE_ENV=production
+export EXPLICIT_HOST=0.0.0.0
+export TRUST_PROXY=true
 
 # ===============================
 # START PLANKA
