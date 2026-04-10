@@ -60,6 +60,10 @@ echo "HOOK_TIMEOUT=80000" >> "$ENV_FILE"
 echo "NODE_ENV=production" >> "$ENV_FILE"
 echo "SESSION_COOKIE_SECURE=false" >> "$ENV_FILE"
 echo "SESSION_STORE=memory" >> "$ENV_FILE"
+echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
+echo "SOCKETS_CORS_ALLOW_ORIGINS=*" >> "$ENV_FILE"
+echo "CORS_ORIGIN=*" >> "$ENV_FILE"
+echo "TRUST_PROXY=true" >> "$ENV_FILE"
 # ===============================
 # ADMIN (premier démarrage uniquement)
 # ===============================
@@ -112,9 +116,8 @@ export HOOK_TIMEOUT=80000
 export NODE_ENV=production
 export EXPLICIT_HOST=0.0.0.0
 export TRUST_PROXY=true
-export sails_config__sockets__onlyAllowOrigins="*"
-export sails_config__session__cookie__secure="false"
-export sails_config__http__trustProxy="true"
+export SESSION_COOKIE_SECURE="false"
+export SESSION_STORE="memory"
 
 # ===============================
 # START PLANKA
