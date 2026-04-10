@@ -112,6 +112,9 @@ export HOOK_TIMEOUT=80000
 export NODE_ENV=production
 export EXPLICIT_HOST=0.0.0.0
 export TRUST_PROXY=true
+export sails_config__sockets__onlyAllowOrigins="*"
+export sails_config__session__cookie__secure="false"
+export sails_config__http__trustProxy="true"
 
 # ===============================
 # START PLANKA
