@@ -53,7 +53,6 @@ RUN wget -O planka-prebuild.zip "https://github.com/plankanban/planka/releases/d
 # ===============================
 WORKDIR /opt/planka
 RUN cp -r /tmp/planka-source/* . \
-    && cp -r /tmp/planka-source/.tmp . \
     && npm install \
     && python3 -m venv .venv \
     && .venv/bin/pip3 install --upgrade pip \
