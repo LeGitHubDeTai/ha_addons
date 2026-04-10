@@ -85,11 +85,13 @@ RUN cp -r /tmp/planka-source/* . \
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY run.sh /opt/planka/run.sh
+COPY start.sh /opt/planka/start.sh
 
 # ===============================
 # PERMISSIONS
 # ===============================
 RUN chmod +x /opt/planka/run.sh && \
+    chmod +x /opt/planka/start.sh && \
     chown -R root:root /opt/planka && \
     chown -R nginx:nginx /var/log/nginx
 
