@@ -45,7 +45,6 @@ fi
 # ===============================
 # ADDITIONAL PLANKA ENV VARS (officiel)
 # ===============================
-echo "NODE_ENV=${NODE_ENV:-production}" >> "$ENV_FILE"
 echo "PORT=${PORT:-1337}" >> "$ENV_FILE"
 echo "EXPLICIT_HOST=0.0.0.0" >> "$ENV_FILE"
 echo "TRUST_PROXY=true" >> "$ENV_FILE"
@@ -55,14 +54,6 @@ echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
 echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
 echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 echo "SOCKETS_CORS_ALLOW_ORIGINS=*" >> "$ENV_FILE"
-BASE_URL="http://localhost:1337"
-
-if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
-    sed -i "s|^BASE_URL=.*|BASE_URL=${BASE_URL}|" "$ENV_FILE"
-else
-    echo "BASE_URL=${BASE_URL}" >> "$ENV_FILE"
-fi
-
 # ===============================
 # ADMIN (premier démarrage uniquement)
 # ===============================
@@ -84,17 +75,20 @@ cd /opt/planka
 cp $ENV_FILE ./
 chmod 600 "$ENV_FILE"
 chmod 600 "./.env"
+chmod +x "./start.sh"
 
 # ===============================
-# DB INIT SI NECESSAIRE
+# EXPORT VARIABLES FOR START.SH
 # ===============================
-if [[ "$DB_CHANGED" == "true" ]]; then
-    bashio::log.warning "Initialisation / migration base de données"
-    npm run db:init
-fi
+# Export all variables to environment for start.sh
+while IFS= read -r line; do
+    if [[ "$line" =~ ^[A-Z_]+= ]]; then
+        export "$line"
+    fi
+done < "$ENV_FILE"
 
 # ===============================
 # START PLANKA
 # ===============================
-bashio::log.info "Démarrage Planka"
-exec sh start.sh
+bashio::log.info "Démarrage Planka avec start.sh officiel"
+exec ./start.sh
