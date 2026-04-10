@@ -104,8 +104,22 @@ if [ "$DB_CHANGED" = true ] || [ ! -f "/opt/planka/server/db/migrations/20260312
     bashio::log.warning "Réinitialisation de la base de données (migration manquante)"
     
     # Create missing migration file
-    cd /opt/planka
-    node /opt/planka/create-migration.js
+    mkdir -p /opt/planka/server/db/migrations
+    cat > /opt/planka/server/db/migrations/20260312000000_add_ability_to_display_card_ages.js << 'EOF'
+'use strict';
+
+exports.up = function(knex) {
+    return knex.schema.table('cards', function(table) {
+        table.boolean('displayCardAges').defaultTo(false);
+    });
+};
+
+exports.down = function(knex) {
+    return knex.schema.table('cards', function(table) {
+        table.dropColumn('displayCardAges');
+    });
+};
+EOF
     
     # Drop and recreate database
     export PGPASSWORD="$DB_PASSWORD"
