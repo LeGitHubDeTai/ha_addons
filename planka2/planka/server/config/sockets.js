@@ -26,6 +26,7 @@ module.exports.sockets = {
    *
    */
   // transports: [ 'websocket' ],
+  onlyAllowOrigins: ['*'],
   /**
    *
    * `beforeConnect`
@@ -66,5 +67,4 @@ module.exports.sockets = {
    *
    */
   // grant3rdPartyCookie: true,
-  onlyAllowOrigins: ['http://localhost:1337'],
 };

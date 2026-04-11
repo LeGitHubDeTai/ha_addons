@@ -21,7 +21,7 @@ module.exports.session = {
   secret: process.env.SECRET_KEY,
 
   cookie: {
-    secure: true,
+    secure: false,
   }
   /**
    *
