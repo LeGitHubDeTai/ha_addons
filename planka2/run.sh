@@ -70,7 +70,7 @@ echo "TRUST_PROXY=true" >> "$ENV_FILE"
 echo "sails.config.http.trustProxy=true" >> "$ENV_FILE"
 echo "sails.config.sockets.onlyAllowOrigins=*" >> "$ENV_FILE"
 echo "sails.config.session.cookie.secure=false" >> "$ENV_FILE"
-echo "sails.config.session.secret=$SECRET_KEY" >> "$ENV_FILE"
+# SECRET_KEY will be added after initialization
 # ===============================
 # ADMIN (premier démarrage uniquement)
 # ===============================
@@ -144,6 +144,9 @@ while IFS= read -r line; do
         export "$line"
     fi
 done < "$ENV_FILE"
+
+# Add SECRET_KEY to ENV_FILE now that it's available
+echo "sails.config.session.secret=$SECRET_KEY" >> "$ENV_FILE"
 
 # Ensure WebSocket variables are directly exported
 export SOCKETS_ONLY_ALLOW_ORIGINS="*"
