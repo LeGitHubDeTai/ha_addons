@@ -64,6 +64,13 @@ RUN cp -r /tmp/planka-source/* . \
     && rm -rf /tmp/planka-source
 
 # ===============================
+# COPY CUSTOM CONFIG FILES
+# ===============================
+COPY planka/server/config/http.js /opt/planka/server/config/http.js
+COPY planka/server/config/session.js /opt/planka/server/config/session.js
+COPY planka/server/config/sockets.js /opt/planka/server/config/sockets.js
+
+# ===============================
 # COPY CONFIGURATION FILES
 # ===============================
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
