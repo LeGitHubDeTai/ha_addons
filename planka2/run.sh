@@ -10,8 +10,11 @@ bashio::log.info "Initialisation Planka"
 # ===============================
 if [[ ! -f "$ENV_FILE" ]] || ! grep -q "^SECRET_KEY=" "$ENV_FILE"; then
     bashio::log.info "Génération du SECRET"
-    SECRET="$(openssl rand -hex 64)"
-    echo "SECRET_KEY=${SECRET}" >> "$ENV_FILE"
+    if [ -z "$SECRET_KEY" ]; then
+        export SECRET_KEY=$(openssl rand -hex 32)
+        bashio::log.info "SECRET_KEY générée automatiquement"
+    fi
+    echo "SECRET_KEY=${SECRET_KEY}" >> "$ENV_FILE"
 fi
 
 # ===============================

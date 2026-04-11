@@ -27,12 +27,42 @@ export SOCKETS_CORS_ALLOW_ORIGINS="*"
 export CORS_ORIGIN="*"
 
 # ===============================
+# DEBUG CONFIGURATION
+# ===============================
+echo "=== PLANKA STARTUP DEBUG ==="
+echo "NODE_ENV: $NODE_ENV"
+echo "PORT: $PORT"
+echo "EXPLICIT_HOST: $EXPLICIT_HOST"
+echo "TRUST_PROXY: $TRUST_PROXY"
+echo "DATABASE_URL: ${DATABASE_URL:0:50}..."
+echo "SECRET_KEY: ${SECRET_KEY:0:10}..."
+echo "sails_config__http__trustProxy: $sails_config__http__trustProxy"
+echo "sails_config__sockets__onlyAllowOrigins: $sails_config__sockets__onlyAllowOrigins"
+echo "sails_config__session__cookie__secure: $sails_config__session__cookie__secure"
+echo "============================="
+
+# ===============================
+# HEALTH CHECK
+# ===============================
+echo "Checking database connection..."
+if command -v psql >/dev/null 2>&1; then
+    echo "PostgreSQL client available"
+else
+    echo "PostgreSQL client not found"
+fi
+
+echo "Checking Node.js version..."
+node --version
+
+echo "Checking npm version..."
+npm --version
+
+echo "Checking Planka files..."
+ls -la app.js 2>/dev/null || echo "app.js not found"
+ls -la package.json 2>/dev/null || echo "package.json not found"
+
+# ===============================
 # START PLANKA
 # ===============================
 echo "Starting Planka with forced configuration..."
-echo "trustProxy: $sails_config__http__trustProxy"
-echo "socket origins: $sails_config__sockets__onlyAllowOrigins"
-echo "session secure: $sails_config__session__cookie__secure"
-
-# Start Planka
-npm run start --production
+exec npm run start --production
