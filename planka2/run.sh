@@ -65,6 +65,9 @@ echo "SOCKETS_CORS_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 echo "CORS_ORIGIN=*" >> "$ENV_FILE"
 echo "TRUST_PROXY=true" >> "$ENV_FILE"
 echo "sails.config.http.trustProxy=true" >> "$ENV_FILE"
+echo "sails.config.sockets.onlyAllowOrigins=*" >> "$ENV_FILE"
+echo "sails.config.session.cookie.secure=false" >> "$ENV_FILE"
+echo "sails.config.session.secret=$SECRET_KEY" >> "$ENV_FILE"
 # ===============================
 # ADMIN (premier démarrage uniquement)
 # ===============================
@@ -152,6 +155,7 @@ export TRUST_PROXY=true
 export sails_config__http__trustProxy="true"
 export sails_config__sockets__onlyAllowOrigins="*"
 export sails_config__session__cookie__secure="false"
+export sails_config__session__secret="$SECRET_KEY"
 export SESSION_COOKIE_SECURE="false"
 export SESSION_STORE="memory"
 
