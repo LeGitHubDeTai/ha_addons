@@ -49,6 +49,13 @@ RUN wget -O planka-prebuild.zip "https://github.com/plankanban/planka/releases/d
     && mv planka /tmp/planka-source
 
 # ===============================
+# COPY CUSTOM CONFIG FILES
+# ===============================
+COPY planka/server/config/http.js /opt/planka/server/config/http.js
+COPY planka/server/config/session.js /opt/planka/server/config/session.js
+COPY planka/server/config/sockets.js /opt/planka/server/config/sockets.js
+
+# ===============================
 # SETUP PLANKA FINAL
 # ===============================
 WORKDIR /opt/planka
@@ -62,13 +69,6 @@ RUN cp -r /tmp/planka-source/* . \
     && (if [ -f public/index.ejs ]; then cp public/index.ejs server/views/; elif [ -f client/dist/index.ejs ]; then cp client/dist/index.ejs server/views/; else echo "Creating basic index.ejs template"; echo '<!DOCTYPE html><html><head><title>Planka</title></head><body><div id="root"></div></body></html>' > server/views/index.ejs; fi) \
     && npm config set update-notifier false \
     && rm -rf /tmp/planka-source
-
-# ===============================
-# COPY CUSTOM CONFIG FILES
-# ===============================
-COPY planka/server/config/http.js /opt/planka/server/config/http.js
-COPY planka/server/config/session.js /opt/planka/server/config/session.js
-COPY planka/server/config/sockets.js /opt/planka/server/config/sockets.js
 
 # ===============================
 # COPY CONFIGURATION FILES
