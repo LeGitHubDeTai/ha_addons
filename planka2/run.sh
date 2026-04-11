@@ -129,8 +129,14 @@ EOF
 fi
 
 # ===============================
-# EXPORT VARIABLES FOR START.SH
+# CLEAN UP ENV FILE
 # ===============================
+# Remove all sails.config.* lines that cause command not found errors
+if [ -f "$ENV_FILE" ]; then
+    grep -v "sails\.config\." "$ENV_FILE" > "$ENV_FILE.tmp" || true
+    mv "$ENV_FILE.tmp" "$ENV_FILE" || true
+    bashio::log.info "Nettoyage du fichier ENV_FILE"
+fi
 # Export all variables to environment for start.sh
 while IFS= read -r line; do
     if [[ "$line" =~ ^[A-Z_]+= ]]; then
@@ -140,6 +146,11 @@ done < "$ENV_FILE"
 
 # Add SECRET_KEY to ENV_FILE now that it's available
 echo "sails_config_session_secret=$SECRET_KEY" >> "$ENV_FILE"
+
+# Add proper Sails configuration
+echo "sails_config_http_trustProxy=true" >> "$ENV_FILE"
+echo "sails_config_sockets_onlyAllowOrigins=*" >> "$ENV_FILE"
+echo "sails_config_session_cookie_secure=false" >> "$ENV_FILE"
 
 # Ensure WebSocket variables are directly exported
 export SOCKETS_ONLY_ALLOW_ORIGINS="*"
