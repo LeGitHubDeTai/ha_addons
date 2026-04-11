@@ -52,13 +52,6 @@ echo "PORT=${PORT:-1337}" >> "$ENV_FILE"
 echo "EXPLICIT_HOST=0.0.0.0" >> "$ENV_FILE"
 echo "TRUST_PROXY=true" >> "$ENV_FILE"
 echo "SERVER_BASE_URL=http://localhost:1337" >> "$ENV_FILE"
-echo "CORS_ORIGIN=*" >> "$ENV_FILE"
-echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
-echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
-echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
-echo "SOCKETS_CORS_ALLOW_ORIGINS=*" >> "$ENV_FILE"
-echo "ALLOWED_ORIGINS=*" >> "$ENV_FILE"
-echo "SOCKET_ORIGINS=*" >> "$ENV_FILE"
 echo "HOOK_TIMEOUT=80000" >> "$ENV_FILE"
 echo "NODE_ENV=production" >> "$ENV_FILE"
 echo "SESSION_COOKIE_SECURE=false" >> "$ENV_FILE"
@@ -66,11 +59,11 @@ echo "SESSION_STORE=memory" >> "$ENV_FILE"
 echo "SOCKETS_ONLY_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 echo "SOCKETS_CORS_ALLOW_ORIGINS=*" >> "$ENV_FILE"
 echo "CORS_ORIGIN=*" >> "$ENV_FILE"
-echo "TRUST_PROXY=true" >> "$ENV_FILE"
-echo "sails.config.http.trustProxy=true" >> "$ENV_FILE"
-echo "sails.config.sockets.onlyAllowOrigins=*" >> "$ENV_FILE"
-echo "sails.config.session.cookie.secure=false" >> "$ENV_FILE"
-# SECRET_KEY will be added after initialization
+echo "UV_THREADPOOL_SIZE=16" >> "$ENV_FILE"
+echo "ALLOWED_ORIGINS=*" >> "$ENV_FILE"
+echo "SOCKET_ORIGINS=*" >> "$ENV_FILE"
+echo "NODE_OPTIONS=--max-old-space-size=4096" >> "$ENV_FILE"
+
 # ===============================
 # ADMIN (premier démarrage uniquement)
 # ===============================
@@ -146,7 +139,7 @@ while IFS= read -r line; do
 done < "$ENV_FILE"
 
 # Add SECRET_KEY to ENV_FILE now that it's available
-echo "sails.config.session.secret=$SECRET_KEY" >> "$ENV_FILE"
+echo "sails_config_session_secret=$SECRET_KEY" >> "$ENV_FILE"
 
 # Ensure WebSocket variables are directly exported
 export SOCKETS_ONLY_ALLOW_ORIGINS="*"
