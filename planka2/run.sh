@@ -80,6 +80,19 @@ if ! grep -q "^DEFAULT_ADMIN_EMAIL=" "$ENV_FILE" 2>/dev/null; then
 fi
 
 # ===============================
+# CONFIGURE PLANKA HTTP SETTINGS
+# ===============================
+# Add trustProxy to http.js
+if [ -f "/opt/planka/server/config/http.js" ]; then
+    # Backup original file
+    cp /opt/planka/server/config/http.js /opt/planka/server/config/http.js.bak
+    
+    # Add trustProxy configuration
+    sed -i '/module.exports.http = {/a\\n  trustProxy: true,' /opt/planka/server/config/http.js
+    bashio::log.info "Configuration trustProxy ajoutée à http.js"
+fi
+
+# ===============================
 # CREATE REQUIRED DIRECTORIES
 # ===============================
 mkdir -p /opt/planka/.tmp/public/preloaded-favicons
