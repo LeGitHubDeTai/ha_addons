@@ -61,8 +61,42 @@ echo "Checking Planka files..."
 ls -la app.js 2>/dev/null || echo "app.js not found"
 ls -la package.json 2>/dev/null || echo "package.json not found"
 
+echo "Checking port availability..."
+if netstat -tuln | grep -q ":1337 "; then
+    echo "Port 1337 is already in use"
+else
+    echo "Port 1337 is available"
+fi
+
+echo "Checking environment variables..."
+env | grep -E "(NODE_ENV|PORT|DATABASE_URL|SECRET_KEY)" | head -10
+
 # ===============================
-# START PLANKA
+# START PLANKA WITH HEALTH MONITORING
 # ===============================
 echo "Starting Planka with forced configuration..."
-exec npm run start --production
+
+# Start Planka in background for monitoring
+npm run start --production &
+PLANKA_PID=$!
+
+# Wait for startup and monitor
+echo "Planka PID: $PLANKA_PID"
+echo "Waiting for Planka to start..."
+
+for i in {1..30}; do
+    if kill -0 $PLANKA_PID 2>/dev/null; then
+        echo "Planka process running ($i/30 seconds)"
+        sleep 1
+    else
+        echo "Planka process died!"
+        echo "Exit status: $?"
+        exit 1
+    fi
+done
+
+echo "Planka should be ready now. Checking health..."
+curl -f http://localhost:1337/health 2>/dev/null && echo "Health check passed" || echo "Health check failed"
+
+# Bring Planka to foreground
+wait $PLANKA_PID
