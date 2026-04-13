@@ -3,8 +3,6 @@ set -euo pipefail
 
 ENV_FILE="/data/.env"
 
-rm $ENV_FILE
-
 bashio::log.info "Initialisation Planka"
 
 # ===============================
