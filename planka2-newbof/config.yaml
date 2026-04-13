@@ -1,0 +1,54 @@
+name: Planka2DEV
+version: "26.4.2.65"
+slug: planka2
+panel_title: Planka - Kanban Board
+panel_icon: "mdi:view-week"
+description: Open-source kanban board for project management and collaboration
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/planka
+image: ghcr.io/legithubdetai/ha_addons/dev-planka2-{arch}
+stage: experimental
+arch:
+  - amd64
+startup: application
+boot: auto
+ingress: true
+ingress_port: 1338
+backup_exclude:
+  - "planka/node_modules"
+  - "planka/.cache"
+  - "planka/.logs"
+  - "supervisord.log*"
+  - "/data/uploads/*.tmp"
+map:
+  - type: addon_config
+    read_only: false
+    path: /config
+  - share:rw
+ports:
+  1337/tcp: 1337
+ports_description:
+  1337/tcp: The port for Planka web interface. Direct access to Planka on port 1337. Ingress uses port 1339 for Home Assistant integration.
+options:
+  DATABASE:
+    db_host: postgres
+    db_port: 5432
+    db_user: planka
+    db_password: homeassistant
+    db_name: planka
+  ADMIN:
+    email: admin@example.com
+    password: homeassistant
+    name: Admin
+  SECRET_KEY: null
+schema:
+  DATABASE:
+    db_host: str
+    db_port: int
+    db_user: str
+    db_password: password
+    db_name: str
+  ADMIN:
+    email: email
+    password: password
+    name: str
+  SECRET_KEY: str?
