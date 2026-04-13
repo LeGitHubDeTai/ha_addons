@@ -87,6 +87,7 @@ if [[ "$INIT_DB" == "true" ]]; then
 fi
 
 if [[ "$DB_CHANGED" == "true" ]]; then
+    bashio::log.warning "Initialisation / migration base de données"
     npm run db:init
 fi
 
