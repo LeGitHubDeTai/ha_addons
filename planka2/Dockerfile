@@ -37,10 +37,19 @@ RUN apt-get update && \
 # ===============================
 WORKDIR /opt
 
-RUN curl -fsSL -o planka.zip \
-        https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
-    unzip planka.zip && \
-    rm planka.zip
+# RUN curl -fsSL -o planka.zip \
+#         https://github.com/plankanban/planka/releases/latest/download/planka-prebuild.zip && \
+#     unzip planka.zip && \
+#     rm planka.zip
+
+# ===============================
+# DOWNLOAD PLANKA PREBUILD
+# ===============================
+ARG PLANKA_VERSION=2.1.0
+RUN wget -O planka-prebuild.zip "https://github.com/plankanban/planka/releases/download/v${PLANKA_VERSION}/planka-prebuild.zip" \
+    && unzip planka-prebuild.zip \
+    && rm planka-prebuild.zip \
+    && mv planka /tmp/planka-source
 
 WORKDIR /opt/planka
 
