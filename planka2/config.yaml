@@ -1,5 +1,5 @@
 name: Planka2DEV
-version: "26.4.1.7"
+version: "26.4.1.9"
 slug: planka2
 panel_icon: "mdi:view-week"
 description: Kanban board open-source (Planka)
@@ -32,6 +32,7 @@ options:
       email: admin@example.com
       password: homeassistant
       name: Admin
+    INIT_DB: false
 schema:
     DATABASE:
       db_host: str
@@ -43,6 +44,7 @@ schema:
       email: str
       password: password
       name: str
+    INIT_DB: bool
 map:
   - type: addon_config
     read_only: False

@@ -78,7 +78,8 @@ chmod 600 "./.env"
 # ===============================
 # DB INIT SI NECESSAIRE
 # ===============================
-if [[ "$DB_CHANGED" == "true" ]]; then
+INIT_DB="$(bashio::config 'INIT_DB')"
+if [[ "$INIT_DB" == "true" ]]; then
     bashio::log.warning "Initialisation / migration base de données"
     npm run db:init
 fi
