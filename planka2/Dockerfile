@@ -46,8 +46,8 @@ WORKDIR /opt
 # ===============================
 # DOWNLOAD PLANKA PREBUILD
 # ===============================
-ARG PLANKA_VERSION=1.1.1
-RUN wget -O planka.zip "https://github.com/plankanban/planka/releases/download/v${PLANKA_VERSION}/planka-prebuild.zip" && \
+ARG PLANKA_VERSION="planka-1.1.1"
+RUN wget -O planka.zip "https://github.com/plankanban/planka/releases/download/${PLANKA_VERSION}/planka-prebuild.zip" && \
     unzip planka.zip && \
     rm planka.zip
 
