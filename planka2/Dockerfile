@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/base:20.0.4
+ARG BUILD_FROM=ghcr.io/hassio-addons/base:20.0.4
 
 FROM ${BUILD_FROM}
 
