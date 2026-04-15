@@ -1,4 +1,5 @@
-ARG BUILD_FROM
+ARG BUILD_FROM=ghcr.io/home-assistant/base:20.0.4
+
 FROM ${BUILD_FROM}
 
 ENV DEBIAN_FRONTEND=noninteractive
