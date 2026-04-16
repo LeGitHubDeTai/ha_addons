@@ -6,8 +6,8 @@ url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/obsidian
 image: ghcr.io/legithubdetai/ha_addons/obsidian-{arch}
 panel_icon: "mdi:note-edit"
 arch:
-  - aarch64
   - amd64
+  - aarch64
 init: false
 tmpfs: true
 map:

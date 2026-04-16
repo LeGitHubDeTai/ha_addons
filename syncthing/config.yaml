@@ -6,11 +6,8 @@ description: "Syncthing is a continuous file synchronization program in a
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/syncthing
 image: ghcr.io/legithubdetai/ha_addons/syncthing-{arch}
 arch:
-  - armhf
-  - armv7
-  - aarch64
   - amd64
-  - i386
+  - aarch64
 init: false
 ports:
   8384/tcp: null

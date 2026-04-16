@@ -8,6 +8,7 @@ url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/isoman
 image: ghcr.io/legithubdetai/ha_addons/isoman-{arch}
 arch:
     - amd64
+    - aarch64
 startup: application
 boot: auto
 hassio_role: "default"
