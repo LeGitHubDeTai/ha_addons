@@ -244,6 +244,21 @@ jobs:
           wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
           chmod +x /usr/local/bin/yq
 
+      - name: Copy templates into addon build context
+        env:
+          ADDON: ${{ matrix.build.addon }}
+        run: |
+          set -euo pipefail
+          SCRIPTS_DIR=".scripts"
+          ADDON_DIR="./$ADDON"
+
+          # Copy all template scripts that Dockerfiles might reference
+          for script in ha_automodules.sh ha_autoapps.sh ha_entrypoint.sh bashio-standalone.sh ha_lsio.sh; do
+            if [ -f "$SCRIPTS_DIR/$script" ]; then
+              cp "$SCRIPTS_DIR/$script" "$ADDON_DIR/$script"
+            fi
+          done
+
       - name: Install build tools
         run: |
           # Install Home Assistant CLI tools (optional, for validation)
