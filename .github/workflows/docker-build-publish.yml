@@ -252,6 +252,20 @@ jobs:
           # Note: bashio is typically included in Home Assistant base images
           # and is not needed during the build process itself
 
+      - name: Copy scripts into addon build context
+        run: |
+          set -euo pipefail
+          ADDON="${{ matrix.build.addon }}"
+          SCRIPT_DIR=".scripts"
+          ADDON_DIR="./$ADDON"
+
+          # Copy all scripts that Dockerfiles might reference
+          for script in ha_automodules.sh ha_autoapps.sh ha_entrypoint.sh bashio-standalone.sh ha_lsio.sh; do
+            if [ -f "$SCRIPT_DIR/$script" ]; then
+              cp "$SCRIPT_DIR/$script" "$ADDON_DIR/$script"
+            fi
+          done
+
       - name: Build and push images for each architecture
         run: |
           ADDON="${{ matrix.build.addon }}"
@@ -261,9 +275,11 @@ jobs:
           
           echo "Building $ADDON version $VERSION"
           echo "Architectures: $ARCHS"
+          echo "Current directory: $(pwd)"
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
           
-          # Parse build.yaml for base images
-          BUILD_CONFIG="$ADDON/build.yaml"
+          # Parse build.yaml for base images (use absolute path)
+          BUILD_CONFIG="$GITHUB_WORKSPACE/$ADDON/build.yaml"
           
           # Check if build.yaml has architecture-specific or single base image
           if yq eval '.build_from | type' "$BUILD_CONFIG" | grep -q "!!map"; then
@@ -317,7 +333,8 @@ jobs:
             
             echo "Building image: $IMAGE_TAG"
             
-            # Build and push
+            # Build and push - ensure context includes copied scripts
+            cd "$ADDON"
             docker buildx build \
               $BUILD_ARGS \
               --platform "$PLATFORM" \
@@ -326,9 +343,10 @@ jobs:
               --cache-from type=local,src=/tmp/.buildx-cache \
               --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
               --push \
-              "$ADDON/"
+              .
             
             echo "Successfully built and pushed $IMAGE_TAG"
+            cd ..
           done
 
       - name: Move cache
