@@ -4,7 +4,7 @@ slug: gitea
 description: Gitea for Home Assistant
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/gitea
 webui: "[PROTO:ssl]://[HOST]:[PORT:3000]"
-image: ghcr.io/legithubdetai/ha_addons/gitea-{arch}
+image: ghcr.io/legithubdetai/ha_addons/dev-gitea-{arch}
 arch:
   - aarch64
   - amd64
