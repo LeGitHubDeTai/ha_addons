@@ -354,6 +354,7 @@ jobs:
               .
             
             echo "Successfully built and pushed $IMAGE_TAG"
+            cd ..
           done
 
       - name: Move cache
