@@ -285,9 +285,11 @@ jobs:
           
           echo "Building $ADDON version $VERSION"
           echo "Architectures: $ARCHS"
+          echo "Current directory: $(pwd)"
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
           
-          # Parse build.yaml for base images
-          BUILD_CONFIG="$ADDON/build.yaml"
+          # Parse build.yaml for base images (use absolute path)
+          BUILD_CONFIG="$GITHUB_WORKSPACE/$ADDON/build.yaml"
           
           # Check if build.yaml has architecture-specific or single base image
           if yq eval '.build_from | type' "$BUILD_CONFIG" | grep -q "!!map"; then
