@@ -47,6 +47,7 @@ WORKDIR /opt
 # ===============================
 # DOWNLOAD PLANKA PREBUILD
 # ===============================
+##IL FAUT 2.0.0-rc.4
 ARG PLANKA_VERSION="v2.0.0"
 RUN wget -O planka.zip "https://github.com/plankanban/planka/releases/download/${PLANKA_VERSION}/planka-prebuild.zip" && \
     unzip planka.zip && \
@@ -62,7 +63,5 @@ RUN npm install
 # ===============================
 COPY run.sh /run.sh
 RUN chmod +x /run.sh
-
-EXPOSE 1337
 
 CMD ["/run.sh"]
