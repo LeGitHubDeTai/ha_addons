@@ -22,26 +22,22 @@ RUN if [ ! -f /bin/sh ] && [ -f /usr/bin/sh ]; then ln -s /usr/bin/sh /bin/sh; f
 # Modules
 ARG MODULES="00-banner.sh 00-global_var.sh 01-custom_script.sh"
 
-# Automatic modules download
-COPY ha_automodules.sh /ha_automodules.sh
+# Automatic modules download (scripts copied by workflow)
 RUN chmod 744 /ha_automodules.sh && /ha_automodules.sh "$MODULES" && rm /ha_automodules.sh
 
 # Manual apps
 ENV PACKAGES=""
 
-# Automatic apps & bashio
-COPY ha_autoapps.sh /ha_autoapps.sh
+# Automatic apps & bashio (scripts copied by workflow)
 RUN chmod 744 /ha_autoapps.sh && /ha_autoapps.sh "$PACKAGES" && rm /ha_autoapps.sh
 
 EXPOSE 22 3000
 
-# Add entrypoint
+# Add entrypoint (scripts copied by workflow)
 ENV S6_STAGE2_HOOK=/ha_entrypoint.sh
-COPY ha_entrypoint.sh /ha_entrypoint.sh
 RUN chmod 777 /ha_entrypoint.sh
 
-# Install bashio
-COPY bashio-standalone.sh /usr/local/lib/bashio-standalone.sh
+# Install bashio (script copied by workflow)
 RUN chmod 0755 /usr/local/lib/bashio-standalone.sh
 
 ENTRYPOINT [ "/ha_entrypoint.sh" ]
