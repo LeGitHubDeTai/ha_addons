@@ -19,13 +19,9 @@ RUN find . -type f \( -name "*.sh" -o -name "run" -o -name "finish" \) -print -e
 RUN if [ ! -f /bin/sh ] && [ -f /usr/bin/sh ]; then ln -s /usr/bin/sh /bin/sh; fi && \
     if [ ! -f /bin/bash ] && [ -f /usr/bin/bash ]; then ln -s /usr/bin/bash /bin/bash; fi
 
-# Modules
-ARG MODULES="00-banner.sh 00-global_var.sh 01-custom_script.sh"
-
-# Copy scripts and modules (copied by workflow but also COPY as fallback)
+# Copy scripts (copied by workflow but also COPY as fallback)
 COPY ha_automodules.sh /ha_automodules.sh
-COPY modules/ /modules/
-RUN chmod 744 /ha_automodules.sh && /ha_automodules.sh "$MODULES" && rm /ha_automodules.sh
+RUN chmod 744 /ha_automodules.sh && /ha_automodules.sh && rm /ha_automodules.sh
 
 # Manual apps
 ENV PACKAGES=""
