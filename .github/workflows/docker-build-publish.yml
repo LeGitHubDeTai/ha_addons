@@ -255,6 +255,7 @@ jobs:
       - name: Copy templates into addon build context
         run: |
           set -euo pipefail
+          ADDON="${{ matrix.build.addon }}"
           TEMPLATES_DIR=".scripts"
           ADDON_DIR="./$ADDON"
 
