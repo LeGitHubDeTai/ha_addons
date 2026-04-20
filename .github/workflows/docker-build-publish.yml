@@ -252,12 +252,29 @@ jobs:
           SCRIPTS_DIR=".scripts"
           ADDON_DIR="./$ADDON"
 
+          echo "DEBUG: ADDON=$ADDON"
+          echo "DEBUG: SCRIPTS_DIR=$SCRIPTS_DIR"
+          echo "DEBUG: ADDON_DIR=$ADDON_DIR"
+          echo "DEBUG: Current directory contents:"
+          ls -la
+          echo "DEBUG: Scripts directory contents:"
+          ls -la "$SCRIPTS_DIR" || echo "Scripts directory not found"
+          echo "DEBUG: Addon directory contents:"
+          ls -la "$ADDON_DIR" || echo "Addon directory not found"
+
           # Copy all template scripts that Dockerfiles might reference
           for script in ha_automodules.sh ha_autoapps.sh ha_entrypoint.sh bashiuo-standalone.sh ha_lsio.sh; do
+            echo "DEBUG: Checking for $SCRIPTS_DIR/$script"
             if [ -f "$SCRIPTS_DIR/$script" ]; then
+              echo "DEBUG: Copying $script to $ADDON_DIR"
               cp "$SCRIPTS_DIR/$script" "$ADDON_DIR/$script"
+            else
+              echo "DEBUG: $script not found in $SCRIPTS_DIR"
             fi
           done
+          
+          echo "DEBUG: Final addon directory contents:"
+          ls -la "$ADDON_DIR"
 
       - name: Install build tools
         run: |
