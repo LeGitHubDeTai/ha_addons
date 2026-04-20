@@ -38,7 +38,7 @@ ENV S6_STAGE2_HOOK=/ha_entrypoint.sh
 RUN chmod 777 /ha_entrypoint.sh
 
 # Install bashio (script copied by workflow)
-RUN chmod 0755 /usr/local/lib/bashio-standalone.sh
+RUN chmod 0755 /usr/local/lib/bashiuo-standalone.sh
 
 ENTRYPOINT [ "/ha_entrypoint.sh" ]
 
