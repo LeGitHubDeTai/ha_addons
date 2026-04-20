@@ -254,27 +254,16 @@ jobs:
 
       - name: Copy templates into addon build context
         run: |
+          set -euo pipefail
           TEMPLATES_DIR=".scripts"
-          ADDON="${{ matrix.build.addon }}"
-          echo "Copying scripts to $ADDON directory..."
-          
+          ADDON_DIR="./$ADDON"
+
           # Copy all template scripts that Dockerfiles might reference
-          for script in $TEMPLATES_DIR/ha_automodules.sh $TEMPLATES_DIR/ha_autoapps.sh $TEMPLATES_DIR/ha_entrypoint.sh $TEMPLATES_DIR/bashiuo-standalone.sh $TEMPLATES_DIR/ha_lsio.sh; do
-            if [ -f "$script" ]; then
-              echo "Copying $(basename $script) to $ADDON/"
-              cp "$script" "$ADDON/"
-            else
-              echo "Warning: $script not found"
+          for script in ha_automodules.sh ha_autoapps.sh ha_entrypoint.sh bashio-standalone.sh ha_lsio.sh; do
+            if [ -f "$TEMPLATES_DIR/$script" ]; then
+              cp "$TEMPLATES_DIR/$script" "$ADDON_DIR/$script"
             fi
           done
-          
-          # Copy modules if they exist
-          if [ -d "$ADDON/modules" ]; then
-            echo "Modules directory found, ensuring it's included in build context"
-          fi
-          
-          echo "Files in $ADDON directory:"
-          ls -la "$ADDON/"
 
       - name: Build and push images for each architecture
         run: |
