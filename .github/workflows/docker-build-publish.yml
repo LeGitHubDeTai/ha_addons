@@ -336,7 +336,8 @@ jobs:
             
             echo "Building image: $IMAGE_TAG"
             
-            # Build and push
+            # Build and push - ensure context includes copied scripts
+            cd "$ADDON"
             docker buildx build \
               $BUILD_ARGS \
               --platform "$PLATFORM" \
@@ -345,7 +346,7 @@ jobs:
               --cache-from type=local,src=/tmp/.buildx-cache \
               --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
               --push \
-              "$ADDON/"
+              .
             
             echo "Successfully built and pushed $IMAGE_TAG"
           done
