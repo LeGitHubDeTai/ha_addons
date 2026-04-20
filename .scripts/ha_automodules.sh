@@ -26,29 +26,19 @@ fi
 # Create folder for scripts
 mkdir -p /etc/cont-init.d
 
-# Use local scripts instead of downloading
+# Download scripts
 for scripts in $MODULES; do
     echo "$scripts"
     success=false
-    
-    # Try to copy from local modules directory first
-    if [ -f "/modules/$scripts" ]; then
-        cp "/modules/$scripts" "/etc/cont-init.d/$scripts"
-        echo "Copied $scripts from local modules directory"
-        success=true
-    # Fallback to download if local file not found
-    else
-        for attempt in 1 2 3 4 5; do
-            if curl -f -L -s -S "https://raw.githubusercontent.com/LeGitHubDeTai/ha_addons/gitea-dev/.scripts/$scripts" -o /etc/cont-init.d/"$scripts" \
-                && [ "$(sed -n '/\/bin/p;q' /etc/cont-init.d/"$scripts")" != "" ]; then
-                success=true
-                break
-            fi
-            echo "Attempt $attempt failed for $scripts, retrying in ${attempt}s..."
-            sleep "$attempt"
-        done
-    fi
-    
+    for attempt in 1 2 3 4 5; do
+        if curl -f -L -s -S "https://raw.githubusercontent.com/LeGitHubDeTai/ha_addons/gitea-dev/.scripts/$scripts" -o /etc/cont-init.d/"$scripts" \
+            && [ "$(sed -n '/\/bin/p;q' /etc/cont-init.d/"$scripts")" != "" ]; then
+            success=true
+            break
+        fi
+        echo "Attempt $attempt failed for $scripts, retrying in ${attempt}s..."
+        sleep "$attempt"
+    done
     if [ "$success" != "true" ]; then
         echo "script failed to install $scripts after 5 attempts"
         exit 1
