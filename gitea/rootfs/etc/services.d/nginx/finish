@@ -1,0 +1,9 @@
+#!/usr/bin/with-contenv bashio
+# Nginx service finish script
+
+set -e
+
+bashio::log.info "Nginx stopped, restarting..."
+
+# Return 0 to restart the service
+exit 0
