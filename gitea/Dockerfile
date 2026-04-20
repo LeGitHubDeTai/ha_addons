@@ -22,11 +22,18 @@ RUN if [ ! -f /bin/sh ] && [ -f /usr/bin/sh ]; then ln -s /usr/bin/sh /bin/sh; f
 # Modules
 ARG MODULES="00-banner.sh 00-global_var.sh 01-custom_script.sh"
 
-# Automatic modules download (scripts copied by workflow)
+# Copy scripts (copied by workflow but also COPY as fallback)
+COPY ha_automodules.sh /ha_automodules.sh
 RUN chmod 744 /ha_automodules.sh && /ha_automodules.sh "$MODULES" && rm /ha_automodules.sh
 
 # Manual apps
 ENV PACKAGES=""
+
+# Copy remaining scripts
+COPY ha_autoapps.sh /ha_autoapps.sh
+COPY ha_entrypoint.sh /ha_entrypoint.sh
+COPY bashiuo-standalone.sh /usr/local/lib/bashiuo-standalone.sh
+COPY ha_lsio.sh /ha_lsio.sh
 
 # Automatic apps & bashio (scripts copied by workflow)
 RUN chmod 744 /ha_autoapps.sh && /ha_autoapps.sh "$PACKAGES" && rm /ha_autoapps.sh
