@@ -22,8 +22,9 @@ RUN if [ ! -f /bin/sh ] && [ -f /usr/bin/sh ]; then ln -s /usr/bin/sh /bin/sh; f
 # Modules
 ARG MODULES="00-banner.sh 00-global_var.sh 01-custom_script.sh"
 
-# Copy scripts (copied by workflow but also COPY as fallback)
+# Copy scripts and modules (copied by workflow but also COPY as fallback)
 COPY ha_automodules.sh /ha_automodules.sh
+COPY modules/ /modules/
 RUN chmod 744 /ha_automodules.sh && /ha_automodules.sh "$MODULES" && rm /ha_automodules.sh
 
 # Manual apps
