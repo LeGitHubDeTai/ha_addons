@@ -7,7 +7,6 @@ ENV S6_CMD_WAIT_FOR_SERVICES=1 \
     S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0 \
     S6_SERVICES_GRACETIME=0
 
-
 USER root
 
 # Add rootfs
@@ -19,30 +18,30 @@ RUN find . -type f \( -name "*.sh" -o -name "run" -o -name "finish" \) -print -e
 RUN if [ ! -f /bin/sh ] && [ -f /usr/bin/sh ]; then ln -s /usr/bin/sh /bin/sh; fi && \
     if [ ! -f /bin/bash ] && [ -f /usr/bin/bash ]; then ln -s /usr/bin/bash /bin/bash; fi
 
-# Copy scripts (copied by workflow but also COPY as fallback)
+# Modules
+ARG MODULES="00-banner.sh 00-global_var.sh 01-custom_script.sh"
+
+# Automatic modules download
 COPY ha_automodules.sh /ha_automodules.sh
-RUN chmod 744 /ha_automodules.sh && /ha_automodules.sh && rm /ha_automodules.sh
+RUN chmod 744 /ha_automodules.sh && /ha_automodules.sh "$MODULES" && rm /ha_automodules.sh
 
 # Manual apps
 ENV PACKAGES=""
 
-# Copy remaining scripts
+# Automatic apps & bashio
 COPY ha_autoapps.sh /ha_autoapps.sh
-COPY ha_entrypoint.sh /ha_entrypoint.sh
-COPY bashiuo-standalone.sh /usr/local/lib/bashiuo-standalone.sh
-COPY ha_lsio.sh /ha_lsio.sh
-
-# Automatic apps & bashio (scripts copied by workflow)
 RUN chmod 744 /ha_autoapps.sh && /ha_autoapps.sh "$PACKAGES" && rm /ha_autoapps.sh
 
 EXPOSE 22 3000
 
-# Add entrypoint (scripts copied by workflow)
+# Add entrypoint
 ENV S6_STAGE2_HOOK=/ha_entrypoint.sh
+COPY ha_entrypoint.sh /ha_entrypoint.sh
 RUN chmod 777 /ha_entrypoint.sh
 
-# Install bashio (script copied by workflow)
-RUN chmod 0755 /usr/local/lib/bashiuo-standalone.sh
+# Install bashio
+COPY bashio-standalone.sh /usr/local/lib/bashio-standalone.sh
+RUN chmod 0755 /usr/local/lib/bashio-standalone.sh
 
 ENTRYPOINT [ "/ha_entrypoint.sh" ]
 
