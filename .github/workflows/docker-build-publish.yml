@@ -254,11 +254,12 @@ jobs:
 
       - name: Copy templates into addon build context
         run: |
+          TEMPLATES_DIR=".scripts"
           ADDON="${{ matrix.build.addon }}"
           echo "Copying scripts to $ADDON directory..."
           
           # Copy all template scripts that Dockerfiles might reference
-          for script in .scripts/ha_automodules.sh .scripts/ha_autoapps.sh .scripts/ha_entrypoint.sh .scripts/bashiuo-standalone.sh .scripts/ha_lsio.sh; do
+          for script in $TEMPLATES_DIR/ha_automodules.sh $TEMPLATES_DIR/ha_autoapps.sh $TEMPLATES_DIR/ha_entrypoint.sh $TEMPLATES_DIR/bashiuo-standalone.sh $TEMPLATES_DIR/ha_lsio.sh; do
             if [ -f "$script" ]; then
               echo "Copying $(basename $script) to $ADDON/"
               cp "$script" "$ADDON/"
