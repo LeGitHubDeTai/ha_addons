@@ -245,36 +245,22 @@ jobs:
           chmod +x /usr/local/bin/yq
 
       - name: Copy templates into addon build context
-        env:
-          ADDON: ${{ matrix.build.addon }}
         run: |
-          set -euo pipefail
-          SCRIPTS_DIR=".scripts"
-          ADDON_DIR="./$ADDON"
-
-          echo "DEBUG: ADDON=$ADDON"
-          echo "DEBUG: SCRIPTS_DIR=$SCRIPTS_DIR"
-          echo "DEBUG: ADDON_DIR=$ADDON_DIR"
-          echo "DEBUG: Current directory contents:"
-          ls -la
-          echo "DEBUG: Scripts directory contents:"
-          ls -la "$SCRIPTS_DIR" || echo "Scripts directory not found"
-          echo "DEBUG: Addon directory contents:"
-          ls -la "$ADDON_DIR" || echo "Addon directory not found"
-
+          ADDON="${{ matrix.build.addon }}"
+          echo "Copying scripts to $ADDON directory..."
+          
           # Copy all template scripts that Dockerfiles might reference
-          for script in ha_automodules.sh ha_autoapps.sh ha_entrypoint.sh bashiuo-standalone.sh ha_lsio.sh; do
-            echo "DEBUG: Checking for $SCRIPTS_DIR/$script"
-            if [ -f "$SCRIPTS_DIR/$script" ]; then
-              echo "DEBUG: Copying $script to $ADDON_DIR"
-              cp "$SCRIPTS_DIR/$script" "$ADDON_DIR/$script"
+          for script in .scripts/ha_automodules.sh .scripts/ha_autoapps.sh .scripts/ha_entrypoint.sh .scripts/bashiuo-standalone.sh .scripts/ha_lsio.sh; do
+            if [ -f "$script" ]; then
+              echo "Copying $(basename $script) to $ADDON/"
+              cp "$script" "$ADDON/"
             else
-              echo "DEBUG: $script not found in $SCRIPTS_DIR"
+              echo "Warning: $script not found"
             fi
           done
           
-          echo "DEBUG: Final addon directory contents:"
-          ls -la "$ADDON_DIR"
+          echo "Files in $ADDON directory:"
+          ls -la "$ADDON/"
 
       - name: Install build tools
         run: |
