@@ -111,13 +111,29 @@ jobs:
           
           echo "is_rebase=$IS_REBASE" >> $GITHUB_OUTPUT
           
-          # Check if upgrade branch already exists
-          BRANCH_NAME="upgrade/n8n-v$LATEST_VERSION"
-          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
-            BRANCH_EXISTS="true"
-            echo "Branch $BRANCH_NAME already exists"
+          # For rebase, find existing upgrade branch
+          if [[ "$IS_REBASE" == "true" ]]; then
+            # Find existing upgrade branch
+            EXISTING_BRANCH=$(git ls-remote --heads origin 'upgrade/n8n-*' | head -n1 | sed 's/.*refs\/heads\///')
+            if [[ -n "$EXISTING_BRANCH" ]]; then
+              BRANCH_NAME="$EXISTING_BRANCH"
+              BRANCH_EXISTS="true"
+              echo "Found existing branch for rebase: $BRANCH_NAME"
+            else
+              # No existing branch, create new one
+              BRANCH_NAME="upgrade/n8n-v$LATEST_VERSION"
+              BRANCH_EXISTS="false"
+              echo "No existing branch found, creating new one: $BRANCH_NAME"
+            fi
           else
-            BRANCH_EXISTS="false"
+            # Normal upgrade - check if branch already exists
+            BRANCH_NAME="upgrade/n8n-v$LATEST_VERSION"
+            if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+              BRANCH_EXISTS="true"
+              echo "Branch $BRANCH_NAME already exists"
+            else
+              BRANCH_EXISTS="false"
+            fi
           fi
           
           echo "branch_exists=$BRANCH_EXISTS" >> $GITHUB_OUTPUT
@@ -146,27 +162,53 @@ jobs:
           CURRENT_MONTH=$(date +%m)  # MM format
           CURRENT_MONTH=${CURRENT_MONTH#0}  # Remove leading zero
           
-          # Get current addon version and extract the patch number
-          CURRENT_ADDON_VERSION="${{ steps.current.outputs.config_version }}"
-          CURRENT_PATCH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f3)
-          
           # Check if this is a rebase
           IS_REBASE="${{ steps.branch_check.outputs.is_rebase }}"
           
-          # If year.month changed, reset patch to 1, otherwise increment
-          CURRENT_YEAR_MONTH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f1,2)
-          NEW_YEAR_MONTH="$CURRENT_YEAR.$CURRENT_MONTH"
-          
           if [ "$IS_REBASE" == "true" ]; then
-            # For rebase, reset patch to 1 to start fresh from main
-            NEW_PATCH=1
-            echo "Rebase detected - resetting patch to 1"
-          elif [ "$CURRENT_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
-            # Same month, increment patch
-            NEW_PATCH=$((CURRENT_PATCH + 1))
+            # For rebase, get version from main branch
+            git checkout main
+            MAIN_ADDON_VERSION=$(grep -E '^version:' n8n/config.yaml | sed 's/version: "//' | sed 's/"//')
+            MAIN_PATCH=$(echo $MAIN_ADDON_VERSION | cut -d. -f3)
+            
+            # Get current year and month for main version
+            CURRENT_YEAR=$(date +%y)  # YY format (26 for 2026)
+            CURRENT_MONTH=$(date +%m)  # MM format
+            CURRENT_MONTH=${CURRENT_MONTH#0}  # Remove leading zero
+            
+            MAIN_YEAR_MONTH=$(echo $MAIN_ADDON_VERSION | cut -d. -f1,2)
+            NEW_YEAR_MONTH="$CURRENT_YEAR.$CURRENT_MONTH"
+            
+            if [ "$MAIN_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
+              # Same month as main, increment main patch
+              NEW_PATCH=$((MAIN_PATCH + 1))
+            else
+              # New month, reset patch to 1
+              NEW_PATCH=1
+            fi
+            
+            echo "Rebase detected - using main version $MAIN_ADDON_VERSION as base, new patch: $NEW_PATCH"
           else
-            # New month, reset patch to 1
-            NEW_PATCH=1
+            # Normal upgrade - use current branch version
+            CURRENT_ADDON_VERSION="${{ steps.current.outputs.config_version }}"
+            CURRENT_PATCH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f3)
+            
+            # Get current year and month in correct format
+            CURRENT_YEAR=$(date +%y)  # YY format (26 for 2026)
+            CURRENT_MONTH=$(date +%m)  # MM format
+            CURRENT_MONTH=${CURRENT_MONTH#0}  # Remove leading zero
+            
+            # If year.month changed, reset patch to 1, otherwise increment
+            CURRENT_YEAR_MONTH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f1,2)
+            NEW_YEAR_MONTH="$CURRENT_YEAR.$CURRENT_MONTH"
+            
+            if [ "$CURRENT_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
+              # Same month, increment patch
+              NEW_PATCH=$((CURRENT_PATCH + 1))
+            else
+              # New month, reset patch to 1
+              NEW_PATCH=1
+            fi
           fi
           
           NEW_ADDON_VERSION="$NEW_YEAR_MONTH.$NEW_PATCH"
@@ -181,21 +223,25 @@ jobs:
           BRANCH_EXISTS="${{ steps.branch_check.outputs.branch_exists }}"
           IS_REBASE="${{ steps.branch_check.outputs.is_rebase }}"
           
-          if [[ "$BRANCH_EXISTS" == "true" && "$IS_REBASE" == "true" ]]; then
-            # For rebase, delete existing branch first
-            git push origin --delete "$BRANCH_NAME" || echo "Branch deletion failed or branch doesn't exist remotely"
-            BRANCH_EXISTS="false"
-          fi
-          
-          if [[ "$BRANCH_EXISTS" == "false" ]]; then
-            # Create new branch
-            git checkout -b "$BRANCH_NAME"
-            echo "Created new branch: $BRANCH_NAME"
-          else
+          if [[ "$IS_REBASE" == "true" && "$BRANCH_EXISTS" == "true" ]]; then
+            echo "Rebase triggered - rebasing existing branch from main"
+            # Checkout existing branch and rebase from main
+            git checkout "$BRANCH_NAME"
+            git pull origin "$BRANCH_NAME"
+            echo "Rebasing $BRANCH_NAME from main..."
+            git rebase origin/main
+            echo "Rebase completed"
+          elif [[ "$BRANCH_EXISTS" == "true" ]]; then
             # Checkout existing branch
             git checkout "$BRANCH_NAME"
             git pull origin "$BRANCH_NAME"
             echo "Checked out existing branch: $BRANCH_NAME"
+          else
+            # Create new branch from main
+            git checkout main
+            git pull origin main
+            git checkout -b "$BRANCH_NAME"
+            echo "Created new branch: $BRANCH_NAME from main"
           fi
           
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
