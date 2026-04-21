@@ -9,9 +9,6 @@ image: ghcr.io/legithubdetai/ha_addons/dev-dev-planka-{arch}
 arch:
   - aarch64
   - amd64
-  - armhf
-  - armv7
-  - i386
 startup: application
 boot: auto
 init: false

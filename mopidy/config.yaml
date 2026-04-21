@@ -7,10 +7,8 @@ url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/mopidy
 webui: http://[HOST]:[PORT:6680]/iris
 image: ghcr.io/legithubdetai/ha_addons/mopidy-{arch}
 arch:
-    - armv7
-    - armhf
+    - aarch64
     - amd64
-    - i386
 homeassistant: 0.115.0
 startup: system
 init: false
