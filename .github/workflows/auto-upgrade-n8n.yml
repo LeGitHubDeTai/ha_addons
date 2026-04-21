@@ -167,9 +167,12 @@ jobs:
           
           if [ "$IS_REBASE" == "true" ]; then
             # For rebase, get version from main branch
-            git checkout main
+            git fetch origin main
+            git checkout -b temp-main origin/main
             MAIN_ADDON_VERSION=$(grep -E '^version:' n8n/config.yaml | sed 's/version: "//' | sed 's/"//')
             MAIN_PATCH=$(echo $MAIN_ADDON_VERSION | cut -d. -f3)
+            git checkout "${{ steps.branch_check.outputs.branch_name }}"
+            git branch -D temp-main
             
             # Get current year and month for main version
             CURRENT_YEAR=$(date +%y)  # YY format (26 for 2026)
@@ -225,7 +228,8 @@ jobs:
           
           if [[ "$IS_REBASE" == "true" && "$BRANCH_EXISTS" == "true" ]]; then
             echo "Rebase triggered - rebasing existing branch from main"
-            # Checkout existing branch and rebase from main
+            # Fetch latest main and checkout existing branch
+            git fetch origin main
             git checkout "$BRANCH_NAME"
             git pull origin "$BRANCH_NAME"
             echo "Rebasing $BRANCH_NAME from main..."
@@ -238,9 +242,8 @@ jobs:
             echo "Checked out existing branch: $BRANCH_NAME"
           else
             # Create new branch from main
-            git checkout main
-            git pull origin main
-            git checkout -b "$BRANCH_NAME"
+            git fetch origin main
+            git checkout -b "$BRANCH_NAME" origin/main
             echo "Created new branch: $BRANCH_NAME from main"
           fi
           
