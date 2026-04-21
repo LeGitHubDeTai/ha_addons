@@ -6,6 +6,12 @@ on:
     # Run daily at 9:00 AM UTC
     - cron: '0 9 * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force recreate PR even if one already exists (closed/merged)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   auto-upgrade:
@@ -271,6 +277,8 @@ jobs:
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           IS_NEW_VERSION="${{ steps.compare.outputs.is_new_version }}"
           
+          FORCE_FLAG="${{ github.event.inputs.force }}"
+          
           # Check for open PR
           OPEN_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state open --json number --jq '.[0].number')
           # Check for any PR (open or closed) to avoid duplicates
@@ -303,8 +311,27 @@ jobs:
             fi
             
             echo "PR #$OPEN_PR updated successfully"
+          elif [ "$FORCE_FLAG" = "true" ]; then
+            echo "Force flag is set - creating new PR even if one existed before..."
+            # Create pull request using gh CLI (forced)
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "⬆️ n8n $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade n8n to version $LATEST_VERSION
+
+            **Changes:**
+            - Updated config.yaml addon version to $NEW_ADDON_VERSION
+            - Updated Dockerfile to use n8n@$LATEST_VERSION
+
+            **Release:** ${{ steps.latest.outputs.release_url }}
+
+            This PR was created automatically by the auto-upgrade workflow (forced recreation)." \
+              --label "auto-upgrade,dependencies,$RELEASE_TYPE"
+            
+            echo "PR created successfully (forced)"
           elif [ -n "$ANY_PR" ]; then
-            echo "PR #$ANY_PR already exists but is closed/merged - not creating duplicate"
+            echo "PR #$ANY_PR already exists but is closed/merged - not creating duplicate (use 'force' to recreate)"
           elif [ "$IS_NEW_VERSION" = "true" ]; then
             # Create pull request using gh CLI (only for new versions)
             gh pr create \
