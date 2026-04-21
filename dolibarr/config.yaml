@@ -7,10 +7,7 @@ url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/dolibarr
 webui: http://[HOST]:[PORT:8080]/
 image: ghcr.io/legithubdetai/ha_addons/dolibarr-{arch}
 arch:
-    - armv7
-    - armhf
     - amd64
-    - i386
 startup: services
 boot: auto
 init: false
