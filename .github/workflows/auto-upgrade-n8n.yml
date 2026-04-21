@@ -6,6 +6,12 @@ on:
     # Run daily at 9:00 AM UTC
     - cron: '0 9 * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force recreate PR even if one already exists (closed/merged)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   auto-upgrade:
@@ -37,40 +43,88 @@ jobs:
       - name: Get latest n8n release
         id: latest
         run: |
-          # Get all releases
-          RELEASES=$(curl -s https://api.github.com/repos/n8n-io/n8n/releases | jq -r '.[].tag_name')
+          # Use /releases/latest API to get the actual latest stable release
+          # This is the same as https://github.com/n8n-io/n8n/releases/latest
+          LATEST_RELEASE_DATA=$(curl -s "https://api.github.com/repos/n8n-io/n8n/releases/latest")
           
-          # Check if the first release is "stable" or "latest"
-          FIRST_RELEASE=$(echo "$RELEASES" | head -n1)
-          VERSION=$(echo $FIRST_RELEASE | sed 's/n8n@//')
+          # Extract release info
+          LATEST_RELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.tag_name')
+          LATEST_VERSION=$(echo "$LATEST_RELEASE" | sed 's/n8n@//')
+          IS_PRERELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.prerelease')
+          RELEASE_URL=$(echo "$LATEST_RELEASE_DATA" | jq -r '.html_url')
           
-          # If first release is "stable" or "latest", get the second one
-          if [[ "$VERSION" == "stable" || "$VERSION" == "latest" ]]; then
-            LATEST_RELEASE=$(echo "$RELEASES" | sed -n '2p')
+          # Determine release type label (should always be "latest" for this endpoint)
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            RELEASE_TYPE="pre-release"
           else
-            LATEST_RELEASE="$FIRST_RELEASE"
+            RELEASE_TYPE="latest"
           fi
-          
-          # Extract version number from tag (format: n8n@X.Y.Z)
-          LATEST_VERSION=$(echo $LATEST_RELEASE | sed 's/n8n@//')
           
           echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-          echo "release_url=$(curl -s https://api.github.com/repos/n8n-io/n8n/releases | jq -r ".[] | select(.tag_name==\"$LATEST_RELEASE\") | .html_url")" >> $GITHUB_OUTPUT
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
           
           echo "Latest release: $LATEST_RELEASE"
           echo "Latest version: $LATEST_VERSION"
+          echo "Release type: $RELEASE_TYPE"
 
-      - name: Compare versions
+      - name: Compare versions and check existing PRs
         id: compare
         run: |
           CURRENT_N8N_VERSION="${{ steps.current.outputs.dockerfile_version }}"
           LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
+          RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
           
-          # Compare versions using sort -V
+          # Check if this is a new version
+          IS_NEW_VERSION=false
           if [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_N8N_VERSION" | sort -V | head -n1)" = "$CURRENT_N8N_VERSION" ] && [ "$CURRENT_N8N_VERSION" != "$LATEST_VERSION" ]; then
+            IS_NEW_VERSION=true
+          fi
+          
+          # Check if there's an existing PR for this version with different release type
+          NEEDS_LABEL_UPDATE=false
+          EXISTING_PR=""
+          
+          if [ "$IS_NEW_VERSION" = "false" ]; then
+            # Look for existing PRs for this version
+            PR_LIST=$(gh pr list --search "n8n $LATEST_VERSION" --json number,labels,headRefName --jq '.[]')
+            
+            if [ -n "$PR_LIST" ]; then
+              while IFS= read -r pr; do
+                PR_NUMBER=$(echo "$pr" | jq -r '.number')
+                PR_LABELS=$(echo "$pr" | jq -r '.labels[].name')
+                PR_BRANCH=$(echo "$pr" | jq -r '.headRefName')
+                
+                # Check if PR has different release type label
+                if [ "$RELEASE_TYPE" = "latest" ] && echo "$PR_LABELS" | grep -q "pre-release"; then
+                  NEEDS_LABEL_UPDATE=true
+                  EXISTING_PR="$PR_NUMBER"
+                  EXISTING_BRANCH="$PR_BRANCH"
+                  echo "Found PR #$PR_NUMBER with pre-release label that needs update to latest"
+                  break
+                elif [ "$RELEASE_TYPE" = "pre-release" ] && echo "$PR_LABELS" | grep -q "latest"; then
+                  NEEDS_LABEL_UPDATE=true
+                  EXISTING_PR="$PR_NUMBER"
+                  EXISTING_BRANCH="$PR_BRANCH"
+                  echo "Found PR #$PR_NUMBER with latest label that needs update to pre-release"
+                  break
+                fi
+              done <<< "$PR_LIST"
+            fi
+          fi
+          
+          if [ "$IS_NEW_VERSION" = "true" ] || [ "$NEEDS_LABEL_UPDATE" = "true" ]; then
             echo "needs_upgrade=true" >> $GITHUB_OUTPUT
-            echo "New n8n version available: $LATEST_VERSION (current: $CURRENT_N8N_VERSION)"
+            echo "needs_label_update=$NEEDS_LABEL_UPDATE" >> $GITHUB_OUTPUT
+            echo "existing_pr=$EXISTING_PR" >> $GITHUB_OUTPUT
+            echo "existing_branch=$EXISTING_BRANCH" >> $GITHUB_OUTPUT
+            echo "is_new_version=$IS_NEW_VERSION" >> $GITHUB_OUTPUT
+            if [ "$IS_NEW_VERSION" = "true" ]; then
+              echo "New n8n version available: $LATEST_VERSION (current: $CURRENT_N8N_VERSION)"
+            else
+              echo "Release type changed to $RELEASE_TYPE for version $LATEST_VERSION"
+            fi
           else
             echo "needs_upgrade=false" >> $GITHUB_OUTPUT
             echo "Already up-to-date or no new version"
@@ -105,40 +159,87 @@ jobs:
           echo "new_addon_version=$NEW_ADDON_VERSION" >> $GITHUB_OUTPUT
           echo "New addon version: $NEW_ADDON_VERSION"
 
-      - name: Create upgrade branch
+      - name: Create or checkout upgrade branch
         id: branch
         if: steps.compare.outputs.needs_upgrade == 'true'
         run: |
-          BRANCH_NAME="upgrade/n8n-v${{ steps.latest.outputs.latest_version }}"
-          git checkout -b "$BRANCH_NAME"
+          # Use existing branch if we're just updating labels
+          if [ "${{ steps.compare.outputs.needs_label_update }}" = "true" ] && [ -n "${{ steps.compare.outputs.existing_branch }}" ]; then
+            BRANCH_NAME="${{ steps.compare.outputs.existing_branch }}"
+            echo "Using existing branch $BRANCH_NAME for label update"
+          else
+            BRANCH_NAME="upgrade/n8n-v${{ steps.latest.outputs.latest_version }}"
+          fi
+          
+          # Check if branch exists on remote
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME exists on remote, checking it out..."
+            git fetch origin "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME" origin/"$BRANCH_NAME"
+          else
+            echo "Creating new branch $BRANCH_NAME..."
+            git checkout -b "$BRANCH_NAME"
+          fi
+          
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Update config.yaml
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           # Update version in config.yaml with new addon version
           sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" n8n/config.yaml
           echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
 
       - name: Update Dockerfile
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           # Update version in Dockerfile
           sed -i "s/npm install -g n8n@.*/npm install -g n8n@${{ steps.latest.outputs.latest_version }}/" n8n/Dockerfile
           echo "Updated Dockerfile version to ${{ steps.latest.outputs.latest_version }}"
 
       - name: Commit changes
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add n8n/config.yaml n8n/Dockerfile
-          git commit -m "⬆️ Upgrade n8n to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+          FORCE_FLAG="${{ github.event.inputs.force }}"
+          
+          # Check if there are changes to commit
+          if git diff --cached --quiet; then
+            if [ "$FORCE_FLAG" = "true" ]; then
+              echo "No changes but force flag is set - creating empty commit"
+              git commit --allow-empty -m "⬆️ Force recreate PR for n8n ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+            else
+              echo "No changes to commit - n8n version is already up to date on this branch"
+              exit 0
+            fi
+          else
+            git commit -m "⬆️ Upgrade n8n to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+          fi
 
       - name: Push branch
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
-          git push origin "${{ steps.branch.outputs.branch_name }}"
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          FORCE_FLAG="${{ github.event.inputs.force }}"
+          
+          # Check if there are commits to push (avoids error when no changes)
+          if [ "$FORCE_FLAG" != "true" ] && (git diff --quiet HEAD origin/"$BRANCH_NAME" 2>/dev/null || [ -z "$(git log origin/"$BRANCH_NAME"..HEAD 2>/dev/null)" ]); then
+            echo "No new commits to push - branch is up to date"
+            exit 0
+          fi
+          
+          # Check if branch exists on remote
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME exists on remote, force-pushing updates..."
+            # Fetch the remote branch to avoid stale info error
+            git fetch origin "$BRANCH_NAME" || true
+            git push origin "$BRANCH_NAME" --force
+          else
+            echo "Creating new branch $BRANCH_NAME..."
+            git push origin "$BRANCH_NAME"
+          fi
 
       - name: Setup GitHub CLI
         if: steps.compare.outputs.needs_upgrade == 'true'
@@ -155,32 +256,92 @@ jobs:
           # Verify installation
           gh --version
 
-      - name: Create Pull Request
+      - name: Create or Update Pull Request
         if: steps.compare.outputs.needs_upgrade == 'true'
         run: |
           # Debug: show current branch and repo info
           echo "Current branch: $(git branch --show-current)"
           echo "Remote URL: $(git remote get-url origin)"
           
-          # Check if PR already exists
-          if gh pr list --head "${{ steps.branch.outputs.branch_name }}" --base main | grep -q "${{ steps.branch.outputs.branch_name }}"; then
-            echo "PR already exists, skipping creation"
-          else
-            # Create pull request using gh CLI
+          LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
+          NEW_ADDON_VERSION="${{ steps.addon_version.outputs.new_addon_version }}"
+          RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          IS_NEW_VERSION="${{ steps.compare.outputs.is_new_version }}"
+          
+          FORCE_FLAG="${{ github.event.inputs.force }}"
+          
+          # Check for open PR
+          OPEN_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state open --json number --jq '.[0].number')
+          # Check for any PR (open or closed) to avoid duplicates
+          ANY_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state all --json number --jq '.[0].number')
+          
+          if [ -n "$OPEN_PR" ]; then
+            echo "Open PR #$OPEN_PR found, updating labels..."
+            
+            # Get current labels
+            CURRENT_LABELS=$(gh pr view "$OPEN_PR" --json labels --jq '.labels[].name')
+            echo "Current labels: $CURRENT_LABELS"
+            
+            # Check if PR has pre-release or latest label and needs update
+            if echo "$CURRENT_LABELS" | grep -q "pre-release\|latest"; then
+              # Remove old release type and add new one
+              gh pr edit "$OPEN_PR" --remove-label "pre-release,latest" 2>/dev/null || true
+            fi
+            
+            # Add the correct release type label
+            gh pr edit "$OPEN_PR" --add-label "$RELEASE_TYPE"
+            
+            # Update title if needed (only for new versions)
+            if [ "$IS_NEW_VERSION" = "true" ]; then
+              CURRENT_TITLE=$(gh pr view "$OPEN_PR" --json title --jq '.title')
+              NEW_TITLE="⬆️ n8n $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
+              if [ "$CURRENT_TITLE" != "$NEW_TITLE" ]; then
+                gh pr edit "$OPEN_PR" --title "$NEW_TITLE"
+                echo "Updated PR title to: $NEW_TITLE"
+              fi
+            fi
+            
+            echo "PR #$OPEN_PR updated successfully"
+          elif [ "$FORCE_FLAG" = "true" ]; then
+            echo "Force flag is set - creating new PR even if one existed before..."
+            # Create pull request using gh CLI (forced)
             gh pr create \
               --base main \
-              --head "${{ steps.branch.outputs.branch_name }}" \
-              --title "⬆️ n8n ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})" \
-              --body "Auto-upgrade n8n to version ${{ steps.latest.outputs.latest_version }}
+              --head "$BRANCH_NAME" \
+              --title "⬆️ n8n $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade n8n to version $LATEST_VERSION
 
             **Changes:**
-            - Updated config.yaml addon version to ${{ steps.addon_version.outputs.new_addon_version }}
-            - Updated Dockerfile to use n8n@${{ steps.latest.outputs.latest_version }}
+            - Updated config.yaml addon version to $NEW_ADDON_VERSION
+            - Updated Dockerfile to use n8n@$LATEST_VERSION
+
+            **Release:** ${{ steps.latest.outputs.release_url }}
+
+            This PR was created automatically by the auto-upgrade workflow (forced recreation)." \
+              --label "auto-upgrade,dependencies,$RELEASE_TYPE"
+            
+            echo "PR created successfully (forced)"
+          elif [ -n "$ANY_PR" ]; then
+            echo "PR #$ANY_PR already exists but is closed/merged - not creating duplicate (use 'force' to recreate)"
+          elif [ "$IS_NEW_VERSION" = "true" ]; then
+            # Create pull request using gh CLI (only for new versions)
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "⬆️ n8n $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade n8n to version $LATEST_VERSION
+
+            **Changes:**
+            - Updated config.yaml addon version to $NEW_ADDON_VERSION
+            - Updated Dockerfile to use n8n@$LATEST_VERSION
 
             **Release:** ${{ steps.latest.outputs.release_url }}
 
             This PR was created automatically by the auto-upgrade workflow." \
-              --label "auto-upgrade,dependencies"
+              --label "auto-upgrade,dependencies,$RELEASE_TYPE"
             
             echo "PR created successfully"
+          else
+            echo "No new version and no open PR - nothing to do"
           fi

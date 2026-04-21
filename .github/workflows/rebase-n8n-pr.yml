@@ -1,0 +1,155 @@
+name: Rebase n8n PR
+
+# Workflow to rebuild an auto-upgrade PR with a new version number from main
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [labeled]
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, 'rebase')) ||
+      (github.event_name == 'pull_request' && contains(github.event.label.name, 'rebase'))
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Get PR info
+        id: pr_info
+        run: |
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            PR_NUMBER="${{ github.event.issue.number }}"
+          else
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup GitHub CLI
+        run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh -y
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Get PR details
+        id: pr_details
+        run: |
+          PR_DATA=$(gh pr view ${{ steps.pr_info.outputs.pr_number }} --json headRefName,labels,title,body)
+          HEAD_BRANCH=$(echo "$PR_DATA" | jq -r '.headRefName')
+          LABELS=$(echo "$PR_DATA" | jq -r '.labels[].name')
+          
+          # Check if PR has auto-upgrade label
+          if ! echo "$LABELS" | grep -q "auto-upgrade"; then
+            echo "PR does not have 'auto-upgrade' label, skipping"
+            echo "should_rebase=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "head_branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
+          echo "should_rebase=true" >> $GITHUB_OUTPUT
+
+      - name: Checkout PR branch
+        if: steps.pr_details.outputs.should_rebase == 'true'
+        run: |
+          git checkout ${{ steps.pr_details.outputs.head_branch }}
+
+      - name: Get versions from main and PR
+        id: versions
+        if: steps.pr_details.outputs.should_rebase == 'true'
+        run: |
+          # Get main branch config version
+          git fetch origin main
+          MAIN_CONFIG_VERSION=$(git show origin/main:n8n/config.yaml | grep -E '^version:' | sed 's/version: "//' | sed 's/"//')
+          echo "main_config_version=$MAIN_CONFIG_VERSION" >> $GITHUB_OUTPUT
+          
+          # Get current PR n8n version from Dockerfile
+          PR_N8N_VERSION=$(grep -E 'npm install -g n8n@' n8n/Dockerfile | sed 's/.*n8n@//' | sed 's/[[:space:]].*//')
+          echo "pr_n8n_version=$PR_N8N_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "Main config version: $MAIN_CONFIG_VERSION"
+          echo "PR n8n version: $PR_N8N_VERSION"
+
+      - name: Generate new addon version
+        id: addon_version
+        if: steps.pr_details.outputs.should_rebase == 'true'
+        run: |
+          # Get current year and month
+          CURRENT_YEAR=$(date +%y)
+          CURRENT_MONTH=$(date +%m)
+          CURRENT_MONTH=${CURRENT_MONTH#0}
+          NEW_YEAR_MONTH="$CURRENT_YEAR.$CURRENT_MONTH"
+          
+          # Get main addon version and extract the patch number
+          MAIN_ADDON_VERSION="${{ steps.versions.outputs.main_config_version }}"
+          MAIN_YEAR_MONTH=$(echo $MAIN_ADDON_VERSION | cut -d. -f1,2)
+          MAIN_PATCH=$(echo $MAIN_ADDON_VERSION | cut -d. -f3)
+          
+          # Calculate new version based on main
+          if [ "$MAIN_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
+            # Same month, increment patch from main
+            NEW_PATCH=$((MAIN_PATCH + 1))
+          else
+            # New month, start from 1
+            NEW_PATCH=1
+          fi
+          
+          NEW_ADDON_VERSION="$NEW_YEAR_MONTH.$NEW_PATCH"
+          echo "new_addon_version=$NEW_ADDON_VERSION" >> $GITHUB_OUTPUT
+          echo "New addon version: $NEW_ADDON_VERSION"
+
+      - name: Update config.yaml
+        if: steps.pr_details.outputs.should_rebase == 'true'
+        run: |
+          sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" n8n/config.yaml
+          echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
+
+      - name: Commit and force push changes
+        if: steps.pr_details.outputs.should_rebase == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add n8n/config.yaml
+          
+          # Check if there are changes to commit
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          git commit --amend --no-edit
+          git push origin HEAD --force-with-lease
+
+      - name: Update PR title and body
+        if: steps.pr_details.outputs.should_rebase == 'true'
+        run: |
+          PR_N8N_VERSION="${{ steps.versions.outputs.pr_n8n_version }}"
+          NEW_ADDON_VERSION="${{ steps.addon_version.outputs.new_addon_version }}"
+          
+          # Update PR title
+          gh pr edit ${{ steps.pr_info.outputs.pr_number }} \
+            --title "⬆️ n8n ${PR_N8N_VERSION} (addon ${NEW_ADDON_VERSION})"
+          
+          # Get current body and update version references
+          CURRENT_BODY=$(gh pr view ${{ steps.pr_info.outputs.pr_number }} --json body -q '.body')
+          
+          # Update version references in body (simple replacement)
+          NEW_BODY=$(echo "$CURRENT_BODY" | sed -E "s/addon [0-9]+\.[0-9]+\.[0-9]+/addon ${NEW_ADDON_VERSION}/g" | sed -E "s/version to [0-9]+\.[0-9]+\.[0-9]+/version to ${NEW_ADDON_VERSION}/g")
+          
+          gh pr edit ${{ steps.pr_info.outputs.pr_number }} --body "$NEW_BODY"
+
+      - name: Remove rebase label
+        if: steps.pr_details.outputs.should_rebase == 'true'
+        run: |
+          # Remove rebase label if present
+          gh pr edit ${{ steps.pr_info.outputs.pr_number }} --remove-label "rebase" || true
