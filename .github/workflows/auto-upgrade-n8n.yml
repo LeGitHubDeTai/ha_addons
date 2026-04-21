@@ -287,7 +287,7 @@ jobs:
           
           if [[ "$IS_REBASE" == "true" ]]; then
             echo "Force pushing rebased branch..."
-            git push origin "$BRANCH_NAME" --force-with-lease
+            git push origin "$BRANCH_NAME" --force
           else
             echo "Pushing branch..."
             # Try normal push first, if it fails pull and push again
