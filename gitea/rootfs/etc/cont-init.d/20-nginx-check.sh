@@ -43,6 +43,18 @@ fi
 echo "[DEBUG] Testing nginx configuration..."
 nginx -t 2>&1 || echo "[DEBUG] nginx -t failed (will be checked again by service)"
 
+# Try to start nginx manually to test
+echo "[DEBUG] Attempting to start nginx manually..."
+mkdir -p /var/log/nginx /var/cache/nginx
+nginx -g 'daemon off;' &
+sleep 2
+if pgrep nginx > /dev/null; then
+    echo "[DEBUG] Nginx started successfully!"
+    pkill nginx
+else
+    echo "[DEBUG] Nginx failed to start"
+fi
+
 echo "[DEBUG] ==========================================="
 echo "[DEBUG] Nginx check complete"
 echo "[DEBUG] ==========================================="
