@@ -59,9 +59,23 @@ EOF
 if [ -f /etc/nginx/nginx.conf ]; then
     # Check if conf.d is included
     if ! grep -q "conf.d" /etc/nginx/nginx.conf; then
-        # Add conf.d include
-        sed -i '/http {/a \    include /etc/nginx/conf.d/*.conf;' /etc/nginx/nginx.conf || true
+        # Add conf.d include inside http block (before closing brace)
+        # Find the http block and add include before its closing brace
+        awk '
+            /^http \{/ { in_http = 1 }
+            in_http && /^\}/ && !done {
+                print "    include /etc/nginx/conf.d/*.conf;"
+                done = 1
+            }
+            { print }
+        ' /etc/nginx/nginx.conf > /etc/nginx/nginx.conf.new && mv /etc/nginx/nginx.conf.new /etc/nginx/nginx.conf
     fi
+fi
+
+# Test nginx configuration
+if ! nginx -t 2>&1; then
+    bashio::log.error "Nginx configuration test failed"
+    exit 1
 fi
 
 bashio::log.info "Nginx ingress configured on port ${INGRESS_PORT}"
