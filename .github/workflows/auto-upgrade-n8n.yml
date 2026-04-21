@@ -199,41 +199,48 @@ jobs:
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Update config.yaml
-        if: steps.compare.outputs.needs_upgrade == 'true' && steps.compare.outputs.is_new_version == 'true'
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           # Update version in config.yaml with new addon version
           sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" n8n/config.yaml
           echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
 
       - name: Update Dockerfile
-        if: steps.compare.outputs.needs_upgrade == 'true' && steps.compare.outputs.is_new_version == 'true'
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           # Update version in Dockerfile
           sed -i "s/npm install -g n8n@.*/npm install -g n8n@${{ steps.latest.outputs.latest_version }}/" n8n/Dockerfile
           echo "Updated Dockerfile version to ${{ steps.latest.outputs.latest_version }}"
 
       - name: Commit changes
-        if: steps.compare.outputs.needs_upgrade == 'true' && steps.compare.outputs.is_new_version == 'true'
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add n8n/config.yaml n8n/Dockerfile
+          FORCE_FLAG="${{ github.event.inputs.force }}"
           
           # Check if there are changes to commit
           if git diff --cached --quiet; then
-            echo "No changes to commit - n8n version is already up to date on this branch"
-            exit 0
+            if [ "$FORCE_FLAG" = "true" ]; then
+              echo "No changes but force flag is set - creating empty commit"
+              git commit --allow-empty -m "⬆️ Force recreate PR for n8n ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+            else
+              echo "No changes to commit - n8n version is already up to date on this branch"
+              exit 0
+            fi
+          else
+            git commit -m "⬆️ Upgrade n8n to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
           fi
-          
-          git commit -m "⬆️ Upgrade n8n to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
 
       - name: Push branch
-        if: steps.compare.outputs.needs_upgrade == 'true' && steps.compare.outputs.is_new_version == 'true'
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          FORCE_FLAG="${{ github.event.inputs.force }}"
           
           # Check if there are commits to push (avoids error when no changes)
-          if git diff --quiet HEAD origin/"$BRANCH_NAME" 2>/dev/null || [ -z "$(git log origin/"$BRANCH_NAME"..HEAD 2>/dev/null)" ]; then
+          if [ "$FORCE_FLAG" != "true" ] && (git diff --quiet HEAD origin/"$BRANCH_NAME" 2>/dev/null || [ -z "$(git log origin/"$BRANCH_NAME"..HEAD 2>/dev/null)" ]); then
             echo "No new commits to push - branch is up to date"
             exit 0
           fi
