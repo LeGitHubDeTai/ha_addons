@@ -43,32 +43,17 @@ jobs:
       - name: Get latest n8n release
         id: latest
         run: |
-          # Get all releases and find the first valid one (not stable/latest tag)
-          RAW_RELEASES=$(curl -s "https://api.github.com/repos/n8n-io/n8n/releases?per_page=20")
+          # Use /releases/latest API to get the actual latest stable release
+          # This is the same as https://github.com/n8n-io/n8n/releases/latest
+          LATEST_RELEASE_DATA=$(curl -s "https://api.github.com/repos/n8n-io/n8n/releases/latest")
           
-          # Find the first release that is not "stable" or "latest" tag
-          LATEST_RELEASE=""
-          IS_PRERELEASE="false"
+          # Extract release info
+          LATEST_RELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.tag_name')
+          LATEST_VERSION=$(echo "$LATEST_RELEASE" | sed 's/n8n@//')
+          IS_PRERELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.prerelease')
+          RELEASE_URL=$(echo "$LATEST_RELEASE_DATA" | jq -r '.html_url')
           
-          for row in $(echo "$RAW_RELEASES" | jq -r '.[] | @base64'); do
-            _jq() {
-              echo "$row" | base64 --decode | jq -r "$1"
-            }
-            
-            tag=$(_jq '.tag_name')
-            VERSION=$(echo $tag | sed 's/n8n@//')
-            
-            if [[ "$VERSION" != "stable" && "$VERSION" != "latest" ]]; then
-              LATEST_RELEASE="$tag"
-              IS_PRERELEASE=$(_jq '.prerelease')
-              break
-            fi
-          done
-          
-          # Extract version number from tag (format: n8n@X.Y.Z)
-          LATEST_VERSION=$(echo $LATEST_RELEASE | sed 's/n8n@//')
-          
-          # Determine release type label
+          # Determine release type label (should always be "latest" for this endpoint)
           if [ "$IS_PRERELEASE" = "true" ]; then
             RELEASE_TYPE="pre-release"
           else
@@ -78,7 +63,7 @@ jobs:
           echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
           echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
-          echo "release_url=$(echo "$RAW_RELEASES" | jq -r ".[] | select(.tag_name==\"$LATEST_RELEASE\") | .html_url")" >> $GITHUB_OUTPUT
+          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
           
           echo "Latest release: $LATEST_RELEASE"
           echo "Latest version: $LATEST_VERSION"
