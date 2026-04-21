@@ -3,13 +3,13 @@
 
 set -e
 
-# Wait for Nginx configuration to be ready
-until [ -f /etc/nginx/conf.d/ingress.conf ]; do
-    bashio::log.info "Waiting for Nginx configuration..."
-    sleep 1
-done
-
 bashio::log.info "Starting Nginx for Home Assistant ingress..."
+
+# Test nginx configuration first
+if ! nginx -t; then
+    bashio::log.error "Nginx configuration test failed"
+    exit 1
+fi
 
 # Start Nginx
 exec nginx -g 'daemon off;'

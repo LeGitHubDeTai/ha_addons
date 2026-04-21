@@ -1,5 +1,5 @@
 name: Gitea
-version: "26.4.2.3"
+version: "26.4.2.4"
 slug: gitea
 description: Gitea for Home Assistant
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/gitea
@@ -15,11 +15,9 @@ ingress_stream: false
 ports:
   22/tcp: 2222
   3000/tcp: 3000
-  8099/tcp: null
 ports_description:
   22/tcp: ssh
   3000/tcp: Web interface
-  8099/tcp: Ingress Nginx proxy
 map:
   - addon_config:rw
   - share:rw

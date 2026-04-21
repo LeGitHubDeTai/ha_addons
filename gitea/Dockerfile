@@ -13,6 +13,9 @@ USER root
 COPY rootfs/ /
 RUN find . -type f \( -name "*.sh" -o -name "run" -o -name "finish" \) -print -exec chmod +x {} \;
 
+# Copy nginx configuration for ingress
+COPY nginx.conf /etc/nginx/nginx.conf
+
 # Uses /bin for compatibility purposes
 # hadolint ignore=DL4005
 RUN if [ ! -f /bin/sh ] && [ -f /usr/bin/sh ]; then ln -s /usr/bin/sh /bin/sh; fi && \
