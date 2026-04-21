@@ -269,6 +269,7 @@ jobs:
           NEW_ADDON_VERSION="${{ steps.addon_version.outputs.new_addon_version }}"
           RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          IS_NEW_VERSION="${{ steps.compare.outputs.is_new_version }}"
           
           # Check if PR already exists
           EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --base main --json number --jq '.[0].number')
@@ -292,17 +293,19 @@ jobs:
             # Add the correct release type label
             gh pr edit "$EXISTING_PR" --add-label "$RELEASE_TYPE"
             
-            # Update title if needed
-            CURRENT_TITLE=$(gh pr view "$EXISTING_PR" --json title --jq '.title')
-            NEW_TITLE="⬆️ n8n $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
-            if [ "$CURRENT_TITLE" != "$NEW_TITLE" ]; then
-              gh pr edit "$EXISTING_PR" --title "$NEW_TITLE"
-              echo "Updated PR title to: $NEW_TITLE"
+            # Update title if needed (only for new versions)
+            if [ "$IS_NEW_VERSION" = "true" ]; then
+              CURRENT_TITLE=$(gh pr view "$EXISTING_PR" --json title --jq '.title')
+              NEW_TITLE="⬆️ n8n $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
+              if [ "$CURRENT_TITLE" != "$NEW_TITLE" ]; then
+                gh pr edit "$EXISTING_PR" --title "$NEW_TITLE"
+                echo "Updated PR title to: $NEW_TITLE"
+              fi
             fi
             
             echo "PR #$EXISTING_PR updated successfully"
-          else
-            # Create pull request using gh CLI
+          elif [ "$IS_NEW_VERSION" = "true" ]; then
+            # Create pull request using gh CLI (only for new versions)
             gh pr create \
               --base main \
               --head "$BRANCH_NAME" \
@@ -319,4 +322,6 @@ jobs:
               --label "auto-upgrade,dependencies,$RELEASE_TYPE"
             
             echo "PR created successfully"
+          else
+            echo "No new version and no existing PR - nothing to do"
           fi
