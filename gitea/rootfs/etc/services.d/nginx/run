@@ -3,7 +3,14 @@
 
 set -e
 
-bashio::log.info "Starting Nginx for Home Assistant ingress..."
+bashio::log.info "Waiting for Gitea to be ready..."
+
+# Wait for Gitea to be ready on port 3000
+until nc -z localhost 3000 || nc -z 127.0.0.1 3000; do
+    sleep 2
+done
+
+bashio::log.info "Gitea is ready, starting Nginx for Home Assistant ingress..."
 
 # Test nginx configuration first
 if ! nginx -t; then
