@@ -3,6 +3,11 @@
 
 set -e
 
+# Debug output
+echo "[DEBUG] Nginx service script starting..."
+echo "[DEBUG] Checking bashio availability..."
+type bashio || echo "[DEBUG] bashio not found in PATH"
+
 bashio::log.info "Waiting for Gitea to be ready on port 3000..."
 
 # Wait for Gitea to be ready on port 3000 (using bash built-in)
