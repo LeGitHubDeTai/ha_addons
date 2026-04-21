@@ -122,12 +122,22 @@ jobs:
           echo "new_addon_version=$NEW_ADDON_VERSION" >> $GITHUB_OUTPUT
           echo "New addon version: $NEW_ADDON_VERSION"
 
-      - name: Create upgrade branch
+      - name: Create or checkout upgrade branch
         id: branch
         if: steps.compare.outputs.needs_upgrade == 'true'
         run: |
           BRANCH_NAME="upgrade/n8n-v${{ steps.latest.outputs.latest_version }}"
-          git checkout -b "$BRANCH_NAME"
+          
+          # Check if branch exists on remote
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME exists on remote, checking it out..."
+            git fetch origin "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME" origin/"$BRANCH_NAME"
+          else
+            echo "Creating new branch $BRANCH_NAME..."
+            git checkout -b "$BRANCH_NAME"
+          fi
+          
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Update config.yaml
