@@ -271,39 +271,40 @@ jobs:
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           IS_NEW_VERSION="${{ steps.compare.outputs.is_new_version }}"
           
-          # Check if PR already exists
-          EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --base main --json number --jq '.[0].number')
+          # Check for open PR
+          OPEN_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state open --json number --jq '.[0].number')
+          # Check for any PR (open or closed) to avoid duplicates
+          ANY_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state all --json number --jq '.[0].number')
           
-          if [ -n "$EXISTING_PR" ]; then
-            echo "PR #$EXISTING_PR already exists, updating labels..."
+          if [ -n "$OPEN_PR" ]; then
+            echo "Open PR #$OPEN_PR found, updating labels..."
             
             # Get current labels
-            CURRENT_LABELS=$(gh pr view "$EXISTING_PR" --json labels --jq '.labels[].name')
+            CURRENT_LABELS=$(gh pr view "$OPEN_PR" --json labels --jq '.labels[].name')
             echo "Current labels: $CURRENT_LABELS"
-            
-            # Build new labels: keep auto-upgrade and dependencies, remove old release type labels, add new one
-            NEW_LABELS="auto-upgrade,dependencies"
             
             # Check if PR has pre-release or latest label and needs update
             if echo "$CURRENT_LABELS" | grep -q "pre-release\|latest"; then
               # Remove old release type and add new one
-              gh pr edit "$EXISTING_PR" --remove-label "pre-release,latest" 2>/dev/null || true
+              gh pr edit "$OPEN_PR" --remove-label "pre-release,latest" 2>/dev/null || true
             fi
             
             # Add the correct release type label
-            gh pr edit "$EXISTING_PR" --add-label "$RELEASE_TYPE"
+            gh pr edit "$OPEN_PR" --add-label "$RELEASE_TYPE"
             
             # Update title if needed (only for new versions)
             if [ "$IS_NEW_VERSION" = "true" ]; then
-              CURRENT_TITLE=$(gh pr view "$EXISTING_PR" --json title --jq '.title')
+              CURRENT_TITLE=$(gh pr view "$OPEN_PR" --json title --jq '.title')
               NEW_TITLE="⬆️ n8n $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
               if [ "$CURRENT_TITLE" != "$NEW_TITLE" ]; then
-                gh pr edit "$EXISTING_PR" --title "$NEW_TITLE"
+                gh pr edit "$OPEN_PR" --title "$NEW_TITLE"
                 echo "Updated PR title to: $NEW_TITLE"
               fi
             fi
             
-            echo "PR #$EXISTING_PR updated successfully"
+            echo "PR #$OPEN_PR updated successfully"
+          elif [ -n "$ANY_PR" ]; then
+            echo "PR #$ANY_PR already exists but is closed/merged - not creating duplicate"
           elif [ "$IS_NEW_VERSION" = "true" ]; then
             # Create pull request using gh CLI (only for new versions)
             gh pr create \
@@ -323,5 +324,5 @@ jobs:
             
             echo "PR created successfully"
           else
-            echo "No new version and no existing PR - nothing to do"
+            echo "No new version and no open PR - nothing to do"
           fi
