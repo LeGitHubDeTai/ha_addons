@@ -6,6 +6,21 @@ on:
     # Run daily at 9:00 AM UTC
     - cron: '0 9 * * *'
   workflow_dispatch:
+    inputs:
+      rebase:
+        description: 'Force rebase from main (reset version)'
+        required: false
+        default: false
+        type: boolean
+      update_labels:
+        description: 'Update all existing PR labels only (no new PR creation)'
+        required: false
+        default: false
+        type: boolean
+  pull_request:
+    types: [labeled, closed]
+    paths:
+      - 'n8n/**'
 
 jobs:
   auto-upgrade:
@@ -13,6 +28,11 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    if: | 
+      github.event_name == 'schedule' || 
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'pull_request' && contains(github.event.label.name, 'rebase')) ||
+      github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout repository
@@ -37,48 +57,89 @@ jobs:
       - name: Get latest n8n release
         id: latest
         run: |
-          # Get all releases
-          RELEASES=$(curl -s https://api.github.com/repos/n8n-io/n8n/releases | jq -r '.[].tag_name')
+          # Get all releases with prerelease info
+          RELEASES_JSON=$(curl -s https://api.github.com/repos/n8n-io/n8n/releases)
           
-          # Check if the first release is "stable" or "latest"
-          FIRST_RELEASE=$(echo "$RELEASES" | head -n1)
-          VERSION=$(echo $FIRST_RELEASE | sed 's/n8n@//')
+          # Find the latest stable (non-prerelease) release
+          LATEST_STABLE_RELEASE=$(echo "$RELEASES_JSON" | jq -r '[.[] | select(.prerelease == false)] | .[0].tag_name')
           
-          # If first release is "stable" or "latest", get the second one
-          if [[ "$VERSION" == "stable" || "$VERSION" == "latest" ]]; then
-            LATEST_RELEASE=$(echo "$RELEASES" | sed -n '2p')
+          # Find the latest release (including prereleases)
+          LATEST_ANY_RELEASE=$(echo "$RELEASES_JSON" | jq -r '.[0].tag_name')
+          
+          # Check if latest any release is a prerelease
+          IS_PRERELEASE=$(echo "$RELEASES_JSON" | jq -r ".[0] | select(.tag_name == \"$LATEST_ANY_RELEASE\") | .prerelease")
+          
+          # Determine which release to use
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            # Latest is prerelease, use it
+            LATEST_RELEASE="$LATEST_ANY_RELEASE"
+            RELEASE_TYPE="prerelease"
           else
-            LATEST_RELEASE="$FIRST_RELEASE"
+            # Latest is stable, use it
+            LATEST_RELEASE="$LATEST_STABLE_RELEASE"
+            RELEASE_TYPE="stable"
           fi
           
           # Extract version number from tag (format: n8n@X.Y.Z)
           LATEST_VERSION=$(echo $LATEST_RELEASE | sed 's/n8n@//')
           
+          # Get release URL
+          RELEASE_URL=$(echo "$RELEASES_JSON" | jq -r ".[] | select(.tag_name==\"$LATEST_RELEASE\") | .html_url")
+          
           echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-          echo "release_url=$(curl -s https://api.github.com/repos/n8n-io/n8n/releases | jq -r ".[] | select(.tag_name==\"$LATEST_RELEASE\") | .html_url")" >> $GITHUB_OUTPUT
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
           
           echo "Latest release: $LATEST_RELEASE"
           echo "Latest version: $LATEST_VERSION"
+          echo "Release type: $RELEASE_TYPE"
 
-      - name: Compare versions
-        id: compare
+      - name: Check existing branches and determine action
+        id: branch_check
         run: |
           CURRENT_N8N_VERSION="${{ steps.current.outputs.dockerfile_version }}"
           LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
           
-          # Compare versions using sort -V
-          if [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_N8N_VERSION" | sort -V | head -n1)" = "$CURRENT_N8N_VERSION" ] && [ "$CURRENT_N8N_VERSION" != "$LATEST_VERSION" ]; then
-            echo "needs_upgrade=true" >> $GITHUB_OUTPUT
+          # Check if this is a rebase trigger
+          IS_REBASE="false"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.rebase }}" == "true" ]]; then
+            IS_REBASE="true"
+          elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.label.name }}" == "rebase" ]]; then
+            IS_REBASE="true"
+          fi
+          
+          echo "is_rebase=$IS_REBASE" >> $GITHUB_OUTPUT
+          
+          # Check if upgrade branch already exists
+          BRANCH_NAME="upgrade/n8n-v$LATEST_VERSION"
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            BRANCH_EXISTS="true"
+            echo "Branch $BRANCH_NAME already exists"
+          else
+            BRANCH_EXISTS="false"
+          fi
+          
+          echo "branch_exists=$BRANCH_EXISTS" >> $GITHUB_OUTPUT
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          
+          # Determine if upgrade is needed
+          NEEDS_UPGRADE="false"
+          if [[ "$IS_REBASE" == "true" ]]; then
+            NEEDS_UPGRADE="true"
+            echo "Rebase triggered - forcing upgrade"
+          elif [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_N8N_VERSION" | sort -V | head -n1)" = "$CURRENT_N8N_VERSION" ] && [ "$CURRENT_N8N_VERSION" != "$LATEST_VERSION" ]; then
+            NEEDS_UPGRADE="true"
             echo "New n8n version available: $LATEST_VERSION (current: $CURRENT_N8N_VERSION)"
           else
-            echo "needs_upgrade=false" >> $GITHUB_OUTPUT
             echo "Already up-to-date or no new version"
           fi
+          
+          echo "needs_upgrade=$NEEDS_UPGRADE" >> $GITHUB_OUTPUT
 
       - name: Generate new addon version
         id: addon_version
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.branch_check.outputs.needs_upgrade == 'true'
         run: |
           # Get current year and month in correct format
           CURRENT_YEAR=$(date +%y)  # YY format (26 for 2026)
@@ -89,11 +150,18 @@ jobs:
           CURRENT_ADDON_VERSION="${{ steps.current.outputs.config_version }}"
           CURRENT_PATCH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f3)
           
+          # Check if this is a rebase
+          IS_REBASE="${{ steps.branch_check.outputs.is_rebase }}"
+          
           # If year.month changed, reset patch to 1, otherwise increment
           CURRENT_YEAR_MONTH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f1,2)
           NEW_YEAR_MONTH="$CURRENT_YEAR.$CURRENT_MONTH"
           
-          if [ "$CURRENT_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
+          if [ "$IS_REBASE" == "true" ]; then
+            # For rebase, reset patch to 1 to start fresh from main
+            NEW_PATCH=1
+            echo "Rebase detected - resetting patch to 1"
+          elif [ "$CURRENT_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
             # Same month, increment patch
             NEW_PATCH=$((CURRENT_PATCH + 1))
           else
@@ -105,43 +173,76 @@ jobs:
           echo "new_addon_version=$NEW_ADDON_VERSION" >> $GITHUB_OUTPUT
           echo "New addon version: $NEW_ADDON_VERSION"
 
-      - name: Create upgrade branch
+      - name: Handle upgrade branch
         id: branch
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.branch_check.outputs.needs_upgrade == 'true'
         run: |
-          BRANCH_NAME="upgrade/n8n-v${{ steps.latest.outputs.latest_version }}"
-          git checkout -b "$BRANCH_NAME"
+          BRANCH_NAME="${{ steps.branch_check.outputs.branch_name }}"
+          BRANCH_EXISTS="${{ steps.branch_check.outputs.branch_exists }}"
+          IS_REBASE="${{ steps.branch_check.outputs.is_rebase }}"
+          
+          if [[ "$BRANCH_EXISTS" == "true" && "$IS_REBASE" == "true" ]]; then
+            # For rebase, delete existing branch first
+            git push origin --delete "$BRANCH_NAME" || echo "Branch deletion failed or branch doesn't exist remotely"
+            BRANCH_EXISTS="false"
+          fi
+          
+          if [[ "$BRANCH_EXISTS" == "false" ]]; then
+            # Create new branch
+            git checkout -b "$BRANCH_NAME"
+            echo "Created new branch: $BRANCH_NAME"
+          else
+            # Checkout existing branch
+            git checkout "$BRANCH_NAME"
+            git pull origin "$BRANCH_NAME"
+            echo "Checked out existing branch: $BRANCH_NAME"
+          fi
+          
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "branch_existed=$BRANCH_EXISTS" >> $GITHUB_OUTPUT
 
       - name: Update config.yaml
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.branch_check.outputs.needs_upgrade == 'true'
         run: |
           # Update version in config.yaml with new addon version
           sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" n8n/config.yaml
           echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
 
       - name: Update Dockerfile
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.branch_check.outputs.needs_upgrade == 'true'
         run: |
           # Update version in Dockerfile
           sed -i "s/npm install -g n8n@.*/npm install -g n8n@${{ steps.latest.outputs.latest_version }}/" n8n/Dockerfile
           echo "Updated Dockerfile version to ${{ steps.latest.outputs.latest_version }}"
 
       - name: Commit changes
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.branch_check.outputs.needs_upgrade == 'true'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add n8n/config.yaml n8n/Dockerfile
-          git commit -m "⬆️ Upgrade n8n to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+          
+          # Determine commit message based on rebase status
+          IS_REBASE="${{ steps.branch_check.outputs.is_rebase }}"
+          BRANCH_EXISTED="${{ steps.branch.outputs.branch_existed }}"
+          
+          if [[ "$IS_REBASE" == "true" ]]; then
+            COMMIT_MSG="🔄 Rebase n8n to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+          elif [[ "$BRANCH_EXISTED" == "true" ]]; then
+            COMMIT_MSG="📝 Update n8n to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+          else
+            COMMIT_MSG="⬆️ Upgrade n8n to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+          fi
+          
+          git commit -m "$COMMIT_MSG"
 
       - name: Push branch
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.branch_check.outputs.needs_upgrade == 'true'
         run: |
           git push origin "${{ steps.branch.outputs.branch_name }}"
 
       - name: Setup GitHub CLI
-        if: steps.compare.outputs.needs_upgrade == 'true'
+        if: steps.branch_check.outputs.needs_upgrade == 'true'
         run: |
           # Install GitHub CLI
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
@@ -155,32 +256,156 @@ jobs:
           # Verify installation
           gh --version
 
-      - name: Create Pull Request
-        if: steps.compare.outputs.needs_upgrade == 'true'
+      - name: Create or Update Pull Request
+        if: steps.branch_check.outputs.needs_upgrade == 'true'
         run: |
           # Debug: show current branch and repo info
           echo "Current branch: $(git branch --show-current)"
           echo "Remote URL: $(git remote get-url origin)"
           
-          # Check if PR already exists
-          if gh pr list --head "${{ steps.branch.outputs.branch_name }}" --base main | grep -q "${{ steps.branch.outputs.branch_name }}"; then
-            echo "PR already exists, skipping creation"
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          IS_REBASE="${{ steps.branch_check.outputs.is_rebase }}"
+          RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
+          BRANCH_EXISTED="${{ steps.branch.outputs.branch_existed }}"
+          
+          # Determine labels and title based on scenario
+          if [[ "$IS_REBASE" == "true" ]]; then
+            TITLE="🔄 Rebase n8n ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+            LABELS="rebase,dependencies"
+            BODY_PREFIX="Manual rebase of n8n to version ${{ steps.latest.outputs.latest_version }}"
+          elif [[ "$RELEASE_TYPE" == "prerelease" ]]; then
+            TITLE="⬆️ n8n ${{ steps.latest.outputs.latest_version }} (prerelease) (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+            LABELS="auto-upgrade,dependencies,prerelease"
+            BODY_PREFIX="Auto-upgrade n8n to prerelease version ${{ steps.latest.outputs.latest_version }}"
           else
-            # Create pull request using gh CLI
+            TITLE="⬆️ n8n ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+            LABELS="auto-upgrade,dependencies"
+            BODY_PREFIX="Auto-upgrade n8n to stable version ${{ steps.latest.outputs.latest_version }}"
+          fi
+          
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --base main --json number --jq '.[0].number' 2>/dev/null || echo "")
+          
+          if [[ -n "$EXISTING_PR" && "$BRANCH_EXISTED" == "true" ]]; then
+            echo "PR already exists, updating it"
+            # Update existing PR body
+            PR_BODY="$BODY_PREFIX\n\n**Changes:**\n- Updated config.yaml addon version to ${{ steps.addon_version.outputs.new_addon_version }}\n- Updated Dockerfile to use n8n@${{ steps.latest.outputs.latest_version }}\n\n**Release:** ${{ steps.latest.outputs.release_url }}\n\n**Release Type:** $RELEASE_TYPE\n\nThis PR was updated automatically by the auto-upgrade workflow."
+            
+            gh pr edit "$EXISTING_PR" \
+              --title "$TITLE" \
+              --body "$PR_BODY" \
+              --add-label "$LABELS"
+          elif [[ -z "$EXISTING_PR" ]]; then
+            echo "Creating new PR"
+            # Create new pull request using gh CLI
+            PR_BODY="$BODY_PREFIX\n\n**Changes:**\n- Updated config.yaml addon version to ${{ steps.addon_version.outputs.new_addon_version }}\n- Updated Dockerfile to use n8n@${{ steps.latest.outputs.latest_version }}\n\n**Release:** ${{ steps.latest.outputs.release_url }}\n\n**Release Type:** $RELEASE_TYPE\n\nThis PR was created automatically by the auto-upgrade workflow."
+            
             gh pr create \
               --base main \
-              --head "${{ steps.branch.outputs.branch_name }}" \
-              --title "⬆️ n8n ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})" \
-              --body "Auto-upgrade n8n to version ${{ steps.latest.outputs.latest_version }}
-
-            **Changes:**
-            - Updated config.yaml addon version to ${{ steps.addon_version.outputs.new_addon_version }}
-            - Updated Dockerfile to use n8n@${{ steps.latest.outputs.latest_version }}
-
-            **Release:** ${{ steps.latest.outputs.release_url }}
-
-            This PR was created automatically by the auto-upgrade workflow." \
-              --label "auto-upgrade,dependencies"
+              --head "$BRANCH_NAME" \
+              --title "$TITLE" \
+              --body "$PR_BODY" \
+              --label "$LABELS"
             
             echo "PR created successfully"
+          else
+            echo "PR exists but branch was recreated, keeping existing PR"
           fi
+
+      - name: Update all existing PRs and labels
+        if: always() || github.event.inputs.update_labels == 'true'
+        run: |
+          # Install GitHub CLI if not already installed
+          if ! command -v gh &> /dev/null; then
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+            echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          fi
+          
+          # Get current release info
+          RELEASES_JSON=$(curl -s https://api.github.com/repos/n8n-io/n8n/releases)
+          LATEST_STABLE_RELEASE=$(echo "$RELEASES_JSON" | jq -r '[.[] | select(.prerelease == false)] | .[0].tag_name')
+          LATEST_ANY_RELEASE=$(echo "$RELEASES_JSON" | jq -r '.[0].tag_name')
+          IS_PRERELEASE=$(echo "$RELEASES_JSON" | jq -r ".[0] | select(.tag_name == \"$LATEST_ANY_RELEASE\") | .prerelease")
+          
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            RELEASE_TYPE="prerelease"
+            LATEST_RELEASE="$LATEST_ANY_RELEASE"
+          else
+            RELEASE_TYPE="stable"
+            LATEST_RELEASE="$LATEST_STABLE_RELEASE"
+          fi
+          
+          echo "Current latest release: $LATEST_RELEASE (type: $RELEASE_TYPE)"
+          
+          # Get all upgrade PRs
+          UPGRADE_PRS=$(gh pr list --base main --search "upgrade/n8n" --json number,title,headRefName,labels --jq '.[]')
+          
+          if [[ -z "$UPGRADE_PRS" ]]; then
+            echo "No upgrade PRs found to update"
+            exit 0
+          fi
+          
+          echo "Found upgrade PRs to update:"
+          echo "$UPGRADE_PRS" | jq -r '.'
+          
+          # Update each PR
+          echo "$UPGRADE_PRS" | while read -r pr; do
+            PR_NUMBER=$(echo "$pr" | jq -r '.number')
+            PR_TITLE=$(echo "$pr" | jq -r '.title')
+            PR_BRANCH=$(echo "$pr" | jq -r '.headRefName')
+            CURRENT_LABELS=$(echo "$pr" | jq -r '.labels[].name' | tr '\n' ',' | sed 's/,$//')
+            
+            echo "Processing PR #$PR_NUMBER: $PR_TITLE (branch: $PR_BRANCH)"
+            echo "Current labels: $CURRENT_LABELS"
+            
+            # Extract version from branch name or title
+            BRANCH_VERSION=$(echo "$PR_BRANCH" | sed 's/upgrade\/n8n-v//')
+            if [[ -z "$BRANCH_VERSION" || "$BRANCH_VERSION" == "$PR_BRANCH" ]]; then
+              BRANCH_VERSION=$(echo "$PR_TITLE" | grep -oP 'n8n \K[0-9]+\.[0-9]+\.[0-9]+')
+            fi
+            
+            if [[ -z "$BRANCH_VERSION" ]]; then
+              echo "Could not extract version from PR #$PR_NUMBER, skipping"
+              continue
+            fi
+            
+            echo "Detected version: $BRANCH_VERSION"
+            
+            # Check if this PR version matches current latest
+            if [[ "$BRANCH_VERSION" == "${LATEST_RELEASE//n8n@/}" ]]; then
+              # This is for the latest version, update labels based on release type
+              if [[ "$RELEASE_TYPE" == "prerelease" ]]; then
+                NEW_LABELS="auto-upgrade,dependencies,prerelease"
+                NEW_TITLE="⬆️ n8n $BRANCH_VERSION (prerelease) (addon $(grep -E '^version:' n8n/config.yaml | sed 's/version: "//' | sed 's/"//'))"
+              else
+                NEW_LABELS="auto-upgrade,dependencies"
+                NEW_TITLE="⬆️ n8n $BRANCH_VERSION (addon $(grep -E '^version:' n8n/config.yaml | sed 's/version: "//' | sed 's/"//'))"
+              fi
+              
+              echo "Updating PR #$PR_NUMBER to latest release type: $RELEASE_TYPE"
+              echo "New labels: $NEW_LABELS"
+              echo "New title: $NEW_TITLE"
+              
+              # Update PR title and labels
+              gh pr edit "$PR_NUMBER" \
+                --title "$NEW_TITLE" \
+                --label "$NEW_LABELS" || echo "Failed to update PR #$PR_NUMBER"
+                
+            else
+              # This is for an older version, ensure it has appropriate labels
+              if echo "$CURRENT_LABELS" | grep -q "prerelease"; then
+                # Keep prerelease label if it already has it
+                NEW_LABELS="auto-upgrade,dependencies,prerelease"
+              else
+                NEW_LABELS="auto-upgrade,dependencies"
+              fi
+              
+              echo "Updating older version PR #$PR_NUMBER labels: $NEW_LABELS"
+              gh pr edit "$PR_NUMBER" --label "$NEW_LABELS" || echo "Failed to update labels for PR #$PR_NUMBER"
+            fi
+            
+            echo "---"
+          done
