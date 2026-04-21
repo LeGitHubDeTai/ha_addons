@@ -66,6 +66,24 @@ for file in /data/gitea/conf/app.ini /etc/templates/app.ini; do
 done
 
 ##############
+# START NGINX #
+##############
+
+bashio::log.info "Starting Nginx for ingress..."
+mkdir -p /var/log/nginx /var/cache/nginx
+
+# Start nginx in background
+nginx -g 'daemon off;' &
+NGINX_PID=$!
+sleep 2
+
+if pgrep -x nginx > /dev/null; then
+    bashio::log.info "Nginx started successfully on port 8099"
+else
+    bashio::log.warning "Nginx may have failed to start, ingress might not work"
+fi
+
+##############
 # LAUNCH APP #
 ##############
 
