@@ -208,7 +208,7 @@ jobs:
             **Release:** ${{ steps.latest.outputs.release_url }}
 
             This PR was created automatically by the auto-upgrade workflow." \
-              --label "auto-upgrade,dependencies,n8n-${{ steps.latest.outputs.latest_version }},${{ steps.latest.outputs.release_type }}"
+              --label "auto-upgrade,dependencies,${{ steps.latest.outputs.release_type }}"
             
             echo "PR created successfully"
           fi
