@@ -66,27 +66,11 @@ for file in /data/gitea/conf/app.ini /etc/templates/app.ini; do
 done
 
 ##############
-# START NGINX #
-##############
-
-bashio::log.info "Setting up Nginx for ingress..."
-mkdir -p /var/log/nginx /var/cache/nginx
-chmod +x /usr/local/bin/start-ingress.sh
-
-# Start nginx in background using nohup to survive after this script exits
-nohup /usr/local/bin/start-ingress.sh > /dev/null 2>&1 &
-sleep 2
-
-if pgrep -x nginx > /dev/null; then
-    bashio::log.info "Nginx started successfully on port 8099"
-else
-    bashio::log.warning "Nginx may have failed to start, checking again later..."
-fi
-
-##############
 # LAUNCH APP #
 ##############
 
 bashio::log.info "Please wait while the app is loading !"
 
-/./usr/bin/entrypoint
+# Use wrapper that starts both nginx and gitea
+chmod +x /usr/local/bin/gitea-with-ingress.sh
+exec /usr/local/bin/gitea-with-ingress.sh
