@@ -37,16 +37,24 @@ jobs:
       - name: Get latest n8n release
         id: latest
         run: |
-          # Get non-pre-release versions (filter out prereleases)
-          # Use per_page=20 to get enough releases and filter them
-          RELEASES=$(curl -s "https://api.github.com/repos/n8n-io/n8n/releases?per_page=20" | jq -r '[.[] | select(.prerelease == false)] | .[].tag_name')
+          # Get all releases and find the first valid one (not stable/latest tag)
+          RAW_RELEASES=$(curl -s "https://api.github.com/repos/n8n-io/n8n/releases?per_page=20")
           
-          # Find the first release that is not "stable" or "latest"
+          # Find the first release that is not "stable" or "latest" tag
           LATEST_RELEASE=""
-          for tag in $RELEASES; do
+          IS_PRERELEASE="false"
+          
+          for row in $(echo "$RAW_RELEASES" | jq -r '.[] | @base64'); do
+            _jq() {
+              echo "$row" | base64 --decode | jq -r "$1"
+            }
+            
+            tag=$(_jq '.tag_name')
             VERSION=$(echo $tag | sed 's/n8n@//')
+            
             if [[ "$VERSION" != "stable" && "$VERSION" != "latest" ]]; then
               LATEST_RELEASE="$tag"
+              IS_PRERELEASE=$(_jq '.prerelease')
               break
             fi
           done
@@ -54,12 +62,21 @@ jobs:
           # Extract version number from tag (format: n8n@X.Y.Z)
           LATEST_VERSION=$(echo $LATEST_RELEASE | sed 's/n8n@//')
           
+          # Determine release type label
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            RELEASE_TYPE="pre-release"
+          else
+            RELEASE_TYPE="latest"
+          fi
+          
           echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-          echo "release_url=$(curl -s "https://api.github.com/repos/n8n-io/n8n/releases?per_page=20" | jq -r ".[] | select(.tag_name==\"$LATEST_RELEASE\") | .html_url")" >> $GITHUB_OUTPUT
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          echo "release_url=$(echo "$RAW_RELEASES" | jq -r ".[] | select(.tag_name==\"$LATEST_RELEASE\") | .html_url")" >> $GITHUB_OUTPUT
           
           echo "Latest release: $LATEST_RELEASE"
           echo "Latest version: $LATEST_VERSION"
+          echo "Release type: $RELEASE_TYPE"
 
       - name: Compare versions
         id: compare
@@ -191,7 +208,7 @@ jobs:
             **Release:** ${{ steps.latest.outputs.release_url }}
 
             This PR was created automatically by the auto-upgrade workflow." \
-              --label "auto-upgrade,dependencies,n8n-${{ steps.latest.outputs.latest_version }}"
+              --label "auto-upgrade,dependencies,n8n-${{ steps.latest.outputs.latest_version }},${{ steps.latest.outputs.release_type }}"
             
             echo "PR created successfully"
           fi
