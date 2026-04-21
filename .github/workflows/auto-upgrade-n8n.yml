@@ -160,12 +160,25 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add n8n/config.yaml n8n/Dockerfile
+          
+          # Check if there are changes to commit
+          if git diff --cached --quiet; then
+            echo "No changes to commit - n8n version is already up to date on this branch"
+            exit 0
+          fi
+          
           git commit -m "⬆️ Upgrade n8n to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
 
       - name: Push branch
         if: steps.compare.outputs.needs_upgrade == 'true'
         run: |
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          
+          # Check if there are commits to push (avoids error when no changes)
+          if git diff --quiet HEAD origin/"$BRANCH_NAME" 2>/dev/null || [ -z "$(git log origin/"$BRANCH_NAME"..HEAD 2>/dev/null)" ]; then
+            echo "No new commits to push - branch is up to date"
+            exit 0
+          fi
           
           # Check if branch exists on remote
           if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
