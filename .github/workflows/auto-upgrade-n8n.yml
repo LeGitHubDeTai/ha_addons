@@ -138,7 +138,16 @@ jobs:
       - name: Push branch
         if: steps.compare.outputs.needs_upgrade == 'true'
         run: |
-          git push origin "${{ steps.branch.outputs.branch_name }}"
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          
+          # Check if branch exists on remote
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME exists on remote, force-pushing updates..."
+            git push origin "$BRANCH_NAME" --force-with-lease
+          else
+            echo "Creating new branch $BRANCH_NAME..."
+            git push origin "$BRANCH_NAME"
+          fi
 
       - name: Setup GitHub CLI
         if: steps.compare.outputs.needs_upgrade == 'true'
