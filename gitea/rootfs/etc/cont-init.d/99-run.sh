@@ -71,6 +71,5 @@ done
 
 bashio::log.info "Please wait while the app is loading !"
 
-# Use wrapper that starts both nginx and gitea
-chmod +x /usr/local/bin/gitea-with-ingress.sh
-exec /usr/local/bin/gitea-with-ingress.sh
+# Supervisord will handle starting both Gitea and Nginx
+# This script just exits - supervisord is the main process

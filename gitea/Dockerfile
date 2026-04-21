@@ -2,10 +2,7 @@ ARG BUILD_FROM=gitea/gitea
 
 FROM ${BUILD_FROM}
 
-# Set S6 wait time
-ENV S6_CMD_WAIT_FOR_SERVICES=1 \
-    S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0 \
-    S6_SERVICES_GRACETIME=0
+# Use supervisord for process management
 
 USER root
 
@@ -13,8 +10,9 @@ USER root
 COPY rootfs/ /
 RUN find . -type f \( -name "*.sh" -o -name "run" -o -name "finish" \) -print -exec chmod +x {} \;
 
-# Copy nginx configuration for ingress
+# Copy nginx and supervisord configuration for ingress
 COPY nginx.conf /etc/nginx/nginx.conf
+COPY supervisord.conf /etc/supervisord.conf
 
 # Uses /bin for compatibility purposes
 # hadolint ignore=DL4005
@@ -29,7 +27,7 @@ COPY ha_automodules.sh /ha_automodules.sh
 RUN chmod 744 /ha_automodules.sh && /ha_automodules.sh "$MODULES" && rm /ha_automodules.sh
 
 # Manual apps
-ENV PACKAGES="nginx"
+ENV PACKAGES="nginx supervisor"
 
 # Automatic apps & bashio
 COPY ha_autoapps.sh /ha_autoapps.sh
@@ -37,16 +35,12 @@ RUN chmod 744 /ha_autoapps.sh && /ha_autoapps.sh "$PACKAGES" && rm /ha_autoapps.
 
 EXPOSE 22 3000 8099
 
-# Add entrypoint
-ENV S6_STAGE2_HOOK=/ha_entrypoint.sh
-COPY ha_entrypoint.sh /ha_entrypoint.sh
-RUN chmod 777 /ha_entrypoint.sh
-
 # Install bashio
 COPY bashio-standalone.sh /usr/local/lib/bashio-standalone.sh
 RUN chmod 0755 /usr/local/lib/bashio-standalone.sh
 
-ENTRYPOINT [ "/ha_entrypoint.sh" ]
+# Use supervisord as entrypoint
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
 
 ARG BUILD_ARCH
 ARG BUILD_DATE
