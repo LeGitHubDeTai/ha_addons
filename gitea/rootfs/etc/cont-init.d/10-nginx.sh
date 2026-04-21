@@ -14,63 +14,59 @@ fi
 # Get Gitea internal port (usually 3000)
 GITEA_PORT=3000
 
-# Create Nginx configuration
-mkdir -p /etc/nginx/conf.d
+# Create full Nginx configuration based on isoman pattern
+mkdir -p /etc/nginx
 
-cat > /etc/nginx/conf.d/ingress.conf << EOF
-server {
-    listen ${INGRESS_PORT};
-    listen [::]:${INGRESS_PORT};
+cat > /etc/nginx/nginx.conf << EOF
+user nginx;
+worker_processes auto;
 
-    # Allow large file uploads
-    client_max_body_size 0;
-    
-    # Timeouts
-    proxy_connect_timeout 600;
-    proxy_send_timeout 600;
-    proxy_read_timeout 600;
-    send_timeout 600;
+events {
+    worker_connections 1024;
+}
 
-    location / {
-        # Proxy to Gitea
-        proxy_pass http://127.0.0.1:${GITEA_PORT};
-        
-        # Headers for proxy
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-Host \$host;
-        proxy_set_header X-Forwarded-Port \$server_port;
-        
-        # WebSocket support
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        
-        # Buffer settings
-        proxy_buffering off;
-        proxy_request_buffering off;
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    sendfile        on;
+    keepalive_timeout  65;
+
+    server {
+        listen ${INGRESS_PORT};
+
+        location / {
+            proxy_pass http://127.0.0.1:${GITEA_PORT};
+
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade \$http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Origin \$scheme://\$host;
+            proxy_cache off;
+            proxy_buffering off;
+
+            proxy_set_header Host \$host;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+
+            # Allow large file uploads
+            client_max_body_size 0;
+            proxy_connect_timeout 600;
+            proxy_send_timeout 600;
+            proxy_read_timeout 600;
+
+            # Ingress fix for URL rewriting
+            set \$ingress_path \$http_x_ingress_path;
+
+            sub_filter_types text/html text/css application/javascript;
+            sub_filter_once off;
+            sub_filter 'href="/'  'href="\$ingress_path/';
+            sub_filter 'src="/'   'src="\$ingress_path/';
+            sub_filter 'action="/' 'action="\$ingress_path/';
+        }
     }
 }
 EOF
-
-# Ensure Nginx is configured to load conf.d
-if [ -f /etc/nginx/nginx.conf ]; then
-    # Check if conf.d is included
-    if ! grep -q "conf.d" /etc/nginx/nginx.conf; then
-        # Add conf.d include inside http block (before closing brace)
-        # Find the http block and add include before its closing brace
-        awk '
-            /^http \{/ { in_http = 1 }
-            in_http && /^\}/ && !done {
-                print "    include /etc/nginx/conf.d/*.conf;"
-                done = 1
-            }
-            { print }
-        ' /etc/nginx/nginx.conf > /etc/nginx/nginx.conf.new && mv /etc/nginx/nginx.conf.new /etc/nginx/nginx.conf
-    fi
-fi
 
 # Test nginx configuration
 if ! nginx -t 2>&1; then

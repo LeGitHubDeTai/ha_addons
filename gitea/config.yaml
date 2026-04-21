@@ -1,5 +1,5 @@
 name: Gitea
-version: "26.4.2.1"
+version: "26.4.2.2"
 slug: gitea
 description: Gitea for Home Assistant
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/gitea
