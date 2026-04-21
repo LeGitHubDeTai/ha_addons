@@ -39,9 +39,9 @@ else
     echo "[DEBUG] /etc/services.d/nginx directory NOT FOUND!"
 fi
 
-# Test nginx config
+# Test nginx config (don't fail if it fails, let the service handle it)
 echo "[DEBUG] Testing nginx configuration..."
-nginx -t 2>&1 || echo "[DEBUG] nginx -t failed"
+nginx -t 2>&1 || echo "[DEBUG] nginx -t failed (will be checked again by service)"
 
 echo "[DEBUG] ==========================================="
 echo "[DEBUG] Nginx check complete"
