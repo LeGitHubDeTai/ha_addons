@@ -282,7 +282,21 @@ jobs:
       - name: Push branch
         if: steps.branch_check.outputs.needs_upgrade == 'true'
         run: |
-          git push origin "${{ steps.branch.outputs.branch_name }}"
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          IS_REBASE="${{ steps.branch_check.outputs.is_rebase }}"
+          
+          if [[ "$IS_REBASE" == "true" ]]; then
+            echo "Force pushing rebased branch..."
+            git push origin "$BRANCH_NAME" --force-with-lease
+          else
+            echo "Pushing branch..."
+            # Try normal push first, if it fails pull and push again
+            git push origin "$BRANCH_NAME" || {
+              echo "Push failed, pulling remote changes first..."
+              git pull origin "$BRANCH_NAME" --rebase
+              git push origin "$BRANCH_NAME"
+            }
+          fi
 
       - name: Setup GitHub CLI
         if: steps.branch_check.outputs.needs_upgrade == 'true'
