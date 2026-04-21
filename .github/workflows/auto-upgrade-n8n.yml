@@ -183,32 +183,65 @@ jobs:
           # Verify installation
           gh --version
 
-      - name: Create Pull Request
+      - name: Create or Update Pull Request
         if: steps.compare.outputs.needs_upgrade == 'true'
         run: |
           # Debug: show current branch and repo info
           echo "Current branch: $(git branch --show-current)"
           echo "Remote URL: $(git remote get-url origin)"
           
+          LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
+          NEW_ADDON_VERSION="${{ steps.addon_version.outputs.new_addon_version }}"
+          RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          
           # Check if PR already exists
-          if gh pr list --head "${{ steps.branch.outputs.branch_name }}" --base main | grep -q "${{ steps.branch.outputs.branch_name }}"; then
-            echo "PR already exists, skipping creation"
+          EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --base main --json number --jq '.[0].number')
+          
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists, updating labels..."
+            
+            # Get current labels
+            CURRENT_LABELS=$(gh pr view "$EXISTING_PR" --json labels --jq '.labels[].name')
+            echo "Current labels: $CURRENT_LABELS"
+            
+            # Build new labels: keep auto-upgrade and dependencies, remove old release type labels, add new one
+            NEW_LABELS="auto-upgrade,dependencies"
+            
+            # Check if PR has pre-release or latest label and needs update
+            if echo "$CURRENT_LABELS" | grep -q "pre-release\|latest"; then
+              # Remove old release type and add new one
+              gh pr edit "$EXISTING_PR" --remove-label "pre-release,latest" 2>/dev/null || true
+            fi
+            
+            # Add the correct release type label
+            gh pr edit "$EXISTING_PR" --add-label "$RELEASE_TYPE"
+            
+            # Update title if needed
+            CURRENT_TITLE=$(gh pr view "$EXISTING_PR" --json title --jq '.title')
+            NEW_TITLE="⬆️ n8n $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
+            if [ "$CURRENT_TITLE" != "$NEW_TITLE" ]; then
+              gh pr edit "$EXISTING_PR" --title "$NEW_TITLE"
+              echo "Updated PR title to: $NEW_TITLE"
+            fi
+            
+            echo "PR #$EXISTING_PR updated successfully"
           else
             # Create pull request using gh CLI
             gh pr create \
               --base main \
-              --head "${{ steps.branch.outputs.branch_name }}" \
-              --title "⬆️ n8n ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})" \
-              --body "Auto-upgrade n8n to version ${{ steps.latest.outputs.latest_version }}
+              --head "$BRANCH_NAME" \
+              --title "⬆️ n8n $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade n8n to version $LATEST_VERSION
 
             **Changes:**
-            - Updated config.yaml addon version to ${{ steps.addon_version.outputs.new_addon_version }}
-            - Updated Dockerfile to use n8n@${{ steps.latest.outputs.latest_version }}
+            - Updated config.yaml addon version to $NEW_ADDON_VERSION
+            - Updated Dockerfile to use n8n@$LATEST_VERSION
 
             **Release:** ${{ steps.latest.outputs.release_url }}
 
             This PR was created automatically by the auto-upgrade workflow." \
-              --label "auto-upgrade,dependencies,${{ steps.latest.outputs.release_type }}"
+              --label "auto-upgrade,dependencies,$RELEASE_TYPE"
             
             echo "PR created successfully"
           fi
