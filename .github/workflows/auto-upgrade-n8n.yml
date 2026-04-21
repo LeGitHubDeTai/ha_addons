@@ -166,13 +166,10 @@ jobs:
           IS_REBASE="${{ steps.branch_check.outputs.is_rebase }}"
           
           if [ "$IS_REBASE" == "true" ]; then
-            # For rebase, get version from main branch
+            # For rebase, get version from main branch directly
             git fetch origin main
-            git checkout -b temp-main origin/main
-            MAIN_ADDON_VERSION=$(grep -E '^version:' n8n/config.yaml | sed 's/version: "//' | sed 's/"//')
+            MAIN_ADDON_VERSION=$(git show origin/main:n8n/config.yaml | grep -E '^version:' | sed 's/version: "//' | sed 's/"//')
             MAIN_PATCH=$(echo $MAIN_ADDON_VERSION | cut -d. -f3)
-            git checkout "${{ steps.branch_check.outputs.branch_name }}"
-            git branch -D temp-main
             
             # Get current year and month for main version
             CURRENT_YEAR=$(date +%y)  # YY format (26 for 2026)
@@ -226,19 +223,16 @@ jobs:
           BRANCH_EXISTS="${{ steps.branch_check.outputs.branch_exists }}"
           IS_REBASE="${{ steps.branch_check.outputs.is_rebase }}"
           
-          if [[ "$IS_REBASE" == "true" && "$BRANCH_EXISTS" == "true" ]]; then
-            echo "Rebase triggered - rebasing existing branch from main"
-            # Fetch latest main and checkout existing branch
+          if [[ "$IS_REBASE" == "true" ]]; then
+            echo "Rebase triggered - using main as base"
+            # For rebase, always start from main
             git fetch origin main
-            git checkout "$BRANCH_NAME"
-            git pull origin "$BRANCH_NAME"
-            echo "Rebasing $BRANCH_NAME from main..."
-            git rebase origin/main
-            echo "Rebase completed"
+            git checkout -b "$BRANCH_NAME" origin/main
+            echo "Created rebased branch: $BRANCH_NAME from main"
           elif [[ "$BRANCH_EXISTS" == "true" ]]; then
             # Checkout existing branch
+            git fetch origin "$BRANCH_NAME"
             git checkout "$BRANCH_NAME"
-            git pull origin "$BRANCH_NAME"
             echo "Checked out existing branch: $BRANCH_NAME"
           else
             # Create new branch from main
