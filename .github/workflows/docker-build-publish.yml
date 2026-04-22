@@ -2,7 +2,7 @@ name: Docker Build and Publish
 
 on:
   push:
-    branches: [ main, actions-dev, planka-dev ]
+    branches: [ main, '**' ]
     paths:
       - '**/config.yaml'
       - '**/Dockerfile'
@@ -40,12 +40,63 @@ jobs:
             # For manual dispatch, build all addons
             ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' ' ')
           else
-            # For push/PR, only build changed addons
-            # Get all addon directories automatically
-            ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
-            ADDONS=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | \
-              grep -E "^($ALL_ADDONS)/" | \
-              cut -d'/' -f1 | sort -u | tr '\n' ' ')
+            # For push/PR, build addon based on branch name
+            BRANCH_NAME="${{ github.ref_name }}"
+            echo "🔍 Branch name: $BRANCH_NAME"
+            
+            # Extract addon name from branch name (handles both addon-dev and dev-addon patterns)
+            if [[ "$BRANCH_NAME" =~ ^(.+)-dev$ ]]; then
+              ADDON_NAME="${BASH_REMATCH[1]}"
+            elif [[ "$BRANCH_NAME" =~ ^dev-(.+)$ ]]; then
+              ADDON_NAME="${BASH_REMATCH[1]}"
+            elif [ "$BRANCH_NAME" == "main" ]; then
+              # For main branch, build ALL addons (version check will filter what needs building)
+              ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' ' ')
+              echo "🏠 Main branch: checking all addons: $ADDONS"
+            else
+              # For other branches, use git diff to detect changes
+              ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
+              
+              # Handle different contexts for git diff
+              if [ "${{ github.event_name }}" == "pull_request" ]; then
+                # For PRs, compare against the base branch
+                BASE_SHA="${{ github.event.pull_request.base.sha }}"
+              elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+                # For pushes with valid before SHA
+                BASE_SHA="${{ github.event.before }}"
+              else
+                # Fallback: compare against previous commit
+                BASE_SHA=$(git rev-parse HEAD~1)
+              fi
+              
+              ADDONS=$(git diff --name-only $BASE_SHA ${{ github.sha }} | \
+                grep -E "^($ALL_ADDONS)/" | \
+                cut -d'/' -f1 | sort -u | tr '\n' ' ')
+              echo "📋 Detected changed addons: $ADDONS"
+            fi
+            
+            # If we extracted addon name from branch, validate it exists
+            if [ -n "$ADDON_NAME" ] && [ -d "$ADDON_NAME" ] && [ -f "$ADDON_NAME/config.yaml" ]; then
+              ADDONS="$ADDON_NAME"
+              echo "🎯 Building addon from branch name: $ADDONS"
+            elif [ -n "$ADDON_NAME" ]; then
+              echo "❌ Addon '$ADDON_NAME' not found, checking for changes..."
+              # Fallback to git diff if addon not found
+              ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
+              
+              if [ "${{ github.event_name }}" == "pull_request" ]; then
+                BASE_SHA="${{ github.event.pull_request.base.sha }}"
+              elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+                BASE_SHA="${{ github.event.before }}"
+              else
+                BASE_SHA=$(git rev-parse HEAD~1)
+              fi
+              
+              ADDONS=$(git diff --name-only $BASE_SHA ${{ github.sha }} | \
+                grep -E "^($ALL_ADDONS)/" | \
+                cut -d'/' -f1 | sort -u | tr '\n' ' ')
+              echo "📋 Detected changed addons: $ADDONS"
+            fi
           fi
           
           if [ -z "$ADDONS" ]; then
@@ -115,8 +166,15 @@ jobs:
             echo "  🔍 Vérification des images sur GitHub Container Registry..."
             SKIP_BUILD=true
             
+            # Determine image prefix based on branch
+            if [ "${{ github.ref_name }}" == "main" ]; then
+              IMAGE_PREFIX="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG"
+            else
+              IMAGE_PREFIX="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/dev-$SLUG"
+            fi
+            
             for arch in $ARCHS; do
-              IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
+              IMAGE_TAG="$IMAGE_PREFIX-$arch:$VERSION"
               
               # Check if image exists (will fail if not found)
               if ! docker manifest inspect "$IMAGE_TAG" > /dev/null 2>&1; then
@@ -248,9 +306,14 @@ jobs:
             BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_VERSION=$VERSION"
             BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_ARCH=$arch"
             
-            # Image tag
-            IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
-            IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:latest"
+            # Image tag with dev prefix for non-main branches
+            if [ "${{ github.ref_name }}" == "main" ]; then
+              IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:$VERSION"
+              IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/$SLUG-$arch:latest"
+            else
+              IMAGE_TAG="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/dev-$SLUG-$arch:$VERSION"
+              IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_PREFIX }}/dev-$SLUG-$arch:latest"
+            fi
             
             echo "Building image: $IMAGE_TAG"
             
