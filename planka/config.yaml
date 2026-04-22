@@ -8,7 +8,6 @@ webui: http://[HOST]:[PORT:1337]/
 image: ghcr.io/legithubdetai/ha_addons/planka-{arch}
 arch:
   - amd64
-  - aarch64
 startup: application
 boot: auto
 init: false

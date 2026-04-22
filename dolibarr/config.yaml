@@ -8,7 +8,6 @@ webui: http://[HOST]:[PORT:8080]/
 image: ghcr.io/legithubdetai/ha_addons/dolibarr-{arch}
 arch:
     - amd64
-    - aarch64
 startup: services
 boot: auto
 init: false

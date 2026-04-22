@@ -8,7 +8,6 @@ webui: http://[HOST]:[PORT:4000]/
 image: ghcr.io/legithubdetai/ha_addons/fossflow-{arch}
 arch:
     - amd64
-    - aarch64
 startup: services
 boot: auto
 init: false
