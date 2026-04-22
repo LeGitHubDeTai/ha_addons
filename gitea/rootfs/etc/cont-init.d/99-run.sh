@@ -38,8 +38,10 @@ for file in /data/gitea/conf/app.ini /etc/templates/app.ini; do
     if bashio::config.has_value 'ROOT_URL'; then
         bashio::log.blue "ROOT_URL set, using value : $(bashio::config 'ROOT_URL')"
     else
-        ROOT_URL="$PROTOCOL://$(bashio::config 'DOMAIN'):$(bashio::addon.port 3000)"
-        bashio::log.blue "ROOT_URL not set, using extrapolated value : $ROOT_URL"
+        # Use relative URL for ingress support instead of absolute URL
+        # This allows Gitea to work correctly behind reverse proxy
+        ROOT_URL="/"
+        bashio::log.blue "ROOT_URL not set, using relative URL for ingress: $ROOT_URL"
         sed -i "/server/a ROOT_URL=$ROOT_URL" "$file"
     fi
 
