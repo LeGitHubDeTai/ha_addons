@@ -38,8 +38,15 @@ for file in /data/gitea/conf/app.ini /etc/templates/app.ini; do
     if bashio::config.has_value 'ROOT_URL'; then
         bashio::log.blue "ROOT_URL set, using value : $(bashio::config 'ROOT_URL')"
     else
-        ROOT_URL="$PROTOCOL://$(bashio::config 'DOMAIN'):$(bashio::addon.port 3000)"
-        bashio::log.blue "ROOT_URL not set, using extrapolated value : $ROOT_URL"
+        # Try to get ingress URL, fallback to direct URL
+        INGRESS_URL=$(bashio::addon.ingress_url 2>/dev/null || echo "")
+        if [ -n "$INGRESS_URL" ]; then
+            ROOT_URL="$INGRESS_URL"
+            bashio::log.blue "ROOT_URL using ingress URL: $ROOT_URL"
+        else
+            ROOT_URL="$PROTOCOL://$(bashio::config 'DOMAIN'):$(bashio::addon.port 3000)"
+            bashio::log.blue "ROOT_URL not set, using direct URL: $ROOT_URL"
+        fi
         sed -i "/server/a ROOT_URL=$ROOT_URL" "$file"
     fi
 
