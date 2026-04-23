@@ -11,7 +11,6 @@ arch:
 init: false
 ingress: true
 ingress_port: 8099
-ingress_stream: true
 ports:
   22/tcp: 2222
   3000/tcp: 3000
