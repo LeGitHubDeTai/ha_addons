@@ -6,10 +6,6 @@ FROM ${BUILD_FROM}
 
 USER root
 
-# Add rootfs
-COPY rootfs/ /
-RUN find . -type f \( -name "*.sh" -o -name "run" -o -name "finish" \) -print -exec chmod +x {} \;
-
 # Copy nginx and supervisord configuration for ingress
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY supervisord.conf /etc/supervisord.conf
@@ -36,7 +32,7 @@ ENV PACKAGES="nginx supervisor"
 COPY ha_autoapps.sh /ha_autoapps.sh
 RUN chmod 744 /ha_autoapps.sh && /ha_autoapps.sh "$PACKAGES" && rm /ha_autoapps.sh
 
-EXPOSE 22 3000
+EXPOSE 22 3000 8099
 
 # Install bashio
 COPY bashio-standalone.sh /usr/local/lib/bashio-standalone.sh
