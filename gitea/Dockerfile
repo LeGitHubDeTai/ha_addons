@@ -36,7 +36,7 @@ ENV PACKAGES="nginx supervisor"
 COPY ha_autoapps.sh /ha_autoapps.sh
 RUN chmod 744 /ha_autoapps.sh && /ha_autoapps.sh "$PACKAGES" && rm /ha_autoapps.sh
 
-EXPOSE 22 3000 8099
+EXPOSE 22 3000
 
 # Install bashio
 COPY bashio-standalone.sh /usr/local/lib/bashio-standalone.sh
