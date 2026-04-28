@@ -43,17 +43,28 @@ jobs:
       - name: Get latest n8n release
         id: latest
         run: |
-          # Use /releases/latest API to get the actual latest stable release
-          # This is the same as https://github.com/n8n-io/n8n/releases/latest
-          LATEST_RELEASE_DATA=$(curl -s "https://api.github.com/repos/n8n-io/n8n/releases/latest")
+          # Get all releases and find the first valid version (not stable/latest)
+          LATEST_RELEASE_DATA=$(curl -s "https://api.github.com/repos/n8n-io/n8n/releases")
+          
+          # Extract tag names and find first valid version
+          LATEST_RELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.[].tag_name' | while read -r tag; do
+            VERSION=$(echo "$tag" | sed 's/n8n@//')
+            # Check if version follows semantic versioning (X.Y.Z)
+            if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "$tag"
+              break
+            fi
+          done)
+          
+          # Get full release data for the found version
+          RELEASE_INFO=$(echo "$LATEST_RELEASE_DATA" | jq ".[] | select(.tag_name==\"$LATEST_RELEASE\")")
           
           # Extract release info
-          LATEST_RELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.tag_name')
           LATEST_VERSION=$(echo "$LATEST_RELEASE" | sed 's/n8n@//')
-          IS_PRERELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.prerelease')
-          RELEASE_URL=$(echo "$LATEST_RELEASE_DATA" | jq -r '.html_url')
+          IS_PRERELEASE=$(echo "$RELEASE_INFO" | jq -r '.prerelease')
+          RELEASE_URL=$(echo "$RELEASE_INFO" | jq -r '.html_url')
           
-          # Determine release type label (should always be "latest" for this endpoint)
+          # Determine release type
           if [ "$IS_PRERELEASE" = "true" ]; then
             RELEASE_TYPE="pre-release"
           else
