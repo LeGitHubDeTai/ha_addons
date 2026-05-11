@@ -82,8 +82,6 @@ jobs:
 
       - name: Compare versions and check existing PRs
         id: compare
-        env:
-          GH_TOKEN: ${{ github.GH_TOKEN }}
         run: |
           CURRENT_N8N_VERSION="${{ steps.current.outputs.dockerfile_version }}"
           LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
