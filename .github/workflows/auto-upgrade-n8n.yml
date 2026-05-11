@@ -10,7 +10,7 @@ on:
       force:
         description: 'Force recreate PR even if one already exists (closed/merged)'
         required: false
-        default: false
+        default: true
         type: boolean
 
 jobs:
