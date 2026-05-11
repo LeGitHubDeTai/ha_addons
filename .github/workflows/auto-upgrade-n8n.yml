@@ -32,11 +32,11 @@ jobs:
           # Get n8n version from Dockerfile
           DOCKERFILE_VERSION=$(grep -E 'npm install -g n8n@' n8n/Dockerfile | sed 's/.*n8n@//' | sed 's/[[:space:]].*//')
           echo "dockerfile_version=$DOCKERFILE_VERSION" >> $GITHUB_OUTPUT
-          
+
           # Get addon version from config.yaml
           CONFIG_VERSION=$(grep -E '^version:' n8n/config.yaml | sed 's/version: "//' | sed 's/"//')
           echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
-          
+
           echo "Current n8n version: $DOCKERFILE_VERSION"
           echo "Current addon version: $CONFIG_VERSION"
 
@@ -45,7 +45,7 @@ jobs:
         run: |
           # Get all releases and find the first valid version (not stable/latest)
           LATEST_RELEASE_DATA=$(curl -s "https://api.github.com/repos/n8n-io/n8n/releases")
-          
+
           # Extract tag names and find first valid version
           LATEST_RELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.[].tag_name' | while read -r tag; do
             VERSION=$(echo "$tag" | sed 's/n8n@//')
@@ -55,58 +55,60 @@ jobs:
               break
             fi
           done)
-          
+
           # Get full release data for the found version
           RELEASE_INFO=$(echo "$LATEST_RELEASE_DATA" | jq ".[] | select(.tag_name==\"$LATEST_RELEASE\")")
-          
+
           # Extract release info
           LATEST_VERSION=$(echo "$LATEST_RELEASE" | sed 's/n8n@//')
           IS_PRERELEASE=$(echo "$RELEASE_INFO" | jq -r '.prerelease')
           RELEASE_URL=$(echo "$RELEASE_INFO" | jq -r '.html_url')
-          
+
           # Determine release type
           if [ "$IS_PRERELEASE" = "true" ]; then
             RELEASE_TYPE="pre-release"
           else
             RELEASE_TYPE="latest"
           fi
-          
+
           echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
           echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
           echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
-          
+
           echo "Latest release: $LATEST_RELEASE"
           echo "Latest version: $LATEST_VERSION"
           echo "Release type: $RELEASE_TYPE"
 
       - name: Compare versions and check existing PRs
         id: compare
+        env:
+          GH_TOKEN: ${{ github.GH_TOKEN }}
         run: |
           CURRENT_N8N_VERSION="${{ steps.current.outputs.dockerfile_version }}"
           LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
           RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
-          
+
           # Check if this is a new version
           IS_NEW_VERSION=false
           if [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_N8N_VERSION" | sort -V | head -n1)" = "$CURRENT_N8N_VERSION" ] && [ "$CURRENT_N8N_VERSION" != "$LATEST_VERSION" ]; then
             IS_NEW_VERSION=true
           fi
-          
+
           # Check if there's an existing PR for this version with different release type
           NEEDS_LABEL_UPDATE=false
           EXISTING_PR=""
-          
+
           if [ "$IS_NEW_VERSION" = "false" ]; then
             # Look for existing PRs for this version
             PR_LIST=$(gh pr list --search "n8n $LATEST_VERSION" --json number,labels,headRefName --jq '.[]')
-            
+
             if [ -n "$PR_LIST" ]; then
               while IFS= read -r pr; do
                 PR_NUMBER=$(echo "$pr" | jq -r '.number')
                 PR_LABELS=$(echo "$pr" | jq -r '.labels[].name')
                 PR_BRANCH=$(echo "$pr" | jq -r '.headRefName')
-                
+
                 # Check if PR has different release type label
                 if [ "$RELEASE_TYPE" = "latest" ] && echo "$PR_LABELS" | grep -q "pre-release"; then
                   NEEDS_LABEL_UPDATE=true
@@ -124,7 +126,7 @@ jobs:
               done <<< "$PR_LIST"
             fi
           fi
-          
+
           if [ "$IS_NEW_VERSION" = "true" ] || [ "$NEEDS_LABEL_UPDATE" = "true" ]; then
             echo "needs_upgrade=true" >> $GITHUB_OUTPUT
             echo "needs_label_update=$NEEDS_LABEL_UPDATE" >> $GITHUB_OUTPUT
@@ -149,15 +151,15 @@ jobs:
           CURRENT_YEAR=$(date +%y)  # YY format (26 for 2026)
           CURRENT_MONTH=$(date +%m)  # MM format
           CURRENT_MONTH=${CURRENT_MONTH#0}  # Remove leading zero
-          
+
           # Get current addon version and extract the patch number
           CURRENT_ADDON_VERSION="${{ steps.current.outputs.config_version }}"
           CURRENT_PATCH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f3)
-          
+
           # If year.month changed, reset patch to 1, otherwise increment
           CURRENT_YEAR_MONTH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f1,2)
           NEW_YEAR_MONTH="$CURRENT_YEAR.$CURRENT_MONTH"
-          
+
           if [ "$CURRENT_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
             # Same month, increment patch
             NEW_PATCH=$((CURRENT_PATCH + 1))
@@ -165,7 +167,7 @@ jobs:
             # New month, reset patch to 1
             NEW_PATCH=1
           fi
-          
+
           NEW_ADDON_VERSION="$NEW_YEAR_MONTH.$NEW_PATCH"
           echo "new_addon_version=$NEW_ADDON_VERSION" >> $GITHUB_OUTPUT
           echo "New addon version: $NEW_ADDON_VERSION"
@@ -181,7 +183,7 @@ jobs:
           else
             BRANCH_NAME="upgrade/n8n-v${{ steps.latest.outputs.latest_version }}"
           fi
-          
+
           # Check if branch exists on remote
           if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
             echo "Branch $BRANCH_NAME exists on remote, checking it out..."
@@ -191,7 +193,7 @@ jobs:
             echo "Creating new branch $BRANCH_NAME..."
             git checkout -b "$BRANCH_NAME"
           fi
-          
+
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Update config.yaml
@@ -215,7 +217,7 @@ jobs:
           git config --local user.name "GitHub Action"
           git add n8n/config.yaml n8n/Dockerfile
           FORCE_FLAG="${{ github.event.inputs.force }}"
-          
+
           # Check if there are changes to commit
           if git diff --cached --quiet; then
             if [ "$FORCE_FLAG" = "true" ]; then
@@ -234,13 +236,13 @@ jobs:
         run: |
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           FORCE_FLAG="${{ github.event.inputs.force }}"
-          
+
           # Check if there are commits to push (avoids error when no changes)
           if [ "$FORCE_FLAG" != "true" ] && (git diff --quiet HEAD origin/"$BRANCH_NAME" 2>/dev/null || [ -z "$(git log origin/"$BRANCH_NAME"..HEAD 2>/dev/null)" ]); then
             echo "No new commits to push - branch is up to date"
             exit 0
           fi
-          
+
           # Check if branch exists on remote
           if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
             echo "Branch $BRANCH_NAME exists on remote, force-pushing updates..."
@@ -260,10 +262,10 @@ jobs:
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
           sudo apt update
           sudo apt install gh -y
-          
+
           # Authenticate
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          
+
           # Verify installation
           gh --version
 
@@ -273,36 +275,36 @@ jobs:
           # Debug: show current branch and repo info
           echo "Current branch: $(git branch --show-current)"
           echo "Remote URL: $(git remote get-url origin)"
-          
+
           LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
           NEW_ADDON_VERSION="${{ steps.addon_version.outputs.new_addon_version }}"
           RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           IS_NEW_VERSION="${{ steps.compare.outputs.is_new_version }}"
-          
+
           FORCE_FLAG="${{ github.event.inputs.force }}"
-          
+
           # Check for open PR
           OPEN_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state open --json number --jq '.[0].number')
           # Check for any PR (open or closed) to avoid duplicates
           ANY_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state all --json number --jq '.[0].number')
-          
+
           if [ -n "$OPEN_PR" ]; then
             echo "Open PR #$OPEN_PR found, updating labels..."
-            
+
             # Get current labels
             CURRENT_LABELS=$(gh pr view "$OPEN_PR" --json labels --jq '.labels[].name')
             echo "Current labels: $CURRENT_LABELS"
-            
+
             # Check if PR has pre-release or latest label and needs update
             if echo "$CURRENT_LABELS" | grep -q "pre-release\|latest"; then
               # Remove old release type and add new one
               gh pr edit "$OPEN_PR" --remove-label "pre-release,latest" 2>/dev/null || true
             fi
-            
+
             # Add the correct release type label
             gh pr edit "$OPEN_PR" --add-label "$RELEASE_TYPE"
-            
+
             # Update title if needed (only for new versions)
             if [ "$IS_NEW_VERSION" = "true" ]; then
               CURRENT_TITLE=$(gh pr view "$OPEN_PR" --json title --jq '.title')
@@ -312,7 +314,7 @@ jobs:
                 echo "Updated PR title to: $NEW_TITLE"
               fi
             fi
-            
+
             echo "PR #$OPEN_PR updated successfully"
           elif [ "$FORCE_FLAG" = "true" ]; then
             echo "Force flag is set - creating new PR even if one existed before..."
@@ -331,7 +333,7 @@ jobs:
 
             This PR was created automatically by the auto-upgrade workflow (forced recreation)." \
               --label "auto-upgrade,dependencies,$RELEASE_TYPE"
-            
+
             echo "PR created successfully (forced)"
           elif [ -n "$ANY_PR" ]; then
             echo "PR #$ANY_PR already exists but is closed/merged - not creating duplicate (use 'force' to recreate)"
@@ -351,7 +353,7 @@ jobs:
 
             This PR was created automatically by the auto-upgrade workflow." \
               --label "auto-upgrade,dependencies,$RELEASE_TYPE"
-            
+
             echo "PR created successfully"
           else
             echo "No new version and no open PR - nothing to do"
