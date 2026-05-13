@@ -256,7 +256,7 @@ jobs:
 
       - name: Setup GitHub CLI
         if: steps.compare.outputs.needs_upgrade == 'true'
-        uses: actions/setup-gh@v4
+        uses: wusatosi/setup-gh@v1
         with:
           version: latest
 
