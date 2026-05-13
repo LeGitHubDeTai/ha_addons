@@ -257,8 +257,6 @@ jobs:
       - name: Setup GitHub CLI
         if: steps.compare.outputs.needs_upgrade == 'true'
         uses: wusatosi/setup-gh@v1
-        with:
-          version: latest
 
       - name: Create or Update Pull Request
         if: steps.compare.outputs.needs_upgrade == 'true'
