@@ -237,20 +237,25 @@ jobs:
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           FORCE_FLAG="${{ github.event.inputs.force }}"
 
-          # Check if there are commits to push (avoids error when no changes)
-          if [ "$FORCE_FLAG" != "true" ] && (git diff --quiet HEAD origin/"$BRANCH_NAME" 2>/dev/null || [ -z "$(git log origin/"$BRANCH_NAME"..HEAD 2>/dev/null)" ]); then
-            echo "No new commits to push - branch is up to date"
-            exit 0
-          fi
+          # Fetch to ensure we have latest remote info
+          git fetch origin || true
 
-          # Check if branch exists on remote
-          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
-            echo "Branch $BRANCH_NAME exists on remote, force-pushing updates..."
-            # Fetch the remote branch to avoid stale info error
-            git fetch origin "$BRANCH_NAME" || true
+          # Check if there are commits to push (avoids error when no changes)
+          # Skip this check if force flag is set - always push when forced
+          if [ "$FORCE_FLAG" = "true" ]; then
+            echo "Force flag set - pushing branch unconditionally..."
             git push origin "$BRANCH_NAME" --force
+          elif git rev-parse origin/"$BRANCH_NAME" >/dev/null 2>&1; then
+            # Branch exists remotely - check if we have new commits
+            if [ -n "$(git log origin/"$BRANCH_NAME"..HEAD 2>/dev/null)" ]; then
+              echo "New commits found - pushing updates..."
+              git push origin "$BRANCH_NAME" --force
+            else
+              echo "No new commits to push - branch is up to date"
+            fi
           else
-            echo "Creating new branch $BRANCH_NAME..."
+            # Branch doesn't exist on remote yet
+            echo "Creating new branch $BRANCH_NAME on remote..."
             git push origin "$BRANCH_NAME"
           fi
 
