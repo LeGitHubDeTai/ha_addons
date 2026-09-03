@@ -16,7 +16,8 @@ COPY rootfs /
 
 # Run the script that installs caddy and cloudflared
 RUN chmod +x /build.sh && \
-    chmod +x /run.sh
+    chmod +x /run.sh && \
+    chmod +x /etc/s6-overlay/s6-rc.d/prepare/run.sh
     
 RUN ["/build.sh"]
 
