@@ -1,0 +1,354 @@
+name: Auto-upgrade drawio
+
+# Workflow to automatically upgrade drawio addon when new releases are available
+on:
+  schedule:
+    # Run daily at 9:00 AM UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force recreate PR even if one already exists (closed/merged)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  auto-upgrade:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current versions
+        id: current
+        run: |
+          # Get drawio version from Dockerfile
+          DOCKERFILE_VERSION=$(grep -E 'ARG DRAWIO_VERSION' drawio/Dockerfile | sed 's/.*=//' | sed 's/[[:space:]]*//')
+          echo "dockerfile_version=$DOCKERFILE_VERSION"
+
+          # Get addon version from config.yaml
+          CONFIG_VERSION=$(grep -E '^version:' drawio/config.yaml | sed 's/version: "//' | sed 's/"//')
+          echo "config_version=$CONFIG_VERSION"
+
+          echo "Current drawio version: $DOCKERFILE_VERSION"
+          echo "Current addon version: $CONFIG_VERSION"
+
+      - name: Get latest drawio release
+        id: latest
+        run: |
+          # Get all releases and find the first valid version
+          LATEST_RELEASE_DATA=$(curl -s "https://api.github.com/repos/jgraph/drawio/releases")
+
+          # Extract tag names and find first valid version (semantic versioning X.Y.Z)
+          LATEST_RELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.[].tag_name' | while read -r tag; do
+            VERSION=$(echo "$tag" | sed 's/v//')
+            # Check if version follows semantic versioning (X.Y.Z)
+            if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "$tag"
+              break
+            fi
+          done)
+
+          # Get full release data for the found version
+          RELEASE_INFO=$(echo "$LATEST_RELEASE_DATA" | jq ".[] | select(.tag_name==\"$LATEST_RELEASE\")")
+
+          # Extract release info
+          LATEST_VERSION=$(echo "$LATEST_RELEASE" | sed 's/v//')
+          IS_PRERELEASE=$(echo "$RELEASE_INFO" | jq -r '.prerelease')
+          RELEASE_URL=$(echo "$RELEASE_INFO" | jq -r '.html_url')
+
+          # Determine release type
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            RELEASE_TYPE="pre-release"
+          else
+            RELEASE_TYPE="latest"
+          fi
+
+          echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
+
+          echo "Latest release: $LATEST_RELEASE"
+          echo "Latest version: $LATEST_VERSION"
+          echo "Release type: $RELEASE_TYPE"
+
+      - name: Compare versions and check existing PRs
+        id: compare
+        run: |
+          CURRENT_DRAWIO_VERSION="${{ steps.current.outputs.dockerfile_version }}"
+          LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
+          RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
+
+          # Check if this is a new version
+          IS_NEW_VERSION=false
+          if [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_DRAWIO_VERSION" | sort -V | head -n1)" = "$CURRENT_DRAWIO_VERSION" ] && [ "$CURRENT_DRAWIO_VERSION" != "$LATEST_VERSION" ]; then
+            IS_NEW_VERSION=true
+          fi
+
+          # Check if there's an existing PR for this version with different release type
+          NEEDS_LABEL_UPDATE=false
+          EXISTING_PR=""
+
+          if [ "$IS_NEW_VERSION" = "false" ]; then
+            # Look for existing PRs for this version
+            PR_LIST=$(gh pr list --search "drawio $LATEST_VERSION" --json number,labels,headRefName --jq '.[]')
+
+            if [ -n "$PR_LIST" ]; then
+              while IFS= read -r pr; do
+                PR_NUMBER=$(echo "$pr" | jq -r '.number')
+                PR_LABELS=$(echo "$pr" | jq -r '.labels[].name')
+                PR_BRANCH=$(echo "$pr" | jq -r '.headRefName')
+
+                # Check if PR has different release type label
+                if [ "$RELEASE_TYPE" = "latest" ] && echo "$PR_LABELS" | grep -q "pre-release"; then
+                  NEEDS_LABEL_UPDATE=true
+                  EXISTING_PR="$PR_NUMBER"
+                  EXISTING_BRANCH="$PR_BRANCH"
+                  echo "Found PR #$PR_NUMBER with pre-release label that needs update to latest"
+                  break
+                elif [ "$RELEASE_TYPE" = "pre-release" ] && echo "$PR_LABELS" | grep -q "latest"; then
+                  NEEDS_LABEL_UPDATE=true
+                  EXISTING_PR="$PR_NUMBER"
+                  EXISTING_BRANCH="$PR_BRANCH"
+                  echo "Found PR #$PR_NUMBER with latest label that needs update to pre-release"
+                  break
+                fi
+              done <<< "$PR_LIST"
+            fi
+          fi
+
+          if [ "$IS_NEW_VERSION" = "true" ] || [ "$NEEDS_LABEL_UPDATE" = "true" ]; then
+            echo "needs_upgrade=true" >> $GITHUB_OUTPUT
+            echo "needs_label_update=$NEEDS_LABEL_UPDATE" >> $GITHUB_OUTPUT
+            echo "existing_pr=$EXISTING_PR" >> $GITHUB_OUTPUT
+            echo "existing_branch=$EXISTING_BRANCH"
+            echo "is_new_version=$IS_NEW_VERSION"
+            if [ "$IS_NEW_VERSION" = "true" ]; then
+              echo "New drawio version available: $LATEST_VERSION (current: $CURRENT_DRAWIO_VERSION)"
+            else
+              echo "Release type changed to $RELEASE_TYPE for version $LATEST_VERSION"
+            fi
+          else
+            echo "needs_upgrade=false" >> $GITHUB_OUTPUT
+            echo "Already up-to-date or no new version"
+          fi
+
+      - name: Generate new addon version
+        id: addon_version
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          # Get current year and month in correct format
+          CURRENT_YEAR=$(date +%y)  # YY format (26 for 2026)
+          CURRENT_MONTH=$(date +%m)  # MM format
+          CURRENT_MONTH=${CURRENT_MONTH#0}  # Remove leading zero
+
+          # Get current addon version and extract the patch number
+          CURRENT_ADDON_VERSION="${{ steps.current.outputs.config_version }}"
+          CURRENT_PATCH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f3)
+
+          # If year.month changed, reset patch to 1, otherwise increment
+          CURRENT_YEAR_MONTH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f1,2)
+          NEW_YEAR_MONTH="$CURRENT_YEAR.$CURRENT_MONTH"
+
+          if [ "$CURRENT_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
+            # Same month, increment patch
+            NEW_PATCH=$((CURRENT_PATCH + 1))
+          else
+            # New month, reset patch to 1
+            NEW_PATCH=1
+          fi
+
+          NEW_ADDON_VERSION="$NEW_YEAR_MONTH.$NEW_PATCH"
+          echo "new_addon_version=$NEW_ADDON_VERSION" >> $GITHUB_OUTPUT
+          echo "New addon version: $NEW_ADDON_VERSION"
+
+      - name: Create or checkout upgrade branch
+        id: branch
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          # Use existing branch if we're just updating labels
+          if [ "${{ steps.compare.outputs.needs_label_update }}" = "true" ] && [ -n "${{ steps.compare.outputs.existing_branch }}" ]; then
+            BRANCH_NAME="${{ steps.compare.outputs.existing_branch }}"
+            echo "Using existing branch $BRANCH_NAME for label update"
+          else
+            BRANCH_NAME="upgrade/drawio-v${{ steps.latest.outputs.latest_version }}"
+          fi
+
+          # Check if branch exists on remote
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME exists on remote, checking it out..."
+            git fetch origin "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME" origin/"$BRANCH_NAME"
+          else
+            echo "Creating new branch $BRANCH_NAME..."
+            git checkout -b "$BRANCH_NAME"
+          fi
+
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Update config.yaml
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
+        run: |
+          # Update version in config.yaml with new addon version
+          sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" drawio/config.yaml
+          echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
+
+      - name: Update Dockerfile
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
+        run: |
+          # Update version in Dockerfile
+          sed -i "s/ARG DRAWIO_VERSION=.*/ARG DRAWIO_VERSION=${{ steps.latest.outputs.latest_version }}/" drawio/Dockerfile
+          echo "Updated Dockerfile version to ${{ steps.latest.outputs.latest_version }}"
+
+      - name: Commit changes
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add drawio/config.yaml drawio/Dockerfile
+          FORCE_FLAG="${{ github.event.inputs.force }}"
+
+          # Check if there are changes to commit
+          if git diff --cached --quiet; then
+            if [ "$FORCE_FLAG" = "true" ]; then
+              echo "No changes but force flag is set - creating empty commit"
+              git commit --allow-empty -m "⬆️ Force recreate PR for drawio ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+            else
+              echo "No changes to commit - drawio version is already up to date on this branch"
+              exit 0
+            fi
+          else
+            git commit -m "⬆️ Upgrade drawio to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+          fi
+
+      - name: Push branch
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
+        run: |
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          FORCE_FLAG="${{ github.event.inputs.force || 'true' }}"
+
+          # Fetch to ensure we have latest remote info
+          git fetch origin || true
+
+          # Check if there are commits to push (avoids error when no changes)
+          # Skip this check if force flag is set - always push when forced
+          if [ "$FORCE_FLAG" = "true" ]; then
+            echo "Force flag set - pushing branch unconditionally..."
+            git push origin "$BRANCH_NAME" --force
+          elif git rev-parse origin/"$BRANCH_NAME" >/dev/null 2>&1; then
+            # Branch exists remotely - check if we have new commits
+            if [ -n "$(git log origin/"$BRANCH_NAME"..HEAD 2>/dev/null)" ]; then
+              echo "New commits found - pushing updates..."
+              git push origin "$BRANCH_NAME" --force
+            else
+              echo "No new commits to push - branch is up to date"
+            fi
+          else
+            # Branch doesn't exist on remote yet
+            echo "Creating new branch $BRANCH_NAME on remote..."
+            git push origin "$BRANCH_NAME"
+          fi
+
+      - name: Setup GitHub CLI
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        uses: wusatosi/setup-gh@v1
+
+      - name: Create or Update Pull Request
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          # Debug: show current branch and repo info
+          echo "Current branch: $(git branch --show-current)"
+          echo "Remote URL: $(git remote get-url origin)"
+
+          LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
+          NEW_ADDON_VERSION="${{ steps.addon_version.outputs.new_addon_version }}"
+          RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          IS_NEW_VERSION="${{ steps.compare.outputs.is_new_version }}"
+
+          FORCE_FLAG="${{ github.event.inputs.force || 'true' }}"
+
+          # Check for open PR
+          OPEN_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state open --json number --jq '.[0].number')
+          # Check for any PR (open or closed) to avoid duplicates
+          ANY_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state all --json number --jq '.[0].number')
+
+          if [ -n "$OPEN_PR" ]; then
+            echo "Open PR #$OPEN_PR found, updating labels..."
+
+            # Get current labels
+            CURRENT_LABELS=$(gh pr view "$OPEN_PR" --json labels --jq '.labels[].name')
+            echo "Current labels: $CURRENT_LABELS"
+
+            # Check if PR has pre-release or latest label and needs update
+            if echo "$CURRENT_LABELS" | grep -q "pre-release\|latest"; then
+              # Remove old release type and add new one
+              gh pr edit "$OPEN_PR" --remove-label "pre-release,latest" 2>/dev/null || true
+            fi
+
+            # Add the correct release type label
+            gh pr edit "$OPEN_PR" --add-label "$RELEASE_TYPE"
+
+            # Update title if needed (only for new versions)
+            if [ "$IS_NEW_VERSION" = "true" ]; then
+              CURRENT_TITLE=$(gh pr view "$OPEN_PR" --json title --jq '.title')
+              NEW_TITLE="⬆️ drawio $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
+              if [ "$CURRENT_TITLE" != "$NEW_TITLE" ]; then
+                gh pr edit "$OPEN_PR" --title "$NEW_TITLE"
+                echo "Updated PR title to: $NEW_TITLE"
+              fi
+            fi
+
+            echo "PR #$OPEN_PR updated successfully"
+          elif [ "$FORCE_FLAG" = "true" ]; then
+            echo "Force flag is set - creating new PR even if one existed before..."
+            # Create pull request using gh CLI (forced)
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "⬆️ drawio $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade drawio to version $LATEST_VERSION
+
+            **Changes:**
+            - Updated config.yaml addon version to $NEW_ADDON_VERSION
+            - Updated Dockerfile to use drawio@$LATEST_VERSION
+
+            **Release:** ${{ steps.latest.outputs.release_url }}
+
+            This PR was created automatically by the auto-upgrade workflow (forced recreation)." \
+              --label "auto-upgrade,dependencies,$RELEASE_TYPE"
+
+            echo "PR created successfully (forced)"
+          elif [ -n "$ANY_PR" ]; then
+            echo "PR #$ANY_PR already exists but is closed/merged - not creating duplicate (use 'force' to recreate)"
+          elif [ "$IS_NEW_VERSION" = "true" ]; then
+            # Create pull request using gh CLI (only for new versions)
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "⬆️ drawio $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade drawio to version $LATEST_VERSION
+
+            **Changes:**
+            - Updated config.yaml addon version to $NEW_ADDON_VERSION
+            - Updated Dockerfile to use drawio@$LATEST_VERSION
+
+            **Release:** ${{ steps.latest.outputs.release_url }}
+
+            This PR was created automatically by the auto-upgrade workflow." \
+              --label "auto-upgrade,dependencies,$RELEASE_TYPE"
+
+            echo "PR created successfully"
+          else
+            echo "No new version and no open PR - nothing to do"
+          fi
