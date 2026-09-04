@@ -1,0 +1,5 @@
+panel_iframe:
+  drawio_local:
+    title: "Draw.io"
+    icon: mdi:draw
+    url: "http://homeassistant.local:1665"

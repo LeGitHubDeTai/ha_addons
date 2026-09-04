@@ -1,0 +1,13 @@
+name: "Draw.io"
+version: "26.9.1"
+slug: "drawio"
+image: ghcr.io/legithubdetai/ha_addons/drawio-{arch}
+description: "Auto-hébergé Draw.io comme add-on"
+startup: services
+boot: auto
+webui: http://[HOST]:[PORT:1665]/
+ports:
+  1665/tcp: 1665
+arch:
+  - aarch64
+  - amd64
