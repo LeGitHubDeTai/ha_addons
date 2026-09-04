@@ -199,17 +199,9 @@ jobs:
       - name: Update config.yaml
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
-          # Update version in config.yaml with new addon version, preserving YAML formatting
-          python3 -c "
-import re
-NEW_VERSION = '${{ steps.addon_version.outputs.new_addon_version }}'
-with open('drawio/config.yaml', 'r') as f:
-    content = f.read()
-new_content = re.sub(r'version: ".*?"', f'version: "{NEW_VERSION}"', content, count=1)
-with open('drawio/config.yaml', 'w') as f:
-    f.write(new_content)
-echo \"Updated config.yaml version to $NEW_VERSION\"
-"
+          # Update version in config.yaml with new addon version
+          sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" drawio/config.yaml
+          echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
 
       - name: Update Dockerfile
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
