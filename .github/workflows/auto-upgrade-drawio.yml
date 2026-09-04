@@ -33,11 +33,11 @@ jobs:
         run: |
           # Get drawio version from Dockerfile
           DOCKERFILE_VERSION=$(grep -E 'ARG DRAWIO_VERSION' drawio/Dockerfile | sed 's/.*=//' | sed 's/[[:space:]]*//')
-          echo "dockerfile_version=$DOCKERFILE_VERSION"
+          echo "dockerfile_version=$DOCKERFILE_VERSION" >> $GITHUB_OUTPUT
 
           # Get addon version from config.yaml
           CONFIG_VERSION=$(grep -E '^version:' drawio/config.yaml | sed 's/version: "//' | sed 's/"//')
-          echo "config_version=$CONFIG_VERSION"
+          echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
 
           echo "Current drawio version: $DOCKERFILE_VERSION"
           echo "Current addon version: $CONFIG_VERSION"
