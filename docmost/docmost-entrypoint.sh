@@ -9,7 +9,7 @@ PGDATA="/var/lib/postgresql/data"
 # ===============================
 if [ ! -f "$PGDATA/PG_VERSION" ]; then
     echo "Running initdb..."
-    su -s /bin/bash postgres -c "initdb -D $PGDATA"
+    su -s /bin/bash postgres -c "/usr/lib/postgresql/16/bin/initdb -D $PGDATA"
     sed -i "s/#listen_addresses = 'localhost'/listen_addresses = 'localhost'/" "$PGDATA/postgresql.conf"
     echo "PostgreSQL initialized."
 fi
@@ -18,7 +18,7 @@ fi
 # Start PostgreSQL in background
 # ===============================
 echo "Starting PostgreSQL..."
-su -s /bin/bash postgres -c "pg_ctl -D $PGDATA -o '-c config_file=$PGDATA/postgresql.conf' start -w"
+su -s /bin/bash postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $PGDATA -o '-c config_file=$PGDATA/postgresql.conf' start -w"
 
 # Wait for PostgreSQL to be ready
 until pg_isready -h localhost -p 5432 -U postgres -q; do
@@ -71,7 +71,7 @@ fi
 # ===============================
 # Set environment variables
 # ===============================
-export APP_URL="http://localhost:5200"
+export APP_URL="http://localhost:3000"
 export APP_SECRET="${APP_SECRET}"
 export DATABASE_URL="postgresql://docmost:${DB_PASSWORD}@localhost:5432/docmost"
 export REDIS_URL="redis://localhost:6379"
@@ -83,5 +83,5 @@ export DISABLE_TELEMETRY=true
 # Start Docmost
 # ===============================
 echo "Starting Docmost..."
-cd /opt/docmost
-exec node dist/server.js
+cd /app
+exec pnpm start
