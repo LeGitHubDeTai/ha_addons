@@ -1,0 +1,53 @@
+name: Docmost
+version: "26.9.1"
+slug: docmost
+panel_icon: "mdi:file-document-edit-outline"
+description: Self-hosted documentation & wiki tool (Docmost)
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/docmost
+webui: http://[HOST]:[PORT:3000]/
+image: ghcr.io/legithubdetai/ha_addons/docmost-{arch}
+arch:
+    - amd64
+    - aarch64
+startup: application
+boot: auto
+hassio_role: "default"
+hassio_api: true
+homeassistant_api: true
+ingress: true
+ingress_port: 5200
+ingress_stream: true
+backup_exclude:
+    - "docmost/data/storage/*"
+    - "docmost/log/*"
+    - "supervisord.log*"
+map:
+    - ssl:ro
+    - backup:rw
+    - share:rw
+    - media:rw
+    - config:rw
+ports:
+    3000/tcp: null
+ports_description:
+    3000/tcp: Docmost Web UI. Normally not exposed, as Home Assistant Ingress is more secure and is recommended. You may expose this port if you want to bypass the Ingress.
+options:
+    timezone: "Europe/Berlin"
+    app_secret: ""
+    db_password: ""
+    smtp_host: ""
+    smtp_port: 587
+    smtp_username: ""
+    smtp_password: ""
+    smtp_from_address: ""
+    smtp_from_name: "Docmost"
+schema:
+    timezone: str
+    app_secret: str?
+    db_password: str
+    smtp_host: str?
+    smtp_port: int?
+    smtp_username: str?
+    smtp_password: str?
+    smtp_from_address: str?
+    smtp_from_name: str?
