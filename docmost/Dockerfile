@@ -35,11 +35,7 @@ RUN apk add --no-cache nodejs npm || \
 RUN mkdir -p /run/nginx /data/docmost/data/storage /data/docmost/log \
     /var/lib/postgresql/data /var/lib/redis
 
-# Initialize PostgreSQL
-RUN initdb -D /var/lib/postgresql/data \
-    && sed -i "s/#listen_addresses = 'localhost'/listen_addresses = 'localhost'/" /var/lib/postgresql/data/postgresql.conf
-
-# Set correct permissions
+# Set correct permissions for directories
 RUN chown -R postgres:postgres /var/lib/postgresql/data \
     && chown -R redis:redis /var/lib/redis
 
@@ -57,8 +53,7 @@ COPY nginx.conf /etc/nginx/nginx.conf.template
 COPY supervisord.conf /etc/supervisord.conf
 COPY nginx-entrypoint.sh /app/nginx-entrypoint.sh
 COPY docmost-entrypoint.sh /app/docmost-entrypoint.sh
-COPY init-db.sh /app/init-db.sh
 
-RUN chmod +x /app/nginx-entrypoint.sh /app/docmost-entrypoint.sh /app/init-db.sh
+RUN chmod +x /app/nginx-entrypoint.sh /app/docmost-entrypoint.sh
 
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
