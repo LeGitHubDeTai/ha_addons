@@ -1,7 +1,7 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
-ARG DRAWIO_VERSION=31.4.2
+ARG DRAWIO_VERSION=31.4.4
 
 RUN apk add --no-cache unzip curl
 
