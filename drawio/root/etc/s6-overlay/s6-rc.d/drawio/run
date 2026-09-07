@@ -1,0 +1,5 @@
+#!/command/with-contenv bashio
+set -e
+
+bashio::log.info 'Starting draw.io (nginx)...'
+exec nginx -g "daemon off;"
