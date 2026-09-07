@@ -1,7 +1,6 @@
-ARG BUILD_FROM
-FROM ${BUILD_FROM}
+FROM ghcr.io/hassio-addons/base:21.0.0
 
-ARG DRAWIO_VERSION=31.4.4
+ARG DRAWIO_VERSION=31.4.2
 
 RUN apk add --no-cache unzip curl nginx
 
@@ -10,6 +9,7 @@ RUN mkdir -p /usr/share/nginx/html && \
     unzip /tmp/draw.war -d /usr/share/nginx/html && \
     rm /tmp/draw.war
 
+COPY root /
+
 ENTRYPOINT [ "/init" ]
 CMD []
-COPY root /

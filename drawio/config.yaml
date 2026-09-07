@@ -1,10 +1,11 @@
 name: "Draw.io"
-version: "26.9.5"
+version: "26.9.6"
 slug: "drawio"
 image: ghcr.io/legithubdetai/ha_addons/drawio-{arch}
 description: "Auto-hébergé Draw.io comme add-on"
 startup: services
 boot: auto
+init: false
 webui: http://[HOST]:[PORT:1665]/
 ports:
   1665/tcp: 1665
