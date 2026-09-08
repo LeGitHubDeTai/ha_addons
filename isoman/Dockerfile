@@ -19,9 +19,10 @@ RUN apk add --no-cache \
     su-exec
 
 # Download and extract ISOMan
-RUN wget https://github.com/aloks98/isoman/archive/refs/tags/v0.3.3.zip -O isoman.zip && \
+ARG ISOMAN_VERSION=0.3.3
+RUN wget https://github.com/aloks98/isoman/archive/refs/tags/v${ISOMAN_VERSION}.zip -O isoman.zip && \
     unzip isoman.zip && \
-    mv isoman-0.3.3 /builder && \
+    mv isoman-${ISOMAN_VERSION} /builder && \
     rm isoman.zip
 
 WORKDIR /builder
@@ -40,7 +41,6 @@ RUN bun run build
 # Stage 2: Build backend with Go
 FROM golang:1.24-alpine AS backend-builder
 
-ARG VERSION=0.3.3
 WORKDIR /app
 RUN apk add --no-cache git
 COPY --from=0 /builder/go.mod /builder/go.sum ./
@@ -48,7 +48,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 COPY --from=0 /builder/backend/ ./backend/
 RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-w -s -X main.Version=${VERSION}" \
+    -ldflags="-w -s -X main.Version=${ISOMAN_VERSION}" \
     -o server ./backend
 
 # Stage 3: Runtime Image
