@@ -1,6 +1,6 @@
 {
     "name": "Example devcontainer for apps repositories",
-    "image": "ghcr.io/home-assistant/devcontainer:5-apps",
+    "image": "ghcr.io/home-assistant/devcontainer:6-apps",
     "overrideCommand": false,
     "remoteUser": "vscode",
     "appPort": [
@@ -13,7 +13,7 @@
         "GIT_EDITOR=code --wait",
         "--privileged"
     ],
-    "workspaceFolder": "/mnt/supervisor/addons/local/${localWorkspaceFolderBasename}",
+    "workspaceFolder": "/mnt/supervisor/apps/local/${localWorkspaceFolderBasename}",
     "workspaceMount": "source=${localWorkspaceFolder},target=${containerWorkspaceFolder},type=bind,consistency=cached",
     "containerEnv": {
         "WORKSPACE_DIRECTORY": "${containerWorkspaceFolder}",
