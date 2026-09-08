@@ -221,7 +221,7 @@ jobs:
           if git diff --cached --quiet; then
             if [ "$FORCE_FLAG" = "true" ]; then
               echo "No changes but force flag is set - creating empty commit"
-              git commit --allow-empty -m "⬆️ Force recreate PR for mopidy (Iris ${{ steps.latest.outputs.latest_version }}) (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+              git commit --allow-empty -m "⬆️ Upgrade mopidy to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
             else
               echo "No changes to commit - mopidy version is already up to date on this branch"
               exit 0
@@ -301,7 +301,7 @@ jobs:
             # Update title if needed (only for new versions)
             if [ "$IS_NEW_VERSION" = "true" ]; then
               CURRENT_TITLE=$(gh pr view "$OPEN_PR" --json title --jq '.title')
-              NEW_TITLE="⬆️ mopidy (Iris $LATEST_VERSION) (addon $NEW_ADDON_VERSION)"
+              NEW_TITLE="⬆️ Upgrade mopidy to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
               if [ "$CURRENT_TITLE" != "$NEW_TITLE" ]; then
                 gh pr edit "$OPEN_PR" --title "$NEW_TITLE"
                 echo "Updated PR title to: $NEW_TITLE"
@@ -315,7 +315,7 @@ jobs:
             gh pr create \
               --base main \
               --head "$BRANCH_NAME" \
-              --title "⬆️ mopidy (Iris $LATEST_VERSION) (addon $NEW_ADDON_VERSION)" \
+              --title "⬆️ Upgrade mopidy to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
               --body "Auto-upgrade mopidy addon (Mopidy-Iris to $LATEST_VERSION)
 
             **Changes:**
@@ -335,7 +335,7 @@ jobs:
             gh pr create \
               --base main \
               --head "$BRANCH_NAME" \
-              --title "⬆️ mopidy (Iris $LATEST_VERSION) (addon $NEW_ADDON_VERSION)" \
+              --title "⬆️ Upgrade mopidy to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
               --body "Auto-upgrade mopidy addon (Mopidy-Iris to $LATEST_VERSION)
 
             **Changes:**
