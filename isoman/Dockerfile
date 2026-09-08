@@ -19,7 +19,7 @@ RUN apk add --no-cache \
     su-exec
 
 # Download and extract ISOMan
-ARG ISOMAN_VERSION=0.3.3
+ARG ISOMAN_VERSION=0.3.4
 RUN wget https://github.com/aloks98/isoman/archive/refs/tags/v${ISOMAN_VERSION}.zip -O isoman.zip && \
     unzip isoman.zip && \
     mv isoman-${ISOMAN_VERSION} /builder && \
