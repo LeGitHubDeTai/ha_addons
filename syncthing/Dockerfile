@@ -6,7 +6,7 @@ LABEL \
   io.hass.type="addon" \
   io.hass.arch="${BUILD_ARCH}"
 
-ARG SYNCTHING_VERSION="2.0.13"
+ARG SYNCTHING_VERSION="2.1.5"
 ARG BUILD_ARCH
 
 RUN set -eux; \
