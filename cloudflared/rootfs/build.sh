@@ -8,7 +8,7 @@
 set -eux
 
 # yq is to avoid depending on Home Assistant API on startup
-apk add --no-cache yq-go="${YQ_VERSION}"
+apk add --no-cache yq-go
 
 # Adapt the architecture to the cloudflared specific names if needed
 # see HA archs: https://developers.home-assistant.io/docs/add-ons/configuration/#:~:text=the%20add%2Don.-,arch,-list
