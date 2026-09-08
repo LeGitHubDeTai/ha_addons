@@ -18,16 +18,16 @@ RUN apk add --no-cache \
     npm \
     curl
 
-# Install FossFLOW - create a simple web server for now
-# Since the actual FossFLOW repository might not be available, we'll create a placeholder
-RUN echo "Creating placeholder FossFLOW installation..." \
-    && mkdir -p /tmp/fossflow \
-    && cd /tmp/fossflow \
-    && echo '{"name": "fossflow-placeholder", "version": "1.0.0", "main": "server.js"}' > package.json \
-    && echo 'const http = require("http"); const server = http.createServer((req, res) => { res.writeHead(200, {"Content-Type": "text/html"}); res.end("<h1>FossFLOW Server</h1><p>Placeholder installation - FossFLOW will be available soon</p>"); }); server.listen(4000, "0.0.0.0", () => { console.log("FossFLOW server running on port 4000"); });' > server.js \
+# Install FossFLOW from upstream
+ARG FOSSFLOW_VERSION=1.0.4
+RUN cd /tmp \
+    && curl -L "https://github.com/Abrar74774/FossFLOW/archive/refs/tags/v${FOSSFLOW_VERSION}.zip" -o fossflow.zip \
+    && unzip fossflow.zip \
+    && cd FossFLOW-${FOSSFLOW_VERSION} \
+    && npm install \
     && npm install -g . \
     && cd / \
-    && rm -rf /tmp/fossflow
+    && rm -rf /tmp/fossflow*
 
 # Create directories
 RUN mkdir -p /data/diagrams
