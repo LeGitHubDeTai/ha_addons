@@ -1,5 +1,5 @@
 # Use the official Docmost image as base (Debian-based)
-ARG DOCMOST_VERSION=0.95.0
+ARG DOCMOST_VERSION=0.96.0
 FROM docmost/docmost:$DOCMOST_VERSION
 
 ARG BUILD_VERSION
