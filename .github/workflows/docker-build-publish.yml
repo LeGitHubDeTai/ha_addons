@@ -50,9 +50,19 @@ jobs:
             elif [[ "$BRANCH_NAME" =~ ^dev-(.+)$ ]]; then
               ADDON_NAME="${BASH_REMATCH[1]}"
             elif [ "$BRANCH_NAME" == "main" ]; then
-              # For main branch, build ALL addons (version check will filter what needs building)
-              ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' ' ')
-              echo "🏠 Main branch: checking all addons: $ADDONS"
+              # For main branch, detect changed addons using git diff
+              if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+                BASE_SHA="${{ github.event.before }}"
+              else
+                BASE_SHA=$(git rev-parse HEAD~1)
+              fi
+              
+              ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
+              
+              ADDONS=$(git diff --name-only $BASE_SHA ${{ github.sha }} | \
+                grep -E "^($ALL_ADDONS)/" | \
+                cut -d'/' -f1 | sort -u | tr '\n' ' ')
+              echo "🏠 Main branch: detected changed addons: $ADDONS"
             else
               # For other branches, use git diff to detect changes
               ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
