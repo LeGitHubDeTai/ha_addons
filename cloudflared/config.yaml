@@ -1,5 +1,5 @@
 name: Cloudflared
-version: "26.9.4"
+version: "26.9.5"
 slug: cloudflared
 image: ghcr.io/legithubdetai/ha_addons/cloudflared-{arch}
 breaking_versions:
