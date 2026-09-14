@@ -1,4 +1,4 @@
-name: .Cleanup dev packages
+name: Cleanup dev packages
 
 on:
   schedule:
@@ -40,272 +40,131 @@ jobs:
           fi
           yq --version
 
-      - name: Detect dev- packages without dev branch
+      - name: Detect dev- packages to remove
         id: collect
         run: |
           set -euo pipefail
 
           DRY_RUN="${{ inputs.dry_run }}"
-          echo "### 🧹 Cleanup dev packages (GITHUB_TOKEN uniquement)" >> $GITHUB_STEP_SUMMARY
+          echo "### 🧹 Cleanup dev packages" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Mode dry-run: **${DRY_RUN:-false}**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "📡 Branches distantes :"
+          # === ÉTAPE 1 : Lister TOUS les packages GHCR dev-* ===
+          echo "📦 ÉTAPE 1 : Récupération de TOUTES les packages GHCR en cours..."
+          echo ""
+
+          # Récupérer tous les packages container de l'utilisateur
+          PACKAGES_JSON=$(gh api --paginate "/users/$OWNER_LC/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
+
+          if [ -z "$PACKAGES_JSON" ] || [ "$PACKAGES_JSON" = "[]" ]; then
+            echo "⚠️ Aucun package trouvé via /users. Essai via le repo..."
+            PACKAGES_JSON=$(gh api --paginate "/repos/$OWNER_LC/$REPO_PREFIX/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
+          fi
+
+          # Filtrer uniquement les packages dev-*
+          # Format expected: "ha_addons/dev-planka-amd64" or "dev-planka-amd64"
+          ALL_DEV_PACKAGES=$(echo "$PACKAGES_JSON" | jq -r --arg prefix "$REPO_PREFIX" '
+            .[]
+            | .name as $n
+            | select(
+              ($n | startswith($prefix + "/dev-")) or
+              ($n | startswith("dev-"))
+            )
+            | $n
+          ' | sort -u || true)
+
+          if [ -z "$ALL_DEV_PACKAGES" ]; then
+            echo "ℹ️ Aucun package dev-* trouvé sur GHCR."
+            echo "matrix=[]" >> $GITHUB_OUTPUT
+            echo "count=0" >> $GITHUB_OUTPUT
+            echo ""
+            echo "Aucun package dev- à traiter."
+            exit 0
+          fi
+
+          echo "✅ Found $(echo "$ALL_DEV_PACKAGES" | wc -l) packages dev-* sur GHCR :"
+          echo "$ALL_DEV_PACKAGES"
+          echo ""
+
+          # === ÉTAPE 2 : Obtenir les addons et leurs branches dev ===
+          echo "📦 ÉTAPE 2 : Analyse des addons et branches en cours..."
+          echo ""
+
+          # Obtenir les dossiers d'addon
+          mapfile -t ADDON_DIRS < <(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.$' | sort -u)
+          echo "Addons main détectés : ${ADDON_DIRS[*]}"
+          echo ""
+
+          # Obtenir les branches dev distantes
           git fetch origin --prune 2>/dev/null || true
           REMOTE_BRANCHES=$(git ls-remote --heads origin | sed -E 's|.*refs/heads/||')
-          echo "$REMOTE_BRANCHES"
-          echo ""
           DEV_BRANCHES=$(echo "$REMOTE_BRANCHES" | grep -E '(-dev$|^dev-)' || true)
-          echo "Branches dev : $(echo "$DEV_BRANCHES" | tr '\n' ' ')"
+
+          # Extraire les noms d'addon depuis les branches dev (ex: planka-dev -> planka)
+          declare -A DEV_ADDONS=()  # addon_name -> branch_name
+          if [ -n "$DEV_BRANCHES" ]; then
+            for BRANCH in $DEV_BRANCHES; do
+              # Enlever le suffixe -dev ou préfixe dev-
+              ADDON_NAME=$(echo "$BRANCH" | sed -E 's/-dev$//; s/^dev-//')
+              DEV_ADDONS["$ADDON_NAME"]="$BRANCH"
+            done
+          fi
+
+          echo "🌿 Branches dev trouvées : ${#DEV_ADDONS[@]}"
+          for KEY in "${!DEV_ADDONS[@]}"; do
+            echo "  - $KEY → branche ${DEV_ADDONS[$KEY]}"
+          done
           echo ""
 
-          mapfile -t ADDON_DIRS < <(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.$' | sort -u)
-          echo "Addons main : ${ADDON_DIRS[*]}"
+          # === ÉTAPE 3 : Déterminer quels packages supprimer ===
+          echo "📦 ÉTAPE 3 : Détermination des packages à supprimer..."
           echo ""
 
-          is_main_dir() {
-            local d="$1"
-            for m in "${ADDON_DIRS[@]}"; do
-              if [ "$m" = "$d" ]; then
-                return 0
-              fi
-            done
-            return 1
-          }
+          DELETE_PKGS=()
+          KEEP_PKGS=()
+          SUMMARY_ROWS="| Package dev-* | Décision | Détail |"
+          SUMMARY_ROWS+="\n|---|---|---|"
 
-          main_slug_and_archs() {
-            # $1 = dir -> "slug|archs"
-            local d="$1" s a
-            s=$(yq eval '.slug' "$d/config.yaml" 2>/dev/null | tr -d '"' | xargs || echo "$d")
-            if [ -z "$s" ] || [ "$s" = "null" ]; then
-              s="$d"
-            fi
-            a=$(yq eval '.arch[]' "$d/config.yaml" 2>/dev/null | tr '\n' ' ' || echo "amd64 aarch64")
-            if [ -z "$a" ]; then
-              a="amd64 aarch64"
-            fi
-            echo "$s|$a"
-          }
+          # Pour chaque package dev-*, vérifier si son addon a une branche dev vivante
+          while IFS= read -r PKG; do
+            [ -z "$PKG" ] && continue
 
-          # 1. Slugs EXACTS lus dans les configs des branches dev vivantes.
-          # Indispensable car le slug dev diffère souvent du slug main :
-          #   planka-dev  -> slug "dev-planka"  -> package dev-dev-planka-*
-          #   planka2-dev -> slug "planka2"     -> package dev-planka2-*
-          # (le publish utilise dev-$SLUG, avec le SLUG de la branche dev)
-          declare -A LIVE_SLUG_INFO=()  # slug -> "branch|dir|archs"
-          for B in $DEV_BRANCHES; do
-            CONFIGS=$(git ls-tree -r --name-only "origin/$B" -- '*/config.yaml' 2>/dev/null || true)
-            for cfg in $CONFIGS; do
-              D=$(dirname "$cfg")
-              CONTENT=$(git show "origin/$B:$cfg" 2>/dev/null || true)
-              if [ -z "$CONTENT" ]; then
-                continue
-              fi
-              S=$(echo "$CONTENT" | yq eval '.slug' - 2>/dev/null | tr -d '"' | xargs || true)
-              if [ -z "$S" ] || [ "$S" = "null" ]; then
-                continue
-              fi
-              A=$(echo "$CONTENT" | yq eval '.arch[]' - 2>/dev/null | tr '\n' ' ' || echo "amd64 aarch64")
-              if [ -z "$A" ]; then
-                A="amd64 aarch64"
-              fi
-              if [ -z "${LIVE_SLUG_INFO[$S]:-}" ]; then
-                LIVE_SLUG_INFO["$S"]="$B|$D|$A"
-              fi
-            done
-          done
+            # Extraire le slug depuis le nom du package
+            # Format: ha_addons/dev-slug-arch ou dev-slug-arch
+            SLUG_FROM_PKG=$(echo "$PKG" | sed -E 's|^'"$REPO_PREFIX"'/||; s|-amd64|-aarch64|; s|-[a-z0-9]+$||')
 
-          echo "Slugs dev vivants : ${!LIVE_SLUG_INFO[*]:-(aucun)}"
-          echo ""
+            # Vérifier si cette branch existe pour cet addon
+            HAS_DEV_BRANCH=false
+            BRANCH_INFO=""
 
-          # Convention publish (docker-build-publish.yml) :
-          #   ghcr.io/<owner>/ha_addons/dev-<slug>-<arch> => package "ha_addons/dev-<slug>-<arch>"
-          # Règle : on GARDE dev-<V>-* ssi V est le slug vivant d'une branche dev
-          # dont le dossier existe dans main. Tout le reste se supprime :
-          #  - slug vivant mais dossier hors main (ex. planka2) -> orphelin
-          #  - addon main sans branche dev (ex. isoman, branche supprimée) ->
-          #    dev-<slug>-* + variante historique dev-<slug>dev-* (ex. dev-isomandev-*)
-          # Note: on doit aussi considérer les architectures qui existent sur GHCR
-          # mais qui ne sont plus dans config.yaml (anciennes archs comme armhf, armv7, i386).
-          # On récupère toutes les archs uniques depuis GHCR pour chaque slug.
-          declare -A DELETE_PKGS=()
-          declare -A KEEP_PKGS=()
-          # Dictionnaires pour suivre les archs since config.yaml et depuis GHCR
-          declare -A CONFIG_ARCHS=()  # slug -> "arch1 arch2"
-          echo "| Slug (package dev-*) | Décision | Détail |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
-
-          for S in "${!LIVE_SLUG_INFO[@]}"; do
-            INFO="${LIVE_SLUG_INFO[$S]}"
-            B="${INFO%%|*}"
-            REST="${INFO#*|}"
-            D="${REST%%|*}"
-            A="${REST#*|}"
-            CONFIG_ARCHS["$S"]="$A"
-
-            # Récupérer toutes les archs uniques depuis GHCR pour ce slug
-            # Format package: ha_addons/dev-$S-amd64 (ou dev-$S-amd64)
-            GHCR_ARCHS=""
-            if gh api "/users/$OWNER_LC/packages/container/$REPO_PREFIX/dev-$S-amd64/versions?per_page=1" 2>&1 | grep -qi "not found\|404" 2>/dev/null; then
-              # Essayer sans prefix ha_addons
-              gh api "/user/packages/container/$REPO_PREFIX/dev-$S-amd64/versions?per_page=1" 2>&1 | grep -qi "not found\|404" 2>/dev/null || true
-            fi
-            # On va plutôt récupérer tous les packages dev-$S-* et extraire leurs archs
-            # Mais d'abord, construisons les packages à traiter
-            if is_main_dir "$D"; then
-              for arch in $A; do
-                KEEP_PKGS["$REPO_PREFIX/dev-$S-$arch"]=1
-              done
-              # Aussi, on pourrait avoir d'autres archs sur GHCR - on les récupérera plus tard
-              echo "✅ slug vivant $S (branche $B, dossier main $D) → conservé"
-              echo "| \`dev-$S-*\` | ✅ conservé | branche vivante \`$B\` + dossier main \`$D\` |" >> $GITHUB_STEP_SUMMARY
-            else
-              for arch in $A; do
-                DELETE_PKGS["$REPO_PREFIX/dev-$S-$arch"]=1
-              done
-              echo "🗑️ slug vivant $S (branche $B) mais dossier $D hors main → à supprimer"
-              echo "| \`dev-$S-*\` | 🗑️ à supprimer | dossier \`$D\` absent de main (branche \`$B\`) |" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-
-          # Maintenant, enrichissons DELETE_PKGS et KEEP_PKGS avec le cas échéant
-          # pour les architectures non listées dans config.yaml mais présentes sur GHCR.
-          # Pour chaque slug vivant, on vérifie s'il existe des packages avec
-          # des archs différents de ceux en config.yaml.
-          for S in "${!LIVE_SLUG_INFO[@]}"; do
-            CONFIG_ARCH="${CONFIG_ARCHS[$S]:-}"
-            # Récupérer tous les packages dev-$S-* depuis GHCR (via l'API utilisateur)
-            ENCODED_S=$(echo "$S" | sed 's|/|%2F|g')
-            PACKAGES_JSON=$(gh api --paginate "/users/$OWNER_LC/packages/container?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
-            # Filtrer les packages correspondant au slug (name contient "/dev-$S-" ou "dev-$S-")
-            MATCHED=$(echo "$PACKAGES_JSON" | jq -r --arg slug "$S" '
-              .[]
-              | .name as $n
-              | select(
-                ($n | contains("/dev-" + $slug)) or
-                ($n | test("^dev-" + $slug + "-"))
-              )
-              | $n
-            ' | sort -u || true)
-
-            if [ -n "$MATCHED" ]; then
-              # Extraire les archs uniques depuis les noms de packages GHCR
-              # Format: ha_addons/dev-slug-arch ou dev-slug-arch
-              GHCR_ARCHS=$(echo "$MATCHED" | jq -r 'split("/dev-")[1] // split("dev-")[1] | split("-")[-1]' | sort -u | grep -v '^$' | tr '\n' ' ' || true)
-              if [ -n "$GHCR_ARCHS" ]; then
-                for gh_arch in $GHCR_ARCHS; do
-                  # Si cette arch n'est pas dans config.yaml pour ce slug, c'est une ancienne arch → à supprimer
-                  # Vérifier si gh_arch est dans CONFIG_ARCH
-                  IN_CONFIG=false
-                  for c_arch in $CONFIG_ARCH; do
-                    if [ "$c_arch" = "$gh_arch" ]; then
-                      IN_CONFIG=true
-                      break
-                    fi
-                  done
-                  if [ "$IN_CONFIG" = "false" ]; then
-                    PKG="$REPO_PREFIX/dev-$S-$gh_arch"
-                    # S'assurer qu'elle n'est pas en KEEP (car c'est une ancienne arch)
-                    unset "KEEP_PKGS[$PKG]"
-                    DELETE_PKGS["$PKG"]=1
-                    echo "  📦 Arch \`$gh_arch\` non dans config.yaml pour \`$S\` → ajout à suppression"
-                  else
-                    # Arch dans config.yaml → conserver si branche dev vivante
-                    PKG="$REPO_PREFIX/dev-$S-$gh_arch"
-                    KEEP_PKGS["$PKG"]=1
-                  fi
-                done
-              fi
-            fi
-          done
-
-          for addon_dir in "${ADDON_DIRS[@]}"; do
-            INFO=$(main_slug_and_archs "$addon_dir")
-            M="${INFO%%|*}"
-            A="${INFO#*|}"
-            # Cet addon main a-t-il une production vivante ? = son dossier est
-            # le dossier d'au moins un slug vivant (slug exact de branche).
-            PRODUCED=false
-            for S in "${!LIVE_SLUG_INFO[@]}"; do
-              SD="${LIVE_SLUG_INFO[$S]#*|}"
-              SD="${SD%%|*}"
-              if [ "$SD" = "$addon_dir" ]; then
-                PRODUCED=true
-                break
-              fi
-            done
-            if [ "$PRODUCED" = true ]; then
-              echo "✅ addon main $addon_dir (slug $M) : production dev vivante → ses variantes historiques restent gérées via les slugs vivants"
-              continue
-            fi
-            # Plus aucune branche dev ne produit cet addon (ex. isoman-dev supprimée) :
-            # on vise dev-<M>-* + la variante historique dev-<M>dev-* (ex. dev-isomandev-*).
-            echo "🗑️ addon main $addon_dir (slug $M) sans production dev → à supprimer"
-            TARGETS=""
-            for variant in "$M" "${M}dev"; do
-              for arch in $A; do
-                PKG="$REPO_PREFIX/dev-$variant-$arch"
-                if [ -z "${KEEP_PKGS[$PKG]:-}" ]; then
-                  DELETE_PKGS["$PKG"]=1
-                  TARGETS="$TARGETS \`$PKG\`"
+            if [ -n "$DEV_BRANCHES" ]; then
+              # Chercher si une branche correspond à cet addon
+              for BRANCH in $DEV_BRANCHES; do
+                ADDON_FROM_BRANCH=$(echo "$BRANCH" | sed -E 's/-dev$//; s/^dev-//')
+                if [ "$ADDON_FROM_BRANCH" = "$SLUG_FROM_PKG" ]; then
+                  HAS_DEV_BRANCH=true
+                  BRANCH_INFO="$BRANCH"
+                  break
                 fi
               done
-            done
-            echo "| \`dev-$M-*\` | 🗑️ à supprimer | addon main \`$addon_dir\` sans branche dev |" >> $GITHUB_STEP_SUMMARY
-          done
-
-          # === NOUVEAU : Enrichir DELETE_PKGS avec les archs GHCR non dans config.yaml ===
-          # Pour chaque addon sans branche dev, on vérifie GHCR pour les archs "perdus"
-          for addon_dir in "${ADDON_DIRS[@]}"; do
-            # Récupérer le slug de l'addon
-            SLUG=$(yq eval '.slug' "$addon_dir/config.yaml" 2>/dev/null | tr -d '"' | xargs || echo "$addon_dir")
-            if [ -z "$SLUG" ] || [ "$SLUG" = "null" ]; then
-              SLUG="$addon_dir"
             fi
-            A=$(main_slug_and_archs "$addon_dir")
-            M="${A%%|*}"
-            CONFIG_ARCH="${A#*|}"
 
-            # Récupérer tous les packages dev-$SLUG-* depuis GHCR
-            PACKAGES_JSON=$(gh api --paginate "/users/$OWNER_LC/packages/container?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
-            MATCHED=$(echo "$PACKAGES_JSON" | jq -r --arg slug "$SLUG" '
-              .[]
-              | .name as $n
-              | select(
-                ($n | contains("/dev-" + $slug)) or
-                ($n | test("^dev-" + $slug + "-"))
-              )
-              | $n
-            ' | sort -u || true)
-
-            if [ -n "$MATCHED" ]; then
-              GHCR_ARCHS=$(echo "$MATCHED" | jq -r 'split("/dev-")[1] // split("dev-")[1] | split("-")[-1]' | sort -u | grep -v '^$' | tr '\n' ' ' || true)
-              if [ -n "$GHCR_ARCHS" ]; then
-                for gh_arch in $GHCR_ARCHS; do
-                  # Si cette arch n'est pas dans config.yaml, c'est une ancienne arch → à supprimer
-                  IN_CONFIG=false
-                  for c_arch in $CONFIG_ARCH; do
-                    if [ "$c_arch" = "$gh_arch" ]; then
-                      IN_CONFIG=true
-                      break
-                    fi
-                  done
-                  if [ "$IN_CONFIG" = "false" ]; then
-                    PKG="$REPO_PREFIX/dev-$SLUG-$gh_arch"
-                    unset "KEEP_PKGS[$PKG]"
-                    DELETE_PKGS["$PKG"]=1
-                    echo "  📦 Arch \`$gh_arch\` non dans config.yaml pour \`$SLUG\` (orphan GHCR) → ajouté à suppression"
-                  fi
-                done
-              fi
+            if [ "$HAS_DEV_BRANCH" = true ]; then
+              # Cette branche existe → conserver le package
+              KEEP_PKGS["$PKG"]=1
+              SUMMARY_ROWS+="\n| \`$PKG\` | ✅ conservé | branche dev vivante \`$BRANCH_INFO\` |"
+              echo "✅ \`$PKG\` → conservé (branche \`$BRANCH_INFO\` existante)"
+            else
+                # Aucune branche dev → marquer pour suppression
+                DELETE_PKGS["$PKG"]=1
+                SUMMARY_ROWS+="\n| \`$PKG\` | 🗑️ à supprimer | aucune branche dev vivante |"
+                echo "🗑️ \`$PKG\` → marqué pour suppression (pas de branche dev)"
             fi
-          done
+          done <<< "$ALL_DEV_PACKAGES"
 
-          # Sécurité : un package explicitement conservé ne doit jamais être supprimé
-
-          # Sécurité : un package explicitement conservé ne doit jamais être supprimé
-          # (ex. dev-dev-planka-* conservé via slug vivant dev-planka).
+          # === Préparer la matrix ===
           FILTERED=()
           for PKG in "${!DELETE_PKGS[@]}"; do
             if [ -z "${KEEP_PKGS[$PKG]:-}" ]; then
@@ -313,183 +172,20 @@ jobs:
             fi
           done
 
+          # Trier et formater pour jq
           MATRIX=$(printf '%s\n' "${FILTERED[@]:-}" | grep -v '^$' | sort -u | jq -R . | jq -c -s '. // []')
           COUNT=$(echo "$MATRIX" | jq 'length')
+
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "count=$COUNT" >> $GITHUB_OUTPUT
           echo ""
-          echo "Matrice ($COUNT packages) : $MATRIX"
+          echo "Résumé :"
+          echo "$SUMMARY_ROWS" | column -t -s '|'
+          echo ""
+          echo "Packages orphelins détectés : $COUNT"
+          echo "Packages conservés (avec branche dev vivante) : ${#KEEP_PKGS[@]}"
 
-  delete:
-    runs-on: ubuntu-latest
-    needs: detect-orphans
-    if: needs.detect-orphans.outputs.count != '0' && inputs.dry_run != true
-    strategy:
-      fail-fast: false
-      matrix:
-        package: ${{ fromJson(needs.detect-orphans.outputs.matrix) }}
-    steps:
-      # Suppression sans action Node (évite le warning Node 20) et sans LIST global.
-      # On interroge uniquement le package connu : s'il n'existe pas → skip propre,
-      # plus d'erreur "Package not found". Fonctionne avec le seul GITHUB_TOKEN
-      # si le repo a le rôle Admin sur le package (auto quand publié depuis ce repo).
-      - name: Delete versions of ${{ matrix.package }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set +e
-          PKG="${{ matrix.package }}"
-          ENCODED=$(echo "$PKG" | sed 's|/|%2F|g')
-          echo "📦 Package : $PKG (encodé : $ENCODED)"
-
-          # --- Vérification d'existence du package ---
-          # On ne supprime que si le package existe vraiment sur GHCR.
-          # Si le package n'existe pas (404 REST), on skippe proprement.
-          EXISTS_CHECK=$(gh api "/users/$OWNER_LC/packages/container/$ENCODED/versions?per_page=1" 2>&1 || true)
-          
-          if echo "$EXISTS_CHECK" | grep -qi "not found\|404"; then
-            echo "ℹ️ Package $PKG introuvable → aucune action, il est déjà disparu ou n'a jamais été publié."
-            exit 0
+          if [ "$DRY_RUN" = "true" ]; then
+            echo ""
+            echo "🔍 Dry-run : aucune suppression effectuée. Revue ci-dessus."
           fi
-          echo "✅ Package $PKG confirmé existant → poursuite de la suppression."
-          
-          # On désactive exit 1 pour la suite, mais on conserve pipefail pour les tableaux
-          set -uo pipefail
-
-          VERSIONS_RAW=""
-          REST_404=false
-          for endpoint in "/users/$OWNER_LC/packages/container/$ENCODED/versions?per_page=100" "/user/packages/container/$ENCODED/versions?per_page=100"; do
-            echo "Essai : GET $endpoint"
-            VERSIONS_RAW=$(gh api --paginate "$endpoint" 2>&1 || true)
-            # gh --paginate sort en 1 même si une page 404 ; on détecte au contenu
-            if echo "$VERSIONS_RAW" | grep -qi "not found\|404"; then
-              REST_404=true
-              break
-            fi
-            if [ -n "$VERSIONS_RAW" ] && ! echo "$VERSIONS_RAW" | grep -qi '"message"'; then
-              echo "✅ Versions listées via $endpoint"
-              REST_404=false
-              break
-            fi
-            echo "→ échec :"
-            echo "$VERSIONS_RAW" | head -n 10
-            VERSIONS_RAW=""
-          done
-
-          if [ "$REST_404" = true ]; then
-            # Avec GITHUB_TOKEN, un 404 REST est ambigu : soit le package n'existe
-            # vraiment pas, soit le repo n'a pas le rôle Admin dessus (GitHub
-            # masque l'existence par 404). On lève l'ambiguïté via le registre,
-            # qui utilise la même auth que le push (packages:write) et répond
-            # honnêtement.
-            echo "ℹ️ REST → 404. Vérification via le registre GHCR..."
-            echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin 2>&1 | tail -n 2 || true
-            IMAGE="ghcr.io/$OWNER_LC/$PKG"
-            if docker manifest inspect "$IMAGE:latest" >/dev/null 2>&1 || docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
-              echo "⚠️ Le package EXISTE sur GHCR ($IMAGE) mais REST répond 404."
-              echo "  → c'est un manque de droit Admin, pas une absence."
-              echo "  → Tentative de suppression malgré tout (le token a packages:write)..."
-              # Essayer quand même la suppression - GitHub peut accepter la suppression
-              # même si le listing échoue selon les configurations du package
-              set +e
-              ENCODED=$(echo "$PKG" | sed 's|/|%2F|g')
-              OUT=$(gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || \
-                     gh api --method DELETE "/user/packages/container/$ENCODED" 2>&1 || true)
-              STATUS=$?
-              set -uo pipefail
-              if [ $STATUS -eq 0 ]; then
-                echo "✅ Package supprimé avec succès malgré le 404 initial."
-              elif echo "$OUT" | grep -qi "last tagged version.*delete the package instead"; then
-                echo "  ℹ️ Dernière version taguée : suppression du package entier requise."
-                # Essayer quand même de supprimer le package entier
-                DEL_OUT=$(gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || \
-                           gh api --method DELETE "/user/packages/container/$ENCODED" 2>&1 || true)
-                echo "$DEL_OUT" | head -n 5
-              else
-                echo "  ⚠️ Échec de la suppression :"
-                echo "$OUT" | head -n 5
-              fi
-              # Vérification réelle : le DELETE peut répondre 204 sans que le package
-              # disparaisse (ex. droits insuffisants, soft-delete). On re-GET.
-              sleep 5
-              CHECK=$(gh api "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || true)
-              if echo "$CHECK" | grep -qi "not found\|404"; then
-                echo "  ✅ package $PKG confirmé supprimé (GET → 404)."
-              else
-                echo "  ⚠️ package $PKG TOUJOURS PRÉSENT après DELETE — suppression non effective :"
-                echo "$CHECK" | head -n 20
-                echo "  Causes probables : GITHUB_TOKEN sans rôle Admin sur ce package,"
-                echo "  ou package restaurable (soft-delete 30j). Voir Settings du package → Manage Actions Access."
-              fi
-            else
-              echo "ℹ️ Package absent aussi sur GHCR ($IMAGE) → vraiment jamais publié ou déjà supprimé → skip."
-            fi
-          fi
-
-          if [ -z "$VERSIONS_RAW" ]; then
-            echo "⚠️ Impossible de lister les versions. Si 403 : package GHCR → Settings → Manage Actions Access → repo ha_addons en Admin."
-            exit 0
-          fi
-
-          IDS=$(echo "$VERSIONS_RAW" | jq -s 'add // [] | .[].id' 2>/dev/null || true)
-          if [ -z "$IDS" ]; then
-            echo "ℹ️ Aucune version à supprimer → skip."
-            exit 0
-          fi
-
-          echo "Versions à supprimer :"
-          echo "$IDS"
-          for vid in $IDS; do
-            echo "🗑️ DELETE version $vid"
-            OUT=$(gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED/versions/$vid" 2>&1 || \
-               gh api --method DELETE "/user/packages/container/$ENCODED/versions/$vid" 2>&1)
-            STATUS=$?
-            if [ $STATUS -eq 0 ]; then
-              echo "  ✅ version $vid supprimée"
-            elif echo "$OUT" | grep -qi "last tagged version.*delete the package instead"; then
-              echo "  ℹ️ Dernière version taguée : suppression du package entier requise."
-              break
-            else
-              echo "  ⚠️ échec version $vid (continue) :"
-              echo "$OUT" | head -n 5
-            fi
-          done
-
-          # Supprime le package entier (requis quand il ne reste que la dernière
-          # version taguée ; GitHub refuse DELETE version dans ce cas avec 400).
-          echo "🗑️ DELETE package $PKG"
-          DEL_OUT=$(gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || \
-             gh api --method DELETE "/user/packages/container/$ENCODED" 2>&1 || true)
-          echo "$DEL_OUT" | head -n 10
-
-          # Vérification réelle : le DELETE peut répondre 204 sans que le package
-          # disparaisse (ex. droits insuffisants, soft-delete). On re-GET.
-          sleep 5
-          CHECK=$(gh api "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || true)
-          if echo "$CHECK" | grep -qi "not found\|404"; then
-            echo "  ✅ package $PKG confirmé supprimé (GET → 404)."
-          else
-            echo "  ⚠️ package $PKG TOUJOURS PRÉSENT après DELETE — suppression non effective :"
-            echo "$CHECK" | head -n 20
-            echo "  Causes probables : GITHUB_TOKEN sans rôle Admin sur ce package,"
-            echo "  ou package restaurable (soft-delete 30j). Voir Settings du package → Manage Actions Access."
-          fi
-          echo "✅ Terminé pour $PKG"
-
-  summary:
-    runs-on: ubuntu-latest
-    needs: [detect-orphans, delete]
-    if: always()
-    steps:
-      - name: Summary
-        run: |
-          echo "## Résultat nettoyage" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Packages orphelins détectés : **${{ needs.detect-orphans.outputs.count }}**" >> $GITHUB_STEP_SUMMARY
-          echo "Résultat delete : **${{ needs.delete.result }}**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "🔍 Dry-run : aucune suppression effectuée." >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Si un delete échoue en 403 / Package not found : page du package GHCR → Settings → Manage Actions Access → ajouter le repo \`ha_addons\` avec le rôle \`Admin\`. C'est ce qui donne au \`GITHUB_TOKEN\` le droit de supprimer sans PAT._" >> $GITHUB_STEP_SUMMARY
