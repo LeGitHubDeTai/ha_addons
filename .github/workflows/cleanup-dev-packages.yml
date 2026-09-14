@@ -1,0 +1,208 @@
+name: Cleanup dev packages
+
+on:
+  schedule:
+    # Tous les samedis à 03:00 UTC
+    - cron: '0 3 * * 6'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry-run (liste sans supprimer)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  OWNER_LC: legithubdetai
+  OWNER: LeGitHubDeTai
+  REPO: ha_addons
+  REPO_PREFIX: ha_addons
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install yq
+        run: |
+          if ! command -v yq >/dev/null 2>&1; then
+            wget -q https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+            chmod +x /usr/local/bin/yq
+          fi
+          yq --version
+
+      - name: Cleanup dev- packages without dev branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN_INPUT: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          DRY_RUN="${DRY_RUN_INPUT:-false}"
+          echo "### 🧹 Cleanup dev packages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Mode dry-run: **$DRY_RUN**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # 1. Liste des branches distantes
+          echo "📡 Récupération des branches distantes..."
+          git fetch origin --prune 2>/dev/null || true
+          REMOTE_BRANCHES=$(git ls-remote --heads origin | sed -E 's|.*refs/heads/||')
+          echo "Branches distantes :"
+          echo "$REMOTE_BRANCHES"
+          echo ""
+
+          branch_exists() {
+            local candidate="$1"
+            echo "$REMOTE_BRANCHES" | grep -Fxq "$candidate"
+          }
+
+          # 2. Liste des addons (dossiers avec config.yaml) + slug
+          echo "📦 Détection des addons..."
+          mapfile -t ADDON_DIRS < <(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.$' | sort -u)
+
+          if [ ${#ADDON_DIRS[@]} -eq 0 ]; then
+            echo "Aucun addon trouvé." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          echo "Addons détectés : ${ADDON_DIRS[*]}"
+          echo ""
+
+          # 3. Liste des packages container de l'utilisateur (paginé)
+          echo "📦 Récupération des packages container de $OWNER_LC..."
+          PACKAGES_JSON=$(gh api --paginate "/users/$OWNER_LC/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []')
+
+          if [ -z "$PACKAGES_JSON" ] || [ "$PACKAGES_JSON" = "null" ] || [ "$PACKAGES_JSON" = "[]" ]; then
+            echo "⚠️ Aucun package trouvé via /users. Essai via le repo $OWNER/$REPO..."
+            # Fallback : packages liés au repo (nécessite packages:read)
+            PACKAGES_JSON=$(gh api --paginate "/repos/$OWNER/$REPO/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
+          fi
+
+          echo "$PACKAGES_JSON" | jq -r '.[].name' | sort || true
+          echo ""
+
+          DELETED_COUNT=0
+          KEPT_COUNT=0
+          SKIPPED_COUNT=0
+
+          echo "| Addon | Slug | Branche dev | Packages dev- supprimés |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
+
+          for addon_dir in "${ADDON_DIRS[@]}"; do
+            SLUG=$(yq eval '.slug' "$addon_dir/config.yaml" 2>/dev/null | tr -d '"' | xargs || echo "$addon_dir")
+            if [ -z "$SLUG" ] || [ "$SLUG" = "null" ]; then
+              SLUG="$addon_dir"
+            fi
+            echo "────────────────────────────────────────"
+            echo "📦 Addon dir='$addon_dir' slug='$SLUG'"
+
+            # 4. Vérifier si une branche dev existe pour cet addon
+            # Conventions supportées (cf. docker-build-publish.yml) : <addon>-dev et dev-<addon>,
+            # testées sur le nom du dossier ET sur le slug pour être exhaustif.
+            HAS_DEV_BRANCH=false
+            FOUND_BRANCH=""
+            for candidate in "$addon_dir-dev" "dev-$addon_dir" "$SLUG-dev" "dev-$SLUG"; do
+              if branch_exists "$candidate"; then
+                HAS_DEV_BRANCH=true
+                FOUND_BRANCH="$candidate"
+                break
+              fi
+            done
+
+            if [ "$HAS_DEV_BRANCH" = true ]; then
+              echo "  ✅ Branche dev existante : $FOUND_BRANCH → on conserve les packages dev-"
+              echo "| $addon_dir | $SLUG | ✅ \`$FOUND_BRANCH\` | conservés |" >> $GITHUB_STEP_SUMMARY
+              KEPT_COUNT=$((KEPT_COUNT + 1))
+              continue
+            fi
+
+            echo "  🗑️ Aucune branche dev (testé: $addon_dir-dev, dev-$addon_dir, $SLUG-dev, dev-$SLUG) → suppression des packages dev- liés"
+
+            # 5. Trouver les packages dev- liés à ce slug
+            # Nommage réel (cf. docker-build-publish.yml) :
+            #   ghcr.io/<owner>/ha_addons/dev-<slug>-<arch>
+            # L'API retourne name = "ha_addons/dev-<slug>-<arch>" (avec slash) ou "dev-<slug>-<arch>".
+            # On matche : contient "/dev-<slug>" OU commence par "dev-<slug>".
+            MATCHED_NAMES=$(echo "$PACKAGES_JSON" | jq -r --arg slug "$SLUG" --arg prefix "$REPO_PREFIX" '
+              .[]
+              | .name as $n
+              | select(
+                  ($n | startswith("dev-" + $slug + "-") or startswith("dev-" + $slug))
+                  or
+                  ($n | contains("/dev-" + $slug))
+                )
+              | $n
+            ' | sort -u || true)
+
+            if [ -z "$MATCHED_NAMES" ]; then
+              echo "  ℹ️ Aucun package dev- trouvé pour le slug '$SLUG'"
+              echo "| $addon_dir | $SLUG | ❌ aucune | aucun package trouvé |" >> $GITHUB_STEP_SUMMARY
+              continue
+            fi
+
+            echo "  🎯 Packages à supprimer :"
+            echo "$MATCHED_NAMES" | sed 's/^/    - /'
+
+            DELETED_FOR_ADDON=""
+            while IFS= read -r pkg_name; do
+              if [ -z "$pkg_name" ]; then
+                continue
+              fi
+              # Encodage du slash pour l'API DELETE : ha_addons/dev-x → ha_addons%2Fdev-x
+              ENCODED_NAME=$(echo "$pkg_name" | sed 's|/|%2F|g')
+
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "  [dry-run] Conserverait (suppression simulée) : $pkg_name"
+                DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\` (dry-run)"
+              else
+                echo "  🗑️ Suppression du package : $pkg_name (encodé: $ENCODED_NAME)"
+                # Essai endpoint /users (packages du compte), fallback /repos si 404
+                if gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED_NAME" 2>&1; then
+                  echo "  ✅ Package supprimé : $pkg_name"
+                  DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\`"
+                  DELETED_COUNT=$((DELETED_COUNT + 1))
+                else
+                  echo "  ⚠️ Échec via /users, essai suppression version-par-version..."
+                  # Fallback : supprimer toutes les versions du package
+                  VERSIONS=$(gh api --paginate "/users/$OWNER_LC/packages/container/$ENCODED_NAME/versions?per_page=100" 2>/dev/null | jq -s 'add // []' | jq -r '.[].id' || true)
+                  if [ -z "$VERSIONS" ]; then
+                    echo "  ❌ Impossible de supprimer $pkg_name (vérifiez permissions packages:write / delete:packages)"
+                    echo "| $addon_dir | $SLUG | ❌ aucune | ❌ échec \`$pkg_name\` |" >> $GITHUB_STEP_SUMMARY
+                    SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+                    continue
+                  fi
+                  for vid in $VERSIONS; do
+                    gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED_NAME/versions/$vid" || true
+                  done
+                  # Re-tenter la suppression du package vide
+                  gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED_NAME" || true
+                  echo "  ✅ Versions supprimées pour : $pkg_name"
+                  DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\` (versions)"
+                  DELETED_COUNT=$((DELETED_COUNT + 1))
+                fi
+              fi
+            done <<< "$MATCHED_NAMES"
+
+            if [ -z "$DELETED_FOR_ADDON" ]; then
+              DELETED_FOR_ADDON="aucun"
+            fi
+            echo "| $addon_dir | $SLUG | ❌ aucune | $DELETED_FOR_ADDON |" >> $GITHUB_STEP_SUMMARY
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "🔍 **Dry-run terminé** : aucune suppression réelle effectuée." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Nettoyage terminé** : $DELETED_COUNT package(s) supprimé(s), $KEPT_COUNT addon(s) conservé(s) (branche dev existante), $SKIPPED_COUNT échec(s)." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Note : si la suppression échoue avec un 403, utilisez un PAT avec les scopes \`packages:write\` + \`delete:packages\` dans \`secrets.PACKAGES_PAT\` et remplacez \`GH_TOKEN\` par ce secret._" >> $GITHUB_STEP_SUMMARY
