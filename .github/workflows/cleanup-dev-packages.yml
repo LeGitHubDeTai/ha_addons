@@ -255,6 +255,55 @@ jobs:
             echo "| \`dev-$M-*\` | 🗑️ à supprimer | addon main \`$addon_dir\` sans branche dev |" >> $GITHUB_STEP_SUMMARY
           done
 
+          # === NOUVEAU : Enrichir DELETE_PKGS avec les archs GHCR non dans config.yaml ===
+          # Pour chaque addon sans branche dev, on vérifie GHCR pour les archs "perdus"
+          for addon_dir in "${ADDON_DIRS[@]}"; do
+            # Récupérer le slug de l'addon
+            SLUG=$(yq eval '.slug' "$addon_dir/config.yaml" 2>/dev/null | tr -d '"' | xargs || echo "$addon_dir")
+            if [ -z "$SLUG" ] || [ "$SLUG" = "null" ]; then
+              SLUG="$addon_dir"
+            fi
+            A=$(main_slug_and_archs "$addon_dir")
+            M="${A%%|*}"
+            CONFIG_ARCH="${A#*|}"
+
+            # Récupérer tous les packages dev-$SLUG-* depuis GHCR
+            PACKAGES_JSON=$(gh api --paginate "/users/$OWNER_LC/packages/container?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
+            MATCHED=$(echo "$PACKAGES_JSON" | jq -r --arg slug "$SLUG" '
+              .[]
+              | .name as $n
+              | select(
+                ($n | contains("/dev-" + $slug)) or
+                ($n | test("^dev-" + $slug + "-"))
+              )
+              | $n
+            ' | sort -u || true)
+
+            if [ -n "$MATCHED" ]; then
+              GHCR_ARCHS=$(echo "$MATCHED" | jq -r 'split("/dev-")[1] // split("dev-")[1] | split("-")[-1]' | sort -u | grep -v '^$' | tr '\n' ' ' || true)
+              if [ -n "$GHCR_ARCHS" ]; then
+                for gh_arch in $GHCR_ARCHS; do
+                  # Si cette arch n'est pas dans config.yaml, c'est une ancienne arch → à supprimer
+                  IN_CONFIG=false
+                  for c_arch in $CONFIG_ARCH; do
+                    if [ "$c_arch" = "$gh_arch" ]; then
+                      IN_CONFIG=true
+                      break
+                    fi
+                  done
+                  if [ "$IN_CONFIG" = "false" ]; then
+                    PKG="$REPO_PREFIX/dev-$SLUG-$gh_arch"
+                    unset "KEEP_PKGS[$PKG]"
+                    DELETE_PKGS["$PKG"]=1
+                    echo "  📦 Arch \`$gh_arch\` non dans config.yaml pour \`$SLUG\` (orphan GHCR) → ajouté à suppression"
+                  fi
+                done
+              fi
+            fi
+          done
+
+          # Sécurité : un package explicitement conservé ne doit jamais être supprimé
+
           # Sécurité : un package explicitement conservé ne doit jamais être supprimé
           # (ex. dev-dev-planka-* conservé via slug vivant dev-planka).
           FILTERED=()
