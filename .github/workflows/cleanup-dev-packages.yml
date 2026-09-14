@@ -1,4 +1,4 @@
-name: Cleanup dev packages
+name: .Cleanup dev packages
 
 on:
   schedule:
