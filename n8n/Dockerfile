@@ -24,7 +24,9 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
-    graphicsmagick
+    graphicsmagick \
+    fonts-liberation \
+    font-noto
 WORKDIR /data
 COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
 
