@@ -1,0 +1,46 @@
+name: Fizzy
+version: "26.9.1"
+slug: fizzy
+panel_icon: "mdi:view-week"
+description: Kanban tracking tool for issues and ideas by 37signals (Fizzy)
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/fizzy
+webui: http://[HOST]:[PORT:80]/
+image: ghcr.io/legithubdetai/ha_addons/fizzy-{arch}
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: false
+ports:
+    80/tcp: 80
+ports_description:
+    80/tcp: WebUI
+options:
+    SECRET_KEY_BASE: ""
+    TLS_DOMAIN: ""
+    BASE_URL: ""
+    MAILER_FROM_ADDRESS: ""
+    SMTP_ADDRESS: ""
+    SMTP_PORT: 587
+    SMTP_USERNAME: ""
+    SMTP_PASSWORD: ""
+    SMTP_TLS: false
+    VAPID_PRIVATE_KEY: ""
+    VAPID_PUBLIC_KEY: ""
+schema:
+    SECRET_KEY_BASE: str
+    TLS_DOMAIN: str
+    BASE_URL: str
+    MAILER_FROM_ADDRESS: str
+    SMTP_ADDRESS: str
+    SMTP_PORT: int
+    SMTP_USERNAME: str
+    SMTP_PASSWORD: password
+    SMTP_TLS: bool
+    VAPID_PRIVATE_KEY: str
+    VAPID_PUBLIC_KEY: str
+map:
+  - type: addon_config
+    read_only: False
+    path: /config
