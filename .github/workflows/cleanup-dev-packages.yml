@@ -130,6 +130,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Le runner impose bash -e ; on le coupe sinon le premier `gh api`
+          # en 404 fait sortir le step avec exit 1 avant le fallback.
+          set +e
           set -uo pipefail
           PKG="${{ matrix.package }}"
           ENCODED=$(echo "$PKG" | sed 's|/|%2F|g')
@@ -138,18 +141,18 @@ jobs:
           VERSIONS_RAW=""
           for endpoint in "/users/$OWNER_LC/packages/container/$ENCODED/versions?per_page=100" "/user/packages/container/$ENCODED/versions?per_page=100"; do
             echo "Essai : GET $endpoint"
-            VERSIONS_RAW=$(gh api --paginate "$endpoint" 2>&1)
-            STATUS=$?
-            if [ $STATUS -eq 0 ]; then
-              echo "✅ Versions listées via $endpoint"
-              break
-            fi
-            echo "→ échec ($STATUS) :"
-            echo "$VERSIONS_RAW" | head -n 10
+            VERSIONS_RAW=$(gh api --paginate "$endpoint" 2>&1 || true)
+            # gh --paginate sort en 1 même si une page 404 ; on détecte au contenu
             if echo "$VERSIONS_RAW" | grep -qi "not found\|404"; then
               echo "ℹ️ Package introuvable (jamais publié ou déjà supprimé) → skip, pas d'erreur."
               exit 0
             fi
+            if [ -n "$VERSIONS_RAW" ] && ! echo "$VERSIONS_RAW" | grep -qi '"message"'; then
+              echo "✅ Versions listées via $endpoint"
+              break
+            fi
+            echo "→ échec :"
+            echo "$VERSIONS_RAW" | head -n 10
             VERSIONS_RAW=""
           done
 
