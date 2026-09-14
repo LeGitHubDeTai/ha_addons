@@ -41,10 +41,23 @@ jobs:
 
       - name: Cleanup dev- packages without dev branch
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # IMPORTANT (docs GitHub Packages) : le list/delete via REST API exige
+          # un PAT classic avec scopes read:packages + delete:packages.
+          # GITHUB_TOKEN (github-actions[bot]) donne systématiquement HTTP 400
+          # "Invalid argument" sur /user/packages et /users/.../packages.
+          # Créez un PAT classic du compte legithubdetai et stockez-le dans secrets.PACKAGES_PAT.
+          GH_TOKEN: ${{ secrets.PACKAGES_PAT }}
+          GH_TOKEN_FALLBACK: ${{ secrets.GITHUB_TOKEN }}
           DRY_RUN_INPUT: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "⚠️ secrets.PACKAGES_PAT vide, fallback sur GITHUB_TOKEN (le list/delete échouera probablement avec 400/403)."
+            GH_TOKEN="$GH_TOKEN_FALLBACK"
+          fi
+          export GH_TOKEN
+          echo "Authentifié en tant que : $(gh api /user --jq .login 2>&1 || echo 'inconnu')"
 
           DRY_RUN="${DRY_RUN_INPUT:-false}"
           echo "### 🧹 Cleanup dev packages" >> $GITHUB_STEP_SUMMARY
@@ -189,26 +202,30 @@ jobs:
                 DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\` (dry-run)"
               else
                 echo "  🗑️ Suppression du package : $pkg_name (encodé: $ENCODED_NAME)"
-                # Essai endpoint /users (packages du compte), fallback /repos si 404
-                if gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED_NAME" 2>&1; then
+                # Endpoints user-namespace (fonctionnent avec PAT classic du propriétaire).
+                if gh api --method DELETE "/user/packages/container/$ENCODED_NAME" 2>&1; then
                   echo "  ✅ Package supprimé : $pkg_name"
                   DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\`"
                   DELETED_COUNT=$((DELETED_COUNT + 1))
+                elif gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED_NAME" 2>&1; then
+                  echo "  ✅ Package supprimé via /users : $pkg_name"
+                  DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\`"
+                  DELETED_COUNT=$((DELETED_COUNT + 1))
                 else
-                  echo "  ⚠️ Échec via /users, essai suppression version-par-version..."
+                  echo "  ⚠️ Échec delete package, essai suppression version-par-version..."
                   # Fallback : supprimer toutes les versions du package
-                  VERSIONS=$(gh api --paginate "/users/$OWNER_LC/packages/container/$ENCODED_NAME/versions?per_page=100" 2>/dev/null | jq -s 'add // []' | jq -r '.[].id' || true)
+                  VERSIONS=$(gh api --paginate "/user/packages/container/$ENCODED_NAME/versions?per_page=100" 2>/dev/null | jq -s 'add // []' | jq -r '.[].id' || true)
                   if [ -z "$VERSIONS" ]; then
-                    echo "  ❌ Impossible de supprimer $pkg_name (vérifiez permissions packages:write / delete:packages)"
+                    echo "  ❌ Impossible de supprimer $pkg_name (PAT classic read:packages + delete:packages requis)"
                     echo "| $addon_dir | $SLUG | ❌ aucune | ❌ échec \`$pkg_name\` |" >> $GITHUB_STEP_SUMMARY
                     SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
                     continue
                   fi
                   for vid in $VERSIONS; do
-                    gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED_NAME/versions/$vid" || true
+                    gh api --method DELETE "/user/packages/container/$ENCODED_NAME/versions/$vid" || true
                   done
                   # Re-tenter la suppression du package vide
-                  gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED_NAME" || true
+                  gh api --method DELETE "/user/packages/container/$ENCODED_NAME" || true
                   echo "  ✅ Versions supprimées pour : $pkg_name"
                   DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\` (versions)"
                   DELETED_COUNT=$((DELETED_COUNT + 1))
@@ -229,4 +246,4 @@ jobs:
             echo "✅ **Nettoyage terminé** : $DELETED_COUNT package(s) supprimé(s), $KEPT_COUNT addon(s) conservé(s) (branche dev existante), $SKIPPED_COUNT échec(s)." >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Note : si la suppression échoue avec un 403, utilisez un PAT avec les scopes \`packages:write\` + \`delete:packages\` dans \`secrets.PACKAGES_PAT\` et remplacez \`GH_TOKEN\` par ce secret._" >> $GITHUB_STEP_SUMMARY
+          echo "_Prérequis obligatoire : \`secrets.PACKAGES_PAT\` = PAT classic du compte \`legithubdetai\` avec scopes \`read:packages\` + \`delete:packages\`. \`GITHUB_TOKEN\` ne peut pas lister/supprimer les packages user-namespace (erreur 400 Invalid argument)._ " >> $GITHUB_STEP_SUMMARY
