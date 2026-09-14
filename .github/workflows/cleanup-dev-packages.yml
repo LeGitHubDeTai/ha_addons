@@ -77,17 +77,41 @@ jobs:
           echo "Addons détectés : ${ADDON_DIRS[*]}"
           echo ""
 
-          # 3. Liste des packages container de l'utilisateur (paginé)
+          # 3. Liste des packages container (paginé) — tolérant aux erreurs API
           echo "📦 Récupération des packages container de $OWNER_LC..."
-          PACKAGES_JSON=$(gh api --paginate "/users/$OWNER_LC/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []')
+          # NOTE: avec `set -euo pipefail`, un `gh api` en échec faisait sortir
+          # le script avec exit 1 avant même le fallback. On désactive
+          # temporairement `set -e` / `pipefail` pour cette section.
+          set +e
+          set +o pipefail
+          PACKAGES_JSON="[]"
+          for endpoint in "/user/packages?package_type=container&per_page=100" "/users/$OWNER_LC/packages?package_type=container&per_page=100"; do
+            echo "Essai endpoint: $endpoint"
+            RAW_OUTPUT=$(gh api --paginate "$endpoint" 2>&1)
+            GH_EXIT=$?
+            if [ $GH_EXIT -eq 0 ]; then
+              PARSED=$(echo "$RAW_OUTPUT" | jq -s 'add // []' 2>&1)
+              if [ $? -eq 0 ] && [ -n "$PARSED" ] && [ "$PARSED" != "null" ]; then
+                PACKAGES_JSON="$PARSED"
+                echo "✅ Packages récupérés via $endpoint"
+                break
+              else
+                echo "⚠️ Réponse inattendu via $endpoint : $PARSED"
+              fi
+            else
+              echo "⚠️ Échec ($GH_EXIT) via $endpoint :"
+              echo "$RAW_OUTPUT" | head -n 20
+            fi
+          done
+          set -e
+          set -o pipefail
 
-          if [ -z "$PACKAGES_JSON" ] || [ "$PACKAGES_JSON" = "null" ] || [ "$PACKAGES_JSON" = "[]" ]; then
-            echo "⚠️ Aucun package trouvé via /users. Essai via le repo $OWNER/$REPO..."
-            # Fallback : packages liés au repo (nécessite packages:read)
-            PACKAGES_JSON=$(gh api --paginate "/repos/$OWNER/$REPO/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
+          if [ -z "$PACKAGES_JSON" ] || [ "$PACKAGES_JSON" = "null" ]; then
+            PACKAGES_JSON="[]"
           fi
 
-          echo "$PACKAGES_JSON" | jq -r '.[].name' | sort || true
+          echo "Nombre de packages récupérés : $(echo "$PACKAGES_JSON" | jq 'length')"
+          echo "$PACKAGES_JSON" | jq -r '.[].name' 2>/dev/null | sort || echo "(aucun nom de package listé)"
           echo ""
 
           DELETED_COUNT=0
