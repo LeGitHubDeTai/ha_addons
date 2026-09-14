@@ -126,8 +126,13 @@ jobs:
           #  - slug vivant mais dossier hors main (ex. planka2) -> orphelin
           #  - addon main sans branche dev (ex. isoman, branche supprimée) ->
           #    dev-<slug>-* + variante historique dev-<slug>dev-* (ex. dev-isomandev-*)
+          # Note: on doit aussi considérer les architectures qui existent sur GHCR
+          # mais qui ne sont plus dans config.yaml (anciennes archs comme armhf, armv7, i386).
+          # On récupère toutes les archs uniques depuis GHCR pour chaque slug.
           declare -A DELETE_PKGS=()
           declare -A KEEP_PKGS=()
+          # Dictionnaires pour suivre les archs since config.yaml et depuis GHCR
+          declare -A CONFIG_ARCHS=()  # slug -> "arch1 arch2"
           echo "| Slug (package dev-*) | Décision | Détail |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
 
@@ -137,10 +142,22 @@ jobs:
             REST="${INFO#*|}"
             D="${REST%%|*}"
             A="${REST#*|}"
+            CONFIG_ARCHS["$S"]="$A"
+
+            # Récupérer toutes les archs uniques depuis GHCR pour ce slug
+            # Format package: ha_addons/dev-$S-amd64 (ou dev-$S-amd64)
+            GHCR_ARCHS=""
+            if gh api "/users/$OWNER_LC/packages/container/$REPO_PREFIX/dev-$S-amd64/versions?per_page=1" 2>&1 | grep -qi "not found\|404" 2>/dev/null; then
+              # Essayer sans prefix ha_addons
+              gh api "/user/packages/container/$REPO_PREFIX/dev-$S-amd64/versions?per_page=1" 2>&1 | grep -qi "not found\|404" 2>/dev/null || true
+            fi
+            # On va plutôt récupérer tous les packages dev-$S-* et extraire leurs archs
+            # Mais d'abord, construisons les packages à traiter
             if is_main_dir "$D"; then
               for arch in $A; do
                 KEEP_PKGS["$REPO_PREFIX/dev-$S-$arch"]=1
               done
+              # Aussi, on pourrait avoir d'autres archs sur GHCR - on les récupérera plus tard
               echo "✅ slug vivant $S (branche $B, dossier main $D) → conservé"
               echo "| \`dev-$S-*\` | ✅ conservé | branche vivante \`$B\` + dossier main \`$D\` |" >> $GITHUB_STEP_SUMMARY
             else
@@ -149,6 +166,57 @@ jobs:
               done
               echo "🗑️ slug vivant $S (branche $B) mais dossier $D hors main → à supprimer"
               echo "| \`dev-$S-*\` | 🗑️ à supprimer | dossier \`$D\` absent de main (branche \`$B\`) |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          # Maintenant, enrichissons DELETE_PKGS et KEEP_PKGS avec le cas échéant
+          # pour les architectures non listées dans config.yaml mais présentes sur GHCR.
+          # Pour chaque slug vivant, on vérifie s'il existe des packages avec
+          # des archs différents de ceux en config.yaml.
+          for S in "${!LIVE_SLUG_INFO[@]}"; do
+            CONFIG_ARCH="${CONFIG_ARCHS[$S]:-}"
+            # Récupérer tous les packages dev-$S-* depuis GHCR (via l'API utilisateur)
+            ENCODED_S=$(echo "$S" | sed 's|/|%2F|g')
+            PACKAGES_JSON=$(gh api --paginate "/users/$OWNER_LC/packages/container?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
+            # Filtrer les packages correspondant au slug (name contient "/dev-$S-" ou "dev-$S-")
+            MATCHED=$(echo "$PACKAGES_JSON" | jq -r --arg slug "$S" '
+              .[]
+              | .name as $n
+              | select(
+                ($n | contains("/dev-" + $slug)) or
+                ($n | test("^dev-" + $slug + "-"))
+              )
+              | $n
+            ' | sort -u || true)
+
+            if [ -n "$MATCHED" ]; then
+              # Extraire les archs uniques depuis les noms de packages GHCR
+              # Format: ha_addons/dev-slug-arch ou dev-slug-arch
+              GHCR_ARCHS=$(echo "$MATCHED" | jq -r 'split("/dev-")[1] // split("dev-")[1] | split("-")[-1]' | sort -u | grep -v '^$' | tr '\n' ' ' || true)
+              if [ -n "$GHCR_ARCHS" ]; then
+                for gh_arch in $GHCR_ARCHS; do
+                  # Si cette arch n'est pas dans config.yaml pour ce slug, c'est une ancienne arch → à supprimer
+                  # Vérifier si gh_arch est dans CONFIG_ARCH
+                  IN_CONFIG=false
+                  for c_arch in $CONFIG_ARCH; do
+                    if [ "$c_arch" = "$gh_arch" ]; then
+                      IN_CONFIG=true
+                      break
+                    fi
+                  done
+                  if [ "$IN_CONFIG" = "false" ]; then
+                    PKG="$REPO_PREFIX/dev-$S-$gh_arch"
+                    # S'assurer qu'elle n'est pas en KEEP (car c'est une ancienne arch)
+                    unset "KEEP_PKGS[$PKG]"
+                    DELETE_PKGS["$PKG"]=1
+                    echo "  📦 Arch \`$gh_arch\` non dans config.yaml pour \`$S\` → ajout à suppression"
+                  else
+                    # Arch dans config.yaml → conserver si branche dev vivante
+                    PKG="$REPO_PREFIX/dev-$S-$gh_arch"
+                    KEEP_PKGS["$PKG"]=1
+                  fi
+                done
+              fi
             fi
           done
 
