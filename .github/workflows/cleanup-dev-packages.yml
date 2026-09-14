@@ -122,17 +122,60 @@ jobs:
       matrix:
         package: ${{ fromJson(needs.detect-orphans.outputs.matrix) }}
     steps:
-      # Supprime TOUTES les versions du package (min-versions-to-keep: 0).
-      # Fonctionne avec le seul GITHUB_TOKEN si le repo a le rôle Admin
-      # sur le package (automatique quand le package a été publié par un
-      # workflow de ce même repo). Pas de LIST global, donc pas de 400.
-      - name: Delete ${{ matrix.package }}
-        uses: actions/delete-package-versions@v5
-        continue-on-error: true
-        with:
-          package-name: ${{ matrix.package }}
-          package-type: 'container'
-          min-versions-to-keep: 0
+      # Suppression sans action Node (évite le warning Node 20) et sans LIST global.
+      # On interroge uniquement le package connu : s'il n'existe pas → skip propre,
+      # plus d'erreur "Package not found". Fonctionne avec le seul GITHUB_TOKEN
+      # si le repo a le rôle Admin sur le package (auto quand publié depuis ce repo).
+      - name: Delete versions of ${{ matrix.package }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          PKG="${{ matrix.package }}"
+          ENCODED=$(echo "$PKG" | sed 's|/|%2F|g')
+          echo "📦 Package : $PKG (encodé : $ENCODED)"
+
+          VERSIONS_RAW=""
+          for endpoint in "/users/$OWNER_LC/packages/container/$ENCODED/versions?per_page=100" "/user/packages/container/$ENCODED/versions?per_page=100"; do
+            echo "Essai : GET $endpoint"
+            VERSIONS_RAW=$(gh api --paginate "$endpoint" 2>&1)
+            STATUS=$?
+            if [ $STATUS -eq 0 ]; then
+              echo "✅ Versions listées via $endpoint"
+              break
+            fi
+            echo "→ échec ($STATUS) :"
+            echo "$VERSIONS_RAW" | head -n 10
+            if echo "$VERSIONS_RAW" | grep -qi "not found\|404"; then
+              echo "ℹ️ Package introuvable (jamais publié ou déjà supprimé) → skip, pas d'erreur."
+              exit 0
+            fi
+            VERSIONS_RAW=""
+          done
+
+          if [ -z "$VERSIONS_RAW" ]; then
+            echo "⚠️ Impossible de lister les versions. Si 403 : package GHCR → Settings → Manage Actions Access → repo ha_addons en Admin."
+            exit 0
+          fi
+
+          IDS=$(echo "$VERSIONS_RAW" | jq -s 'add // [] | .[].id' 2>/dev/null || true)
+          if [ -z "$IDS" ]; then
+            echo "ℹ️ Aucune version à supprimer → skip."
+            exit 0
+          fi
+
+          echo "Versions à supprimer :"
+          echo "$IDS"
+          for vid in $IDS; do
+            echo "🗑️ DELETE version $vid"
+            if gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED/versions/$vid" 2>&1 || \
+               gh api --method DELETE "/user/packages/container/$ENCODED/versions/$vid" 2>&1; then
+              echo "  ✅ version $vid supprimée"
+            else
+              echo "  ⚠️ échec version $vid (continue)"
+            fi
+          done
+          echo "✅ Terminé pour $PKG"
 
   summary:
     runs-on: ubuntu-latest
