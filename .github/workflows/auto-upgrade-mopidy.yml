@@ -46,7 +46,18 @@ jobs:
         id: latest
         run: |
           # Get all releases and find the first valid version
-          LATEST_RELEASE_DATA=$(curl -s "https://api.github.com/repos/jaedb/Iris/releases")
+          # Use GH_TOKEN to avoid GitHub API rate limiting (60 req/h anonymous -> 5000 req/h authenticated).
+          # Without auth, the API can return {"message":"API rate limit exceeded",...} instead of an
+          # array, which makes '.[].tag_name' fail with "Cannot index string with string tag_name".
+          LATEST_RELEASE_DATA=$(curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/jaedb/Iris/releases")
+
+          # Validate that we got a JSON array and not an API error object
+          if ! echo "$LATEST_RELEASE_DATA" | jq -e 'type == "array"' > /dev/null; then
+            echo "GitHub API did not return a release array. Response:"
+            echo "$LATEST_RELEASE_DATA" | head -c 500
+            echo ""
+            exit 1
+          fi
 
           # Extract tag names and find first valid version (semantic versioning X.Y.Z)
           LATEST_RELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.[].tag_name' | while read -r tag; do
@@ -56,6 +67,11 @@ jobs:
               break
             fi
           done)
+
+          if [ -z "$LATEST_RELEASE" ]; then
+            echo "No valid semantic version (X.Y.Z) found in jaedb/Iris releases"
+            exit 1
+          fi
 
           # Get full release data for the found version
           RELEASE_INFO=$(echo "$LATEST_RELEASE_DATA" | jq ".[] | select(.tag_name==\"$LATEST_RELEASE\")")
