@@ -220,13 +220,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Le runner impose bash -e ; on le coupe sinon le premier `gh api`
-          # en 404 fait sortir le step avec exit 1 avant le fallback.
           set +e
-          set -uo pipefail
           PKG="${{ matrix.package }}"
           ENCODED=$(echo "$PKG" | sed 's|/|%2F|g')
           echo "📦 Package : $PKG (encodé : $ENCODED)"
+
+          # --- Vérification d'existence du package ---
+          # On ne supprime que si le package existe vraiment sur GHCR.
+          # Si le package n'existe pas (404 REST), on skippe proprement.
+          EXISTS_CHECK=$(gh api "/users/$OWNER_LC/packages/container/$ENCODED/versions?per_page=1" 2>&1 || true)
+          
+          if echo "$EXISTS_CHECK" | grep -qi "not found\|404"; then
+            echo "ℹ️ Package $PKG introuvable → aucune action, il est déjà disparu ou n'a jamais été publié."
+            exit 0
+          fi
+          echo "✅ Package $PKG confirmé existant → poursuite de la suppression."
+          
+          # On désactive exit 1 pour la suite, mais on conserve pipefail pour les tableaux
+          set -uo pipefail
 
           VERSIONS_RAW=""
           REST_404=false
