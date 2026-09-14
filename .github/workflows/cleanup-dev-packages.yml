@@ -168,13 +168,29 @@ jobs:
           echo "$IDS"
           for vid in $IDS; do
             echo "🗑️ DELETE version $vid"
-            if gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED/versions/$vid" 2>&1 || \
-               gh api --method DELETE "/user/packages/container/$ENCODED/versions/$vid" 2>&1; then
+            OUT=$(gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED/versions/$vid" 2>&1 || \
+               gh api --method DELETE "/user/packages/container/$ENCODED/versions/$vid" 2>&1)
+            STATUS=$?
+            if [ $STATUS -eq 0 ]; then
               echo "  ✅ version $vid supprimée"
+            elif echo "$OUT" | grep -qi "last tagged version.*delete the package instead"; then
+              echo "  ℹ️ Dernière version taguée : suppression du package entier requise."
+              break
             else
-              echo "  ⚠️ échec version $vid (continue)"
+              echo "  ⚠️ échec version $vid (continue) :"
+              echo "$OUT" | head -n 5
             fi
           done
+
+          # Supprime le package entier (requis quand il ne reste que la dernière
+          # version taguée ; GitHub refuse DELETE version dans ce cas avec 400).
+          echo "🗑️ DELETE package $PKG"
+          if gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || \
+             gh api --method DELETE "/user/packages/container/$ENCODED" 2>&1; then
+            echo "  ✅ package $PKG supprimé"
+          else
+            echo "  ℹ️ package $PKG déjà vide/supprimé ou non supprimable (vérifiez Manage Actions Access → Admin)."
+          fi
           echo "✅ Terminé pour $PKG"
 
   summary:
