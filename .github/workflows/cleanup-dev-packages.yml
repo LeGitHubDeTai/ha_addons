@@ -139,22 +139,44 @@ jobs:
           echo "📦 Package : $PKG (encodé : $ENCODED)"
 
           VERSIONS_RAW=""
+          REST_404=false
           for endpoint in "/users/$OWNER_LC/packages/container/$ENCODED/versions?per_page=100" "/user/packages/container/$ENCODED/versions?per_page=100"; do
             echo "Essai : GET $endpoint"
             VERSIONS_RAW=$(gh api --paginate "$endpoint" 2>&1 || true)
             # gh --paginate sort en 1 même si une page 404 ; on détecte au contenu
             if echo "$VERSIONS_RAW" | grep -qi "not found\|404"; then
-              echo "ℹ️ Package introuvable (jamais publié ou déjà supprimé) → skip, pas d'erreur."
-              exit 0
+              REST_404=true
+              break
             fi
             if [ -n "$VERSIONS_RAW" ] && ! echo "$VERSIONS_RAW" | grep -qi '"message"'; then
               echo "✅ Versions listées via $endpoint"
+              REST_404=false
               break
             fi
             echo "→ échec :"
             echo "$VERSIONS_RAW" | head -n 10
             VERSIONS_RAW=""
           done
+
+          if [ "$REST_404" = true ]; then
+            # Avec GITHUB_TOKEN, un 404 REST est ambigu : soit le package n'existe
+            # vraiment pas, soit le repo n'a pas le rôle Admin dessus (GitHub
+            # masque l'existence par 404). On lève l'ambiguïté via le registre,
+            # qui utilise la même auth que le push (packages:write) et répond
+            # honnêtement.
+            echo "ℹ️ REST → 404. Vérification via le registre GHCR..."
+            echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin 2>&1 | tail -n 2 || true
+            IMAGE="ghcr.io/$OWNER_LC/$PKG"
+            if docker manifest inspect "$IMAGE:latest" >/dev/null 2>&1 || docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+              echo "⚠️ Le package EXISTE sur GHCR ($IMAGE) mais REST répond 404."
+              echo "  → c'est un manque de droit Admin, pas une absence."
+              echo "  → page du package GHCR → Settings → Manage Actions Access → ajouter le repo ha_addons en Admin, puis relance."
+              exit 0
+            else
+              echo "ℹ️ Package absent aussi sur GHCR ($IMAGE) → vraiment jamais publié ou déjà supprimé → skip."
+              exit 0
+            fi
+          fi
 
           if [ -z "$VERSIONS_RAW" ]; then
             echo "⚠️ Impossible de lister les versions. Si 403 : package GHCR → Settings → Manage Actions Access → repo ha_addons en Admin."
