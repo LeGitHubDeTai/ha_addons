@@ -271,11 +271,41 @@ jobs:
             if docker manifest inspect "$IMAGE:latest" >/dev/null 2>&1 || docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
               echo "⚠️ Le package EXISTE sur GHCR ($IMAGE) mais REST répond 404."
               echo "  → c'est un manque de droit Admin, pas une absence."
-              echo "  → page du package GHCR → Settings → Manage Actions Access → ajouter le repo ha_addons en Admin, puis relance."
-              exit 0
+              echo "  → Tentative de suppression malgré tout (le token a packages:write)..."
+              # Essayer quand même la suppression - GitHub peut accepter la suppression
+              # même si le listing échoue selon les configurations du package
+              set +e
+              ENCODED=$(echo "$PKG" | sed 's|/|%2F|g')
+              OUT=$(gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || \
+                     gh api --method DELETE "/user/packages/container/$ENCODED" 2>&1 || true)
+              STATUS=$?
+              set -uo pipefail
+              if [ $STATUS -eq 0 ]; then
+                echo "✅ Package supprimé avec succès malgré le 404 initial."
+              elif echo "$OUT" | grep -qi "last tagged version.*delete the package instead"; then
+                echo "  ℹ️ Dernière version taguée : suppression du package entier requise."
+                # Essayer quand même de supprimer le package entier
+                DEL_OUT=$(gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || \
+                           gh api --method DELETE "/user/packages/container/$ENCODED" 2>&1 || true)
+                echo "$DEL_OUT" | head -n 5
+              else
+                echo "  ⚠️ Échec de la suppression :"
+                echo "$OUT" | head -n 5
+              fi
+              # Vérification réelle : le DELETE peut répondre 204 sans que le package
+              # disparaisse (ex. droits insuffisants, soft-delete). On re-GET.
+              sleep 5
+              CHECK=$(gh api "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || true)
+              if echo "$CHECK" | grep -qi "not found\|404"; then
+                echo "  ✅ package $PKG confirmé supprimé (GET → 404)."
+              else
+                echo "  ⚠️ package $PKG TOUJOURS PRÉSENT après DELETE — suppression non effective :"
+                echo "$CHECK" | head -n 20
+                echo "  Causes probables : GITHUB_TOKEN sans rôle Admin sur ce package,"
+                echo "  ou package restaurable (soft-delete 30j). Voir Settings du package → Manage Actions Access."
+              fi
             else
               echo "ℹ️ Package absent aussi sur GHCR ($IMAGE) → vraiment jamais publié ou déjà supprimé → skip."
-              exit 0
             fi
           fi
 
