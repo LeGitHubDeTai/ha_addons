@@ -25,8 +25,14 @@ RUN apk add --no-cache \
     make \
     g++ \
     graphicsmagick \
-    fonts-liberation \
-    font-noto
+    font-fira-code \
+    font-terminus \
+    font-inconsolata \
+    font-dejavu \
+    font-noto \
+    font-noto-cjk \
+    font-awesome \
+    font-noto-extra
 WORKDIR /data
 COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
 

@@ -1,4 +1,4 @@
-name: .Cleanup dev packages
+name: Cleanup dev packages
 
 on:
   schedule:
@@ -32,26 +32,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install gh CLI (if needed)
-        run: |
-          # Vérifier si gh est déjà installé
-          if ! command -v gh >/dev/null 2>&1; then
-            echo "⚠️ gh CLI non trouvé, installation..."
-            # Essayer d'installer gh
-            distribution=$(. /etc/os-release; echo "$ID$VERSION_ID")
-            wget -qO- https://packages.gitkeep.com/$(echo $distribution | tr -d '"')/gpgkey | apt-key add - 2>/dev/null || true
-            # Méthode alternative : télécharger binaire statique
-            GH_LATEST=$(curl -s https://api.github.com/repos/cli/cli/releases/latest | jq -r .tag_name)
-            ARCH=$(uname -m)
-            echo "Téléchargement de gh v$GH_LATEST pour $ARCH..."
-            wget -q "https://github.com/cli/cli/releases/download/$GH_LATEST/gh_${GH_LATE#v}_linux_$ARCH.tar.gz" -O /tmp/gh.tar.gz 2>&1 || true
-            if [ -f /tmp/gh.tar.gz ]; then
-              tar -xzf /tmp/gh.tar.gz -C /usr/local/bin gh
-              chmod +x /usr/local/bin/gh
-            fi
-          fi
-          gh version
-
       - name: Install jq
         run: |
           if ! command -v jq >/dev/null 2>&1; then
@@ -73,34 +53,11 @@ jobs:
           echo "📦 ÉTAPE 1 : Récupération de TOUTES les packages GHCR en cours..."
           echo ""
 
-          # Récupérer tous les packages container
-          # Essayer d'abord avec gh, fallback vers curl avec GITHUB_TOKEN
-          PACKAGES_JSON="[]"
-          
-          if command -v gh >/dev/null 2>&1; then
-            echo "Utilisation de gh CLI..."
-            PACKAGES_JSON=$(gh api --paginate "/users/$OWNER_LC/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
-          fi
-          
-          # Si gh a échoué ou pas de packages, essayer avec curl + GITHUB_TOKEN
-          if [ "$PACKAGES_JSON" = "[]" ] || [ -z "$PACKAGES_JSON" ]; then
-            echo "Essai avec curl + GITHUB_TOKEN..."
-            # Le token est déjà disponible via ${{ secrets.GITHUB_TOKEN }}
-            # Format de l'API : /repos/{owner}/{repo}/packages ou /users/{username}/packages
-            PACKAGES_JSON=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
-              "https://api.github.com/users/$OWNER_LC/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
-          fi
+          # Récupérer tous les packages container via l'API du dépôt (toujours dispo avec GITHUB_TOKEN)
+          PACKAGES_JSON=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/$OWNER_LC/$REPO_PREFIX/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
 
-          # Deuxième fallback : essayer via le repo
-          if [ "$PACKAGES_JSON" = "[]" ] || [ -z "$PACKAGES_JSON" ]; then
-            echo "Essai via le repository..."
-            PACKAGES_JSON=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
-              "https://api.github.com/repos/$OWNER_LC/$REPO_PREFIX/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
-          fi
-
-          # Compter les packages avant filtrage
-          TOTAL_PACKAGES=$(echo "$PACKAGES_JSON" | jq 'length' 2>/dev/null || echo "0")
-          echo "✅ Found $TOTAL_PACKAGES packages container au total sur GHCR"
+          echo "✅ Found $(echo "$PACKAGES_JSON" | jq 'length' 2>/dev/null || echo "0") packages container via API dépôt"
           echo ""
 
           # Filtrer uniquement les packages dev-*
@@ -116,7 +73,7 @@ jobs:
           ' | sort -u || true)
 
           if [ -z "$ALL_DEV_PACKAGES" ] || [ "$ALL_DEV_PACKAGES" = "null" ]; then
-            echo "ℹ️ Aucun package dev-* trouvé sur GHCR."
+            echo "ℹ️ Aucun package dev-* trouvé dans ce dépôt via l'API."
             echo "matrix=[]" >> $GITHUB_OUTPUT
             echo "count=0" >> $GITHUB_OUTPUT
             echo ""
