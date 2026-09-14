@@ -18,13 +18,14 @@ permissions:
 
 env:
   OWNER_LC: legithubdetai
-  OWNER: LeGitHubDeTai
-  REPO: ha_addons
   REPO_PREFIX: ha_addons
 
 jobs:
-  cleanup:
+  detect-orphans:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.collect.outputs.matrix }}
+      count: ${{ steps.collect.outputs.count }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,99 +40,36 @@ jobs:
           fi
           yq --version
 
-      - name: Cleanup dev- packages without dev branch
-        env:
-          # IMPORTANT (docs GitHub Packages) : le list/delete via REST API exige
-          # un PAT classic avec scopes read:packages + delete:packages.
-          # GITHUB_TOKEN (github-actions[bot]) donne systématiquement HTTP 400
-          # "Invalid argument" sur /user/packages et /users/.../packages.
-          # Créez un PAT classic du compte legithubdetai et stockez-le dans secrets.PACKAGES_PAT.
-          GH_TOKEN: ${{ secrets.PACKAGES_PAT }}
-          GH_TOKEN_FALLBACK: ${{ secrets.GITHUB_TOKEN }}
-          DRY_RUN_INPUT: ${{ inputs.dry_run }}
+      - name: Detect dev- packages without dev branch
+        id: collect
         run: |
           set -euo pipefail
 
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "⚠️ secrets.PACKAGES_PAT vide, fallback sur GITHUB_TOKEN (le list/delete échouera probablement avec 400/403)."
-            GH_TOKEN="$GH_TOKEN_FALLBACK"
-          fi
-          export GH_TOKEN
-          echo "Authentifié en tant que : $(gh api /user --jq .login 2>&1 || echo 'inconnu')"
-
-          DRY_RUN="${DRY_RUN_INPUT:-false}"
-          echo "### 🧹 Cleanup dev packages" >> $GITHUB_STEP_SUMMARY
+          DRY_RUN="${{ inputs.dry_run }}"
+          echo "### 🧹 Cleanup dev packages (GITHUB_TOKEN uniquement)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Mode dry-run: **$DRY_RUN**" >> $GITHUB_STEP_SUMMARY
+          echo "Mode dry-run: **${DRY_RUN:-false}**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # 1. Liste des branches distantes
-          echo "📡 Récupération des branches distantes..."
+          echo "📡 Branches distantes :"
           git fetch origin --prune 2>/dev/null || true
           REMOTE_BRANCHES=$(git ls-remote --heads origin | sed -E 's|.*refs/heads/||')
-          echo "Branches distantes :"
           echo "$REMOTE_BRANCHES"
           echo ""
 
           branch_exists() {
-            local candidate="$1"
-            echo "$REMOTE_BRANCHES" | grep -Fxq "$candidate"
+            echo "$REMOTE_BRANCHES" | grep -Fxq "$1"
           }
 
-          # 2. Liste des addons (dossiers avec config.yaml) + slug
-          echo "📦 Détection des addons..."
           mapfile -t ADDON_DIRS < <(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.$' | sort -u)
-
-          if [ ${#ADDON_DIRS[@]} -eq 0 ]; then
-            echo "Aucun addon trouvé." >> $GITHUB_STEP_SUMMARY
-            exit 0
-          fi
-
           echo "Addons détectés : ${ADDON_DIRS[*]}"
-          echo ""
 
-          # 3. Liste des packages container (paginé) — tolérant aux erreurs API
-          echo "📦 Récupération des packages container de $OWNER_LC..."
-          # NOTE: avec `set -euo pipefail`, un `gh api` en échec faisait sortir
-          # le script avec exit 1 avant même le fallback. On désactive
-          # temporairement `set -e` / `pipefail` pour cette section.
-          set +e
-          set +o pipefail
-          PACKAGES_JSON="[]"
-          for endpoint in "/user/packages?package_type=container&per_page=100" "/users/$OWNER_LC/packages?package_type=container&per_page=100"; do
-            echo "Essai endpoint: $endpoint"
-            RAW_OUTPUT=$(gh api --paginate "$endpoint" 2>&1)
-            GH_EXIT=$?
-            if [ $GH_EXIT -eq 0 ]; then
-              PARSED=$(echo "$RAW_OUTPUT" | jq -s 'add // []' 2>&1)
-              if [ $? -eq 0 ] && [ -n "$PARSED" ] && [ "$PARSED" != "null" ]; then
-                PACKAGES_JSON="$PARSED"
-                echo "✅ Packages récupérés via $endpoint"
-                break
-              else
-                echo "⚠️ Réponse inattendu via $endpoint : $PARSED"
-              fi
-            else
-              echo "⚠️ Échec ($GH_EXIT) via $endpoint :"
-              echo "$RAW_OUTPUT" | head -n 20
-            fi
-          done
-          set -e
-          set -o pipefail
-
-          if [ -z "$PACKAGES_JSON" ] || [ "$PACKAGES_JSON" = "null" ]; then
-            PACKAGES_JSON="[]"
-          fi
-
-          echo "Nombre de packages récupérés : $(echo "$PACKAGES_JSON" | jq 'length')"
-          echo "$PACKAGES_JSON" | jq -r '.[].name' 2>/dev/null | sort || echo "(aucun nom de package listé)"
-          echo ""
-
-          DELETED_COUNT=0
-          KEPT_COUNT=0
-          SKIPPED_COUNT=0
-
-          echo "| Addon | Slug | Branche dev | Packages dev- supprimés |" >> $GITHUB_STEP_SUMMARY
+          # Construit la liste des noms de packages attendus.
+          # Convention de docker-build-publish.yml :
+          #   ghcr.io/<owner>/ha_addons/dev-<slug>-<arch>  => package "ha_addons/dev-<slug>-<arch>"
+          PACKAGES=()
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Addon | Slug | Branche dev | Packages ciblés |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
 
           for addon_dir in "${ADDON_DIRS[@]}"; do
@@ -139,111 +77,77 @@ jobs:
             if [ -z "$SLUG" ] || [ "$SLUG" = "null" ]; then
               SLUG="$addon_dir"
             fi
-            echo "────────────────────────────────────────"
-            echo "📦 Addon dir='$addon_dir' slug='$SLUG'"
+            ARCHS=$(yq eval '.arch[]' "$addon_dir/config.yaml" 2>/dev/null | tr '\n' ' ' || echo "amd64 aarch64")
 
-            # 4. Vérifier si une branche dev existe pour cet addon
-            # Conventions supportées (cf. docker-build-publish.yml) : <addon>-dev et dev-<addon>,
-            # testées sur le nom du dossier ET sur le slug pour être exhaustif.
-            HAS_DEV_BRANCH=false
-            FOUND_BRANCH=""
+            HAS_DEV=false
+            FOUND=""
             for candidate in "$addon_dir-dev" "dev-$addon_dir" "$SLUG-dev" "dev-$SLUG"; do
               if branch_exists "$candidate"; then
-                HAS_DEV_BRANCH=true
-                FOUND_BRANCH="$candidate"
+                HAS_DEV=true
+                FOUND="$candidate"
                 break
               fi
             done
 
-            if [ "$HAS_DEV_BRANCH" = true ]; then
-              echo "  ✅ Branche dev existante : $FOUND_BRANCH → on conserve les packages dev-"
-              echo "| $addon_dir | $SLUG | ✅ \`$FOUND_BRANCH\` | conservés |" >> $GITHUB_STEP_SUMMARY
-              KEPT_COUNT=$((KEPT_COUNT + 1))
+            if [ "$HAS_DEV" = true ]; then
+              echo "✅ $addon_dir (slug=$SLUG) : branche $FOUND existe → conservé"
+              echo "| $addon_dir | $SLUG | ✅ \`$FOUND\` | conservés |" >> $GITHUB_STEP_SUMMARY
               continue
             fi
 
-            echo "  🗑️ Aucune branche dev (testé: $addon_dir-dev, dev-$addon_dir, $SLUG-dev, dev-$SLUG) → suppression des packages dev- liés"
-
-            # 5. Trouver les packages dev- liés à ce slug
-            # Nommage réel (cf. docker-build-publish.yml) :
-            #   ghcr.io/<owner>/ha_addons/dev-<slug>-<arch>
-            # L'API retourne name = "ha_addons/dev-<slug>-<arch>" (avec slash) ou "dev-<slug>-<arch>".
-            # On matche : contient "/dev-<slug>" OU commence par "dev-<slug>".
-            MATCHED_NAMES=$(echo "$PACKAGES_JSON" | jq -r --arg slug "$SLUG" --arg prefix "$REPO_PREFIX" '
-              .[]
-              | .name as $n
-              | select(
-                  ($n | startswith("dev-" + $slug + "-") or startswith("dev-" + $slug))
-                  or
-                  ($n | contains("/dev-" + $slug))
-                )
-              | $n
-            ' | sort -u || true)
-
-            if [ -z "$MATCHED_NAMES" ]; then
-              echo "  ℹ️ Aucun package dev- trouvé pour le slug '$SLUG'"
-              echo "| $addon_dir | $SLUG | ❌ aucune | aucun package trouvé |" >> $GITHUB_STEP_SUMMARY
-              continue
-            fi
-
-            echo "  🎯 Packages à supprimer :"
-            echo "$MATCHED_NAMES" | sed 's/^/    - /'
-
-            DELETED_FOR_ADDON=""
-            while IFS= read -r pkg_name; do
-              if [ -z "$pkg_name" ]; then
-                continue
-              fi
-              # Encodage du slash pour l'API DELETE : ha_addons/dev-x → ha_addons%2Fdev-x
-              ENCODED_NAME=$(echo "$pkg_name" | sed 's|/|%2F|g')
-
-              if [ "$DRY_RUN" = "true" ]; then
-                echo "  [dry-run] Conserverait (suppression simulée) : $pkg_name"
-                DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\` (dry-run)"
-              else
-                echo "  🗑️ Suppression du package : $pkg_name (encodé: $ENCODED_NAME)"
-                # Endpoints user-namespace (fonctionnent avec PAT classic du propriétaire).
-                if gh api --method DELETE "/user/packages/container/$ENCODED_NAME" 2>&1; then
-                  echo "  ✅ Package supprimé : $pkg_name"
-                  DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\`"
-                  DELETED_COUNT=$((DELETED_COUNT + 1))
-                elif gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED_NAME" 2>&1; then
-                  echo "  ✅ Package supprimé via /users : $pkg_name"
-                  DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\`"
-                  DELETED_COUNT=$((DELETED_COUNT + 1))
-                else
-                  echo "  ⚠️ Échec delete package, essai suppression version-par-version..."
-                  # Fallback : supprimer toutes les versions du package
-                  VERSIONS=$(gh api --paginate "/user/packages/container/$ENCODED_NAME/versions?per_page=100" 2>/dev/null | jq -s 'add // []' | jq -r '.[].id' || true)
-                  if [ -z "$VERSIONS" ]; then
-                    echo "  ❌ Impossible de supprimer $pkg_name (PAT classic read:packages + delete:packages requis)"
-                    echo "| $addon_dir | $SLUG | ❌ aucune | ❌ échec \`$pkg_name\` |" >> $GITHUB_STEP_SUMMARY
-                    SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-                    continue
-                  fi
-                  for vid in $VERSIONS; do
-                    gh api --method DELETE "/user/packages/container/$ENCODED_NAME/versions/$vid" || true
-                  done
-                  # Re-tenter la suppression du package vide
-                  gh api --method DELETE "/user/packages/container/$ENCODED_NAME" || true
-                  echo "  ✅ Versions supprimées pour : $pkg_name"
-                  DELETED_FOR_ADDON="$DELETED_FOR_ADDON \`$pkg_name\` (versions)"
-                  DELETED_COUNT=$((DELETED_COUNT + 1))
-                fi
-              fi
-            done <<< "$MATCHED_NAMES"
-
-            if [ -z "$DELETED_FOR_ADDON" ]; then
-              DELETED_FOR_ADDON="aucun"
-            fi
-            echo "| $addon_dir | $SLUG | ❌ aucune | $DELETED_FOR_ADDON |" >> $GITHUB_STEP_SUMMARY
+            echo "🗑️ $addon_dir (slug=$SLUG, archs=$ARCHS) : aucune branche dev → à supprimer"
+            TARGETS=""
+            for arch in $ARCHS; do
+              PKG="$REPO_PREFIX/dev-$SLUG-$arch"
+              PACKAGES+=("$PKG")
+              TARGETS="$TARGETS \`$PKG\`"
+            done
+            echo "| $addon_dir | $SLUG | ❌ aucune | $TARGETS |" >> $GITHUB_STEP_SUMMARY
           done
 
+          # Déduplique + fabrique la matrice JSON ["pkg1","pkg2",...]
+          MATRIX=$(printf '%s\n' "${PACKAGES[@]:-}" | grep -v '^$' | sort -u | jq -R . | jq -c -s '. // []')
+          COUNT=$(echo "$MATRIX" | jq 'length')
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo ""
+          echo "Matrice ($COUNT packages) : $MATRIX"
+
+  delete:
+    runs-on: ubuntu-latest
+    needs: detect-orphans
+    if: needs.detect-orphans.outputs.count != '0' && inputs.dry_run != true
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-orphans.outputs.matrix) }}
+    steps:
+      # Supprime TOUTES les versions du package (min-versions-to-keep: 0).
+      # Fonctionne avec le seul GITHUB_TOKEN si le repo a le rôle Admin
+      # sur le package (automatique quand le package a été publié par un
+      # workflow de ce même repo). Pas de LIST global, donc pas de 400.
+      - name: Delete ${{ matrix.package }}
+        uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: ${{ matrix.package }}
+          package-type: 'container'
+          min-versions-to-keep: 0
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: [detect-orphans, delete]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## Résultat nettoyage" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "🔍 **Dry-run terminé** : aucune suppression réelle effectuée." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ **Nettoyage terminé** : $DELETED_COUNT package(s) supprimé(s), $KEPT_COUNT addon(s) conservé(s) (branche dev existante), $SKIPPED_COUNT échec(s)." >> $GITHUB_STEP_SUMMARY
+          echo "Packages orphelins détectés : **${{ needs.detect-orphans.outputs.count }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Résultat delete : **${{ needs.delete.result }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "🔍 Dry-run : aucune suppression effectuée." >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Prérequis obligatoire : \`secrets.PACKAGES_PAT\` = PAT classic du compte \`legithubdetai\` avec scopes \`read:packages\` + \`delete:packages\`. \`GITHUB_TOKEN\` ne peut pas lister/supprimer les packages user-namespace (erreur 400 Invalid argument)._ " >> $GITHUB_STEP_SUMMARY
+          echo "_Si un delete échoue en 403 / Package not found : page du package GHCR → Settings → Manage Actions Access → ajouter le repo \`ha_addons\` avec le rôle \`Admin\`. C'est ce qui donne au \`GITHUB_TOKEN\` le droit de supprimer sans PAT._" >> $GITHUB_STEP_SUMMARY
