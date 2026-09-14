@@ -56,107 +56,147 @@ jobs:
           REMOTE_BRANCHES=$(git ls-remote --heads origin | sed -E 's|.*refs/heads/||')
           echo "$REMOTE_BRANCHES"
           echo ""
-
-          branch_exists() {
-            echo "$REMOTE_BRANCHES" | grep -Fxq "$1"
-          }
+          DEV_BRANCHES=$(echo "$REMOTE_BRANCHES" | grep -E '(-dev$|^dev-)' || true)
+          echo "Branches dev : $(echo "$DEV_BRANCHES" | tr '\n' ' ')"
+          echo ""
 
           mapfile -t ADDON_DIRS < <(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.$' | sort -u)
-          echo "Addons détectés : ${ADDON_DIRS[*]}"
+          echo "Addons main : ${ADDON_DIRS[*]}"
+          echo ""
 
-          # Slug -> dossier (pour retrouver les archs) et set des slugs connus.
-          declare -A SLUG_TO_DIR=()
-          for addon_dir in "${ADDON_DIRS[@]}"; do
-            SLUG=$(yq eval '.slug' "$addon_dir/config.yaml" 2>/dev/null | tr -d '"' | xargs || echo "$addon_dir")
-            if [ -z "$SLUG" ] || [ "$SLUG" = "null" ]; then
-              SLUG="$addon_dir"
+          is_main_dir() {
+            local d="$1"
+            for m in "${ADDON_DIRS[@]}"; do
+              if [ "$m" = "$d" ]; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          main_slug_and_archs() {
+            # $1 = dir -> "slug|archs"
+            local d="$1" s a
+            s=$(yq eval '.slug' "$d/config.yaml" 2>/dev/null | tr -d '"' | xargs || echo "$d")
+            if [ -z "$s" ] || [ "$s" = "null" ]; then
+              s="$d"
             fi
-            SLUG_TO_DIR["$SLUG"]="$addon_dir"
-            # Le nom du dossier peut différer du slug (ex. FossFLOW/fossflow) :
-            # on indexe les deux.
-            if [ -z "${SLUG_TO_DIR[$addon_dir]:-}" ]; then
-              SLUG_TO_DIR["$addon_dir"]="$addon_dir"
+            a=$(yq eval '.arch[]' "$d/config.yaml" 2>/dev/null | tr '\n' ' ' || echo "amd64 aarch64")
+            if [ -z "$a" ]; then
+              a="amd64 aarch64"
+            fi
+            echo "$s|$a"
+          }
+
+          # 1. Slugs EXACTS lus dans les configs des branches dev vivantes.
+          # Indispensable car le slug dev diffère souvent du slug main :
+          #   planka-dev  -> slug "dev-planka"  -> package dev-dev-planka-*
+          #   planka2-dev -> slug "planka2"     -> package dev-planka2-*
+          # (le publish utilise dev-$SLUG, avec le SLUG de la branche dev)
+          declare -A LIVE_SLUG_INFO=()  # slug -> "branch|dir|archs"
+          for B in $DEV_BRANCHES; do
+            CONFIGS=$(git ls-tree -r --name-only "origin/$B" -- '*/config.yaml' 2>/dev/null || true)
+            for cfg in $CONFIGS; do
+              D=$(dirname "$cfg")
+              CONTENT=$(git show "origin/$B:$cfg" 2>/dev/null || true)
+              if [ -z "$CONTENT" ]; then
+                continue
+              fi
+              S=$(echo "$CONTENT" | yq eval '.slug' - 2>/dev/null | tr -d '"' | xargs || true)
+              if [ -z "$S" ] || [ "$S" = "null" ]; then
+                continue
+              fi
+              A=$(echo "$CONTENT" | yq eval '.arch[]' - 2>/dev/null | tr '\n' ' ' || echo "amd64 aarch64")
+              if [ -z "$A" ]; then
+                A="amd64 aarch64"
+              fi
+              if [ -z "${LIVE_SLUG_INFO[$S]:-}" ]; then
+                LIVE_SLUG_INFO["$S"]="$B|$D|$A"
+              fi
+            done
+          done
+
+          echo "Slugs dev vivants : ${!LIVE_SLUG_INFO[*]:-(aucun)}"
+          echo ""
+
+          # Convention publish (docker-build-publish.yml) :
+          #   ghcr.io/<owner>/ha_addons/dev-<slug>-<arch> => package "ha_addons/dev-<slug>-<arch>"
+          # Règle : on GARDE dev-<V>-* ssi V est le slug vivant d'une branche dev
+          # dont le dossier existe dans main. Tout le reste se supprime :
+          #  - slug vivant mais dossier hors main (ex. planka2) -> orphelin
+          #  - addon main sans branche dev (ex. isoman, branche supprimée) ->
+          #    dev-<slug>-* + variante historique dev-<slug>dev-* (ex. dev-isomandev-*)
+          declare -A DELETE_PKGS=()
+          declare -A KEEP_PKGS=()
+          echo "| Slug (package dev-*) | Décision | Détail |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+
+          for S in "${!LIVE_SLUG_INFO[@]}"; do
+            INFO="${LIVE_SLUG_INFO[$S]}"
+            B="${INFO%%|*}"
+            REST="${INFO#*|}"
+            D="${REST%%|*}"
+            A="${REST#*|}"
+            if is_main_dir "$D"; then
+              for arch in $A; do
+                KEEP_PKGS["$REPO_PREFIX/dev-$S-$arch"]=1
+              done
+              echo "✅ slug vivant $S (branche $B, dossier main $D) → conservé"
+              echo "| \`dev-$S-*\` | ✅ conservé | branche vivante \`$B\` + dossier main \`$D\` |" >> $GITHUB_STEP_SUMMARY
+            else
+              for arch in $A; do
+                DELETE_PKGS["$REPO_PREFIX/dev-$S-$arch"]=1
+              done
+              echo "🗑️ slug vivant $S (branche $B) mais dossier $D hors main → à supprimer"
+              echo "| \`dev-$S-*\` | 🗑️ à supprimer | dossier \`$D\` absent de main (branche \`$B\`) |" >> $GITHUB_STEP_SUMMARY
             fi
           done
 
-          # Slugs déduits des branches dev distantes (ex. planka2-dev -> planka2).
-          # Couvre les addons renommés/supprimés dont le package dev- existe
-          # encore mais qui n'ont plus de dossier (ex. dev-planka2-*).
-          BRANCH_SLUGS=$(echo "$REMOTE_BRANCHES" | sed -n -E -e 's/^(.+)-dev$/\1/p' -e 's/^dev-(.+)$/\1/p' | sort -u)
-
-          # Union : slugs connus (dossiers) + slugs vus dans les branches.
-          ALL_SLUGS=$(printf '%s\n%s\n' "$(printf '%s\n' "${!SLUG_TO_DIR[@]}")" "$BRANCH_SLUGS" | grep -v '^$' | sort -u)
-          echo "Slugs candidats : $(echo "$ALL_SLUGS" | tr '\n' ' ')"
-
-          # Construit la liste des noms de packages attendus.
-          # Convention de docker-build-publish.yml :
-          #   ghcr.io/<owner>/ha_addons/dev-<slug>-<arch>  => package "ha_addons/dev-<slug>-<arch>"
-          # Règle de conservation stricte : on garde dev-<slug>-* UNIQUEMENT si
-          # le slug a un dossier addon ET une branche dev vivante. Sinon (plus
-          # de dossier, ou plus de branche) → suppression.
-          PACKAGES=()
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Slug | Dossier | Branche dev | Packages ciblés |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
-
-          for SLUG in $ALL_SLUGS; do
-            addon_dir="${SLUG_TO_DIR[$SLUG]:-}"
-            if [ -n "$addon_dir" ] && [ -f "$addon_dir/config.yaml" ]; then
-              ARCHS=$(yq eval '.arch[]' "$addon_dir/config.yaml" 2>/dev/null | tr '\n' ' ' || echo "amd64 aarch64")
-            else
-              addon_dir="(supprimé)"
-              ARCHS="amd64 aarch64"
-            fi
-
-            HAS_DEV=false
-            FOUND=""
-            for candidate in "$SLUG-dev" "dev-$SLUG"; do
-              if branch_exists "$candidate"; then
-                HAS_DEV=true
-                FOUND="$candidate"
+          for addon_dir in "${ADDON_DIRS[@]}"; do
+            INFO=$(main_slug_and_archs "$addon_dir")
+            M="${INFO%%|*}"
+            A="${INFO#*|}"
+            # Cet addon main a-t-il une production vivante ? = son dossier est
+            # le dossier d'au moins un slug vivant (slug exact de branche).
+            PRODUCED=false
+            for S in "${!LIVE_SLUG_INFO[@]}"; do
+              SD="${LIVE_SLUG_INFO[$S]#*|}"
+              SD="${SD%%|*}"
+              if [ "$SD" = "$addon_dir" ]; then
+                PRODUCED=true
                 break
               fi
             done
-            # Compat : teste aussi avec le nom du dossier quand il diffère du slug.
-            if [ "$HAS_DEV" = false ] && [ -n "${SLUG_TO_DIR[$SLUG]:-}" ] && [ "${SLUG_TO_DIR[$SLUG]}" != "$SLUG" ]; then
-              D="${SLUG_TO_DIR[$SLUG]}"
-              for candidate in "$D-dev" "dev-$D"; do
-                if branch_exists "$candidate"; then
-                  HAS_DEV=true
-                  FOUND="$candidate"
-                  break
-                fi
-              done
-            fi
-
-            HAS_DIR=false
-            if [ "$addon_dir" != "(supprimé)" ]; then
-              HAS_DIR=true
-            fi
-
-            if [ "$HAS_DIR" = true ] && [ "$HAS_DEV" = true ]; then
-              echo "✅ slug=$SLUG (dir=$addon_dir) : dossier + branche $FOUND → conservé"
-              echo "| $SLUG | $addon_dir | ✅ \`$FOUND\` | conservés |" >> $GITHUB_STEP_SUMMARY
+            if [ "$PRODUCED" = true ]; then
+              echo "✅ addon main $addon_dir (slug $M) : production dev vivante → ses variantes historiques restent gérées via les slugs vivants"
               continue
             fi
-
-            if [ "$HAS_DIR" = false ]; then
-              REASON="dossier supprimé"
-            else
-              REASON="aucune branche dev"
-            fi
-            echo "🗑️ slug=$SLUG (dir=$addon_dir, archs=$ARCHS) : $REASON → à supprimer"
+            # Plus aucune branche dev ne produit cet addon (ex. isoman-dev supprimée) :
+            # on vise dev-<M>-* + la variante historique dev-<M>dev-* (ex. dev-isomandev-*).
+            echo "🗑️ addon main $addon_dir (slug $M) sans production dev → à supprimer"
             TARGETS=""
-            for arch in $ARCHS; do
-              PKG="$REPO_PREFIX/dev-$SLUG-$arch"
-              PACKAGES+=("$PKG")
-              TARGETS="$TARGETS \`$PKG\`"
+            for variant in "$M" "${M}dev"; do
+              for arch in $A; do
+                PKG="$REPO_PREFIX/dev-$variant-$arch"
+                if [ -z "${KEEP_PKGS[$PKG]:-}" ]; then
+                  DELETE_PKGS["$PKG"]=1
+                  TARGETS="$TARGETS \`$PKG\`"
+                fi
+              done
             done
-            echo "| $SLUG | $addon_dir | ❌ $REASON | $TARGETS |" >> $GITHUB_STEP_SUMMARY
+            echo "| \`dev-$M-*\` | 🗑️ à supprimer | addon main \`$addon_dir\` sans branche dev |" >> $GITHUB_STEP_SUMMARY
           done
 
-          # Déduplique + fabrique la matrice JSON ["pkg1","pkg2",...]
-          MATRIX=$(printf '%s\n' "${PACKAGES[@]:-}" | grep -v '^$' | sort -u | jq -R . | jq -c -s '. // []')
+          # Sécurité : un package explicitement conservé ne doit jamais être supprimé
+          # (ex. dev-dev-planka-* conservé via slug vivant dev-planka).
+          FILTERED=()
+          for PKG in "${!DELETE_PKGS[@]}"; do
+            if [ -z "${KEEP_PKGS[$PKG]:-}" ]; then
+              FILTERED+=("$PKG")
+            fi
+          done
+
+          MATRIX=$(printf '%s\n' "${FILTERED[@]:-}" | grep -v '^$' | sort -u | jq -R . | jq -c -s '. // []')
           COUNT=$(echo "$MATRIX" | jq 'length')
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "count=$COUNT" >> $GITHUB_OUTPUT
