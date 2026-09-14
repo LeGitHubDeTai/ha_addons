@@ -188,11 +188,21 @@ jobs:
           # Supprime le package entier (requis quand il ne reste que la dernière
           # version taguée ; GitHub refuse DELETE version dans ce cas avec 400).
           echo "🗑️ DELETE package $PKG"
-          if gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || \
-             gh api --method DELETE "/user/packages/container/$ENCODED" 2>&1; then
-            echo "  ✅ package $PKG supprimé"
+          DEL_OUT=$(gh api --method DELETE "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || \
+             gh api --method DELETE "/user/packages/container/$ENCODED" 2>&1 || true)
+          echo "$DEL_OUT" | head -n 10
+
+          # Vérification réelle : le DELETE peut répondre 204 sans que le package
+          # disparaisse (ex. droits insuffisants, soft-delete). On re-GET.
+          sleep 5
+          CHECK=$(gh api "/users/$OWNER_LC/packages/container/$ENCODED" 2>&1 || true)
+          if echo "$CHECK" | grep -qi "not found\|404"; then
+            echo "  ✅ package $PKG confirmé supprimé (GET → 404)."
           else
-            echo "  ℹ️ package $PKG déjà vide/supprimé ou non supprimable (vérifiez Manage Actions Access → Admin)."
+            echo "  ⚠️ package $PKG TOUJOURS PRÉSENT après DELETE — suppression non effective :"
+            echo "$CHECK" | head -n 20
+            echo "  Causes probables : GITHUB_TOKEN sans rôle Admin sur ce package,"
+            echo "  ou package restaurable (soft-delete 30j). Voir Settings du package → Manage Actions Access."
           fi
           echo "✅ Terminé pour $PKG"
 
