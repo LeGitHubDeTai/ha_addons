@@ -23,7 +23,8 @@ RUN apk add --no-cache \
     envsubst \
     python3 \
     make \
-    g++
+    g++ \
+    graphicsmagick
 WORKDIR /data
 COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
 
