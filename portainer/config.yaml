@@ -1,0 +1,39 @@
+name: Portainer
+version: "2.22.0"
+slug: portainer
+panel_icon: "mdi:docker"
+description: Manage Docker environments through a web interface
+url: https://github.com/legithubdetai/ha_addons/tree/main/portainer
+webui: http://[HOST]:[PORT:9000]/
+image: portainer/portainer:{arch}
+arch:
+    - amd64
+    - aarch64
+startup: application
+boot: auto
+hassio_role: "default"
+hassio_api: true
+homeassistant_api: true
+apparmor: true
+ingress: true
+ingress_port: 9000
+ingress_stream: true
+backup_exclude:
+    - "portainer/.data"
+    - "portainer/.config"
+map:
+    - config:rw
+ports:
+    9000/tcp: 9000
+ports_description:
+    9000/tcp: Portainer web interface UI
+options:
+    timezone: "Europe/Berlin"
+    env_vars_list: []
+    cmd_line_args: ""
+schema:
+    timezone: str
+    env_vars_list: [
+        "match(^[A-Z_0-9]+: .*$)"
+    ]
+    cmd_line_args: str?
