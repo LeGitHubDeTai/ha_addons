@@ -25,7 +25,6 @@ RUN apk add --no-cache \
     make \
     g++ \
     graphicsmagick \
-    font-fira-code \
     font-terminus \
     font-inconsolata \
     font-dejavu \
