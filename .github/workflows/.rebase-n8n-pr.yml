@@ -1,4 +1,4 @@
-name: Rebase n8n PR
+name: .Rebase n8n PR
 
 # Workflow to rebuild an auto-upgrade PR with a new version number from main
 on:
