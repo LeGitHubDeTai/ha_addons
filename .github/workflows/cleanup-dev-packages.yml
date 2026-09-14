@@ -64,45 +64,95 @@ jobs:
           mapfile -t ADDON_DIRS < <(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.$' | sort -u)
           echo "Addons détectés : ${ADDON_DIRS[*]}"
 
-          # Construit la liste des noms de packages attendus.
-          # Convention de docker-build-publish.yml :
-          #   ghcr.io/<owner>/ha_addons/dev-<slug>-<arch>  => package "ha_addons/dev-<slug>-<arch>"
-          PACKAGES=()
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Addon | Slug | Branche dev | Packages ciblés |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
-
+          # Slug -> dossier (pour retrouver les archs) et set des slugs connus.
+          declare -A SLUG_TO_DIR=()
           for addon_dir in "${ADDON_DIRS[@]}"; do
             SLUG=$(yq eval '.slug' "$addon_dir/config.yaml" 2>/dev/null | tr -d '"' | xargs || echo "$addon_dir")
             if [ -z "$SLUG" ] || [ "$SLUG" = "null" ]; then
               SLUG="$addon_dir"
             fi
-            ARCHS=$(yq eval '.arch[]' "$addon_dir/config.yaml" 2>/dev/null | tr '\n' ' ' || echo "amd64 aarch64")
+            SLUG_TO_DIR["$SLUG"]="$addon_dir"
+            # Le nom du dossier peut différer du slug (ex. FossFLOW/fossflow) :
+            # on indexe les deux.
+            if [ -z "${SLUG_TO_DIR[$addon_dir]:-}" ]; then
+              SLUG_TO_DIR["$addon_dir"]="$addon_dir"
+            fi
+          done
+
+          # Slugs déduits des branches dev distantes (ex. planka2-dev -> planka2).
+          # Couvre les addons renommés/supprimés dont le package dev- existe
+          # encore mais qui n'ont plus de dossier (ex. dev-planka2-*).
+          BRANCH_SLUGS=$(echo "$REMOTE_BRANCHES" | sed -n -E -e 's/^(.+)-dev$/\1/p' -e 's/^dev-(.+)$/\1/p' | sort -u)
+
+          # Union : slugs connus (dossiers) + slugs vus dans les branches.
+          ALL_SLUGS=$(printf '%s\n%s\n' "$(printf '%s\n' "${!SLUG_TO_DIR[@]}")" "$BRANCH_SLUGS" | grep -v '^$' | sort -u)
+          echo "Slugs candidats : $(echo "$ALL_SLUGS" | tr '\n' ' ')"
+
+          # Construit la liste des noms de packages attendus.
+          # Convention de docker-build-publish.yml :
+          #   ghcr.io/<owner>/ha_addons/dev-<slug>-<arch>  => package "ha_addons/dev-<slug>-<arch>"
+          # Règle de conservation stricte : on garde dev-<slug>-* UNIQUEMENT si
+          # le slug a un dossier addon ET une branche dev vivante. Sinon (plus
+          # de dossier, ou plus de branche) → suppression.
+          PACKAGES=()
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Slug | Dossier | Branche dev | Packages ciblés |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
+
+          for SLUG in $ALL_SLUGS; do
+            addon_dir="${SLUG_TO_DIR[$SLUG]:-}"
+            if [ -n "$addon_dir" ] && [ -f "$addon_dir/config.yaml" ]; then
+              ARCHS=$(yq eval '.arch[]' "$addon_dir/config.yaml" 2>/dev/null | tr '\n' ' ' || echo "amd64 aarch64")
+            else
+              addon_dir="(supprimé)"
+              ARCHS="amd64 aarch64"
+            fi
 
             HAS_DEV=false
             FOUND=""
-            for candidate in "$addon_dir-dev" "dev-$addon_dir" "$SLUG-dev" "dev-$SLUG"; do
+            for candidate in "$SLUG-dev" "dev-$SLUG"; do
               if branch_exists "$candidate"; then
                 HAS_DEV=true
                 FOUND="$candidate"
                 break
               fi
             done
+            # Compat : teste aussi avec le nom du dossier quand il diffère du slug.
+            if [ "$HAS_DEV" = false ] && [ -n "${SLUG_TO_DIR[$SLUG]:-}" ] && [ "${SLUG_TO_DIR[$SLUG]}" != "$SLUG" ]; then
+              D="${SLUG_TO_DIR[$SLUG]}"
+              for candidate in "$D-dev" "dev-$D"; do
+                if branch_exists "$candidate"; then
+                  HAS_DEV=true
+                  FOUND="$candidate"
+                  break
+                fi
+              done
+            fi
 
-            if [ "$HAS_DEV" = true ]; then
-              echo "✅ $addon_dir (slug=$SLUG) : branche $FOUND existe → conservé"
-              echo "| $addon_dir | $SLUG | ✅ \`$FOUND\` | conservés |" >> $GITHUB_STEP_SUMMARY
+            HAS_DIR=false
+            if [ "$addon_dir" != "(supprimé)" ]; then
+              HAS_DIR=true
+            fi
+
+            if [ "$HAS_DIR" = true ] && [ "$HAS_DEV" = true ]; then
+              echo "✅ slug=$SLUG (dir=$addon_dir) : dossier + branche $FOUND → conservé"
+              echo "| $SLUG | $addon_dir | ✅ \`$FOUND\` | conservés |" >> $GITHUB_STEP_SUMMARY
               continue
             fi
 
-            echo "🗑️ $addon_dir (slug=$SLUG, archs=$ARCHS) : aucune branche dev → à supprimer"
+            if [ "$HAS_DIR" = false ]; then
+              REASON="dossier supprimé"
+            else
+              REASON="aucune branche dev"
+            fi
+            echo "🗑️ slug=$SLUG (dir=$addon_dir, archs=$ARCHS) : $REASON → à supprimer"
             TARGETS=""
             for arch in $ARCHS; do
               PKG="$REPO_PREFIX/dev-$SLUG-$arch"
               PACKAGES+=("$PKG")
               TARGETS="$TARGETS \`$PKG\`"
             done
-            echo "| $addon_dir | $SLUG | ❌ aucune | $TARGETS |" >> $GITHUB_STEP_SUMMARY
+            echo "| $SLUG | $addon_dir | ❌ $REASON | $TARGETS |" >> $GITHUB_STEP_SUMMARY
           done
 
           # Déduplique + fabrique la matrice JSON ["pkg1","pkg2",...]
