@@ -50,6 +50,10 @@ fi
 export N8N_USER_FOLDER="/data/n8n"
 echo "N8N_USER_FOLDER: ${N8N_USER_FOLDER}"
 
+# Localtunnel configuration
+export N8N_LT_DISABLE=${N8N_LT_DISABLE:-false}
+echo "N8N_LT_DISABLE: ${N8N_LT_DISABLE}"
+
 INFO=$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/info || echo $INFO_FALLBACK)
 INFO=${INFO:-'{}'}
 echo "Fetched Info from Supervisor: ${INFO}"
