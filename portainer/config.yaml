@@ -1,5 +1,5 @@
 name: Portainer
-version: "2.22.0"
+version: "2.45.0"
 slug: portainer
 panel_icon: "mdi:docker"
 description: Manage Docker environments through a web interface
