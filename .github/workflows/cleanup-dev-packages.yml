@@ -19,6 +19,10 @@ permissions:
 env:
   OWNER_LC: legithubdetai
   REPO_PREFIX: ha_addons
+  # Token pour GHCR - en ordre de priorité :
+  # 1. GITHUB_TOKEN (injecté par GitHub Actions, permissions limitées)
+  # 2. PAT via secret PACKAGES_PAT (à créer dans repo Settings → Secrets)
+  GH_TOKEN_FALLBACK: ""
 
 jobs:
   detect-orphans:
@@ -49,16 +53,48 @@ jobs:
           echo "Mode dry-run: **${DRY_RUN:-false}**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # === ÉTAPE 1 : Lister TOUS les packages GHCR dev-* ===
-          echo "📦 ÉTAPE 1 : Récupération de TOUTES les packages GHCR en cours..."
-          echo ""
+# === ÉTAPE 1 : Lister TOUS les packages GHCR dev-* ===
+  echo "📦 ÉTAPE 1 : Récupération de TOUTES les packages GHCR en cours..."
+  echo ""
 
-          # Récupérer tous les packages container via l'API du dépôt (toujours dispo avec GITHUB_TOKEN)
-          PACKAGES_JSON=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
-            "https://api.github.com/repos/$OWNER_LC/$REPO_PREFIX/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
+  # Récupérer tous les packages container
+  # Essayer dans l'ordre : GITHUB_TOKEN d'abord, puis fallback PAT
+  PACKAGES_JSON="[]"
+  
+  # Construction du header d'authentification
+  AUTH_HEADER="Authorization: token ${GITHUB_TOKEN}"
+  # Si GITHUB_TOKEN est vide (execution locale), essayer avec le fallback PAT
+  if [ -z "$GITHUB_TOKEN" ] || [ "$GITHUB_TOKEN" = "__DEFAULT_GITHUB_TOKEN__" ]; then
+    if [ -n "${PAT_SECRET:-}" ] && [ "$PAT_SECRET" != "default" ]; then
+      AUTH_HEADER="Authorization: token ${PAT_SECRET}"
+      echo "Utilisation du PAT pour l'authentification GHCR..."
+    else
+      echo "⚠️ GITHUB_TOKEN non défini, essai avec permissions limitées..."
+    fi
+  fi
 
-          echo "✅ Found $(echo "$PACKAGES_JSON" | jq 'length' 2>/dev/null || echo "0") packages container via API dépôt"
-          echo ""
+  # Tentative 1 : API dépôt (toujours dispo avec GITHUB_TOKEN du repo)
+  PACKAGES_JSON=$(curl -s -H "$AUTH_HEADER" \
+    "https://api.github.com/repos/$OWNER_LC/$REPO_PREFIX/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
+  
+  # Si aucun paquet trouvé avec l'authentification dépôt, essayer API utilisateur
+  if [ "$PACKAGES_JSON" = "[]" ] || [ -z "$PACKAGES_JSON" ]; then
+    AUTH_HEADER_USER="Authorization: token ${GITHUB_TOKEN}"
+    if [ -n "${PAT_SECRET:-}" ] && [ "$PAT_SECRET" != "default" ]; then
+      AUTH_HEADER_USER="Authorization: token ${PAT_SECRET}"
+    fi
+    PACKAGES_JSON=$(curl -s -H "$AUTH_HEADER_USER" \
+      "https://api.github.com/users/$OWNER_LC/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
+  fi
+  
+  # Deuxième fallback : API dépôt avec PAT si différent
+  if [ "$PACKAGES_JSON" = "[]" ] || [ -z "$PACKAGES_JSON" ]; then
+    if [ -n "${PAT_SECRET:-}" ] && [ "$PAT_SECRET" != "default" ]; then
+      AUTH_HEADER_PAT="Authorization: token ${PAT_SECRET}"
+      PACKAGES_JSON=$(curl -s -H "$AUTH_HEADER_PAT" \
+        "https://api.github.com/repos/$OWNER_LC/$REPO_PREFIX/packages?package_type=container&per_page=100" 2>/dev/null | jq -s 'add // []' || echo "[]")
+    fi
+  fi
 
           # Filtrer uniquement les packages dev-*
           # Format expected: "ha_addons/dev-planka-amd64" or "dev-planka-amd64"
