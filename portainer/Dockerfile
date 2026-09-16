@@ -9,11 +9,9 @@ LABEL \
     io.hass.type="addon" \
     io.hass.arch="${BUILD_ARCH}"
 
-RUN mkdir -p /entrypoint.sh
-
-COPY run.sh /entrypoint.sh
+COPY run.sh /app/entrypoint.sh
 COPY supervisord.conf /etc/supervisord.conf
 
-RUN chmod +x /entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
