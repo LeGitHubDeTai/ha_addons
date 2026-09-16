@@ -36,7 +36,7 @@ WORKDIR /data
 COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
 
 # Install n8n (simplified for ARM64/AMD64 compatibility)
-RUN npm install -g n8n@2.38.7
+RUN npm install -g n8n@2.39.6
 
 RUN mkdir -p /run/nginx
 
