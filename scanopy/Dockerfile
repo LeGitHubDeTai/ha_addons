@@ -27,7 +27,7 @@ RUN apk add --no-cache \
     g++
 
 # Download and extract Scanopy
-ARG SCANOPY_VERSION=0.14.19
+ARG SCANOPY_VERSION=0.17.15
 RUN wget https://github.com/scanopy/scanopy/archive/refs/tags/v${SCANOPY_VERSION}.zip -O scanopy.zip && \
     unzip scanopy.zip && \
     mv scanopy-${SCANOPY_VERSION} /builder && \
