@@ -31,6 +31,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Full history is required so `git diff $BASE_SHA $SHA`
+          # works on main after a merge (shallow clones miss BASE_SHA)
+          fetch-depth: 0
 
       - name: Detect changed addons
         id: changes
@@ -56,10 +60,19 @@ jobs:
               else
                 BASE_SHA=$(git rev-parse HEAD~1)
               fi
-              
+
+              # Make sure BASE_SHA is available locally (merge pushes, rebases, etc.)
+              if ! git cat-file -e "$BASE_SHA" 2>/dev/null; then
+                echo "⚠️ BASE_SHA $BASE_SHA missing locally, fetching..."
+                git fetch origin "$BASE_SHA" --depth=1 || git fetch origin main --depth=50
+              fi
+
               ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
-              
-              ADDONS=$(git diff --name-only $BASE_SHA ${{ github.sha }} | \
+
+              echo "📄 Files changed between $BASE_SHA and ${{ github.sha }}:"
+              CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "${{ github.sha }}" || echo "")
+              echo "$CHANGED_FILES"
+              ADDONS=$(echo "$CHANGED_FILES" | \
                 grep -E "^($ALL_ADDONS)/" | \
                 cut -d'/' -f1 | sort -u | tr '\n' ' ')
               echo "🏠 Main branch: detected changed addons: $ADDONS"
@@ -110,11 +123,12 @@ jobs:
           fi
           
           if [ -z "$ADDONS" ]; then
-            echo "addons=[]"
-            echo "matrix=[]"
+            echo "addons=" >> $GITHUB_OUTPUT
+            echo "matrix=[]" >> $GITHUB_OUTPUT
+            echo "No addon changes detected"
             exit 0
           fi
-          
+
           # Create JSON matrix
           ADDON_ARRAY="["
           for addon in $ADDONS; do
@@ -126,11 +140,11 @@ jobs:
             fi
           done
           ADDON_ARRAY="$ADDON_ARRAY]"
-          
+
           echo "addons=$ADDONS"
           echo "matrix=$ADDON_ARRAY"
-          echo "::set-output name=addons::$ADDONS"
-          echo "::set-output name=matrix::$ADDON_ARRAY"
+          echo "addons=$ADDONS" >> $GITHUB_OUTPUT
+          echo "matrix=$ADDON_ARRAY" >> $GITHUB_OUTPUT
 
   check-versions:
     runs-on: ubuntu-latest
@@ -211,7 +225,7 @@ jobs:
           
           BUILD_ARRAY="$BUILD_ARRAY]"
           echo "build-matrix=$BUILD_ARRAY"
-          echo "::set-output name=build-matrix::$BUILD_ARRAY"
+          echo "build-matrix=$BUILD_ARRAY" >> $GITHUB_OUTPUT
 
   build-and-publish:
     runs-on: ubuntu-latest
