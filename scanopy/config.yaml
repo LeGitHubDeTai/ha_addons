@@ -5,7 +5,7 @@ panel_title: Scanopy - Network Scanner
 panel_icon: "mdi:network"
 description: Network scanning tool for discovering and analyzing network devices with web interface
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/scanopy
-image: ghcr.io/legithubdetai/ha_addons/dev-scanopy-{arch}
+image: ghcr.io/legithubdetai/ha_addons/scanopy-{arch}
 arch:
     - amd64
 startup: application
