@@ -144,7 +144,7 @@ cp "$ENV_FILE" /opt/fizzy/.env 2>/dev/null || true
 bashio::log.info "Téléchargement de Fizzy..."
 
 # Download the latest Fizzy release
-FIZZY_VERSION="3068c2a74da2e6d1cba38e7cf15b0dc158dbf2fe"
+FIZZY_VERSION="7355df9b60835c9cb1928d06fc144b2ff57d75ca"
 FIZZY_URL="https://github.com/basecamp/fizzy/archive/refs/heads/${FIZZY_VERSION}.zip"
 
 # Create a temporary directory for download

@@ -1,5 +1,5 @@
 name: Fizzy
-version: "26.9.2"
+version: "26.9.3"
 slug: fizzy
 panel_icon: "mdi:view-week"
 description: Kanban tracking tool for issues and ideas by 37signals (Fizzy)
