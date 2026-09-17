@@ -9,9 +9,6 @@ LABEL \
     io.hass.type="addon" \
     io.hass.arch="${BUILD_ARCH}"
 
-COPY run.sh /app/entrypoint.sh
 COPY supervisord.conf /etc/supervisord.conf
 
-RUN chmod +x /app/entrypoint.sh
-
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/portainer"]
