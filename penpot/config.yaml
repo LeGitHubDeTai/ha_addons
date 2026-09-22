@@ -1,0 +1,52 @@
+name: Penpot
+version: "26.9.1"
+slug: penpot
+panel_icon: "mdi:pen-plus"
+description: Plateforme open-source de design & prototypage (Penpot)
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/penpot
+webui: http://[HOST]:[PORT:9001]/
+image: ghcr.io/legithubdetai/ha_addons/penpot-{arch}
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: false
+hassio_role: "default"
+hassio_api: true
+homeassistant_api: true
+ingress: true
+ingress_port: 9001
+ingress_stream: true
+backup_exclude:
+  - "penpot/postgres/*"
+  - "penpot/*.log"
+  - "supervisord.log*"
+ports:
+  9001/tcp: null
+ports_description:
+  9001/tcp: Penpot Web UI. Normalement non exposé, l'Ingress Home Assistant est recommandé et plus sécurisé. Exposez ce port pour contourner l'Ingress.
+options:
+  timezone: "Europe/Paris"
+  secret_key: ""
+  db_password: ""
+  allow_registration: true
+  disable_telemetry: true
+  smtp_host: ""
+  smtp_port: 587
+  smtp_username: ""
+  smtp_password: ""
+  smtp_from: "no-reply@example.com"
+  smtp_reply_to: "no-reply@example.com"
+schema:
+  timezone: str
+  secret_key: str?
+  db_password: str?
+  allow_registration: bool
+  disable_telemetry: bool
+  smtp_host: str?
+  smtp_port: int?
+  smtp_username: str?
+  smtp_password: str?
+  smtp_from: str?
+  smtp_reply_to: str?

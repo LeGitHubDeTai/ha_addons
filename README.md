@@ -34,6 +34,7 @@
 | [**Obsidian**](./obsidian/) | Gestion de notes et connaissances | 3000 |
 | [**Mopidy**](./mopidy/) | Serveur musical avec support Spotify/Bandcamp | 6680 |
 | [**ISOMan**](./isoman/) | Gestionnaire d'ISOs Linux | 50145 |
+| [**Penpot**](./penpot/) | Design & prototypage open-source | 9001 |
 
 ---
 

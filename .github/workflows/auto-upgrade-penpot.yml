@@ -1,0 +1,264 @@
+name: Auto-upgrade penpot
+
+# Workflow to automatically upgrade penpot addon when new releases are available
+on:
+  schedule:
+    # Run daily at 9:00 AM UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force recreate PR even if one already exists (closed/merged)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  auto-upgrade:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current versions
+        id: current
+        run: |
+          # Get penpot version from Dockerfile (first ARG PENPOT_VERSION)
+          DOCKERFILE_VERSION=$(grep -m1 -E '^ARG PENPOT_VERSION=' penpot/Dockerfile | sed 's/.*=//' | sed 's/[[:space:]]*//')
+          echo "dockerfile_version=$DOCKERFILE_VERSION" >> $GITHUB_OUTPUT
+
+          # Get addon version from config.yaml
+          CONFIG_VERSION=$(grep -E '^version:' penpot/config.yaml | sed 's/version: "//' | sed 's/"//')
+          echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
+
+          echo "Current penpot version: $DOCKERFILE_VERSION"
+          echo "Current addon version: $CONFIG_VERSION"
+
+      - name: Get latest penpot release
+        id: latest
+        run: |
+          LATEST_RELEASE_DATA=$(curl -s "https://api.github.com/repos/penpot/penpot/releases")
+
+          # Penpot tags look like "2.17.0" (no leading v). Find first valid X.Y.Z.
+          LATEST_RELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.[].tag_name' | while read -r tag; do
+            VERSION=$(echo "$tag" | sed 's/^v//')
+            if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "$tag"
+              break
+            fi
+          done)
+
+          RELEASE_INFO=$(echo "$LATEST_RELEASE_DATA" | jq ".[] | select(.tag_name==\"$LATEST_RELEASE\")")
+
+          LATEST_VERSION=$(echo "$LATEST_RELEASE" | sed 's/^v//')
+          # Docker images are tagged per minor (2.17), like the official compose
+          LATEST_MINOR=$(echo "$LATEST_VERSION" | cut -d. -f1,2)
+          IS_PRERELEASE=$(echo "$RELEASE_INFO" | jq -r '.prerelease')
+          RELEASE_URL=$(echo "$RELEASE_INFO" | jq -r '.html_url')
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            RELEASE_TYPE="pre-release"
+          else
+            RELEASE_TYPE="latest"
+          fi
+
+          echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "latest_minor=$LATEST_MINOR" >> $GITHUB_OUTPUT
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
+
+          echo "Latest release: $LATEST_RELEASE (minor: $LATEST_MINOR, type: $RELEASE_TYPE)"
+
+      - name: Compare versions and check existing PRs
+        id: compare
+        run: |
+          CURRENT_MINOR="${{ steps.current.outputs.dockerfile_version }}"
+          LATEST_MINOR="${{ steps.latest.outputs.latest_minor }}"
+          RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
+
+          IS_NEW_VERSION=false
+          if [ "$CURRENT_MINOR" != "$LATEST_MINOR" ]; then
+            # Only upgrade on newer minor (sort -V comparison)
+            if [ "$(printf '%s\n' "$LATEST_MINOR" "$CURRENT_MINOR" | sort -V | head -n1)" = "$CURRENT_MINOR" ]; then
+              IS_NEW_VERSION=true
+            fi
+          fi
+
+          if [ "$IS_NEW_VERSION" = "true" ]; then
+            echo "needs_upgrade=true" >> $GITHUB_OUTPUT
+            echo "is_new_version=true" >> $GITHUB_OUTPUT
+            echo "New penpot version available: $LATEST_MINOR (current: $CURRENT_MINOR)"
+          else
+            echo "needs_upgrade=false" >> $GITHUB_OUTPUT
+            echo "is_new_version=false" >> $GITHUB_OUTPUT
+            echo "Already up-to-date (current: $CURRENT_MINOR, latest: $LATEST_MINOR)"
+          fi
+
+      - name: Generate new addon version
+        id: addon_version
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          CURRENT_YEAR=$(date +%y)
+          CURRENT_MONTH=$(date +%m)
+          CURRENT_MONTH=${CURRENT_MONTH#0}
+
+          CURRENT_ADDON_VERSION="${{ steps.current.outputs.config_version }}"
+          CURRENT_PATCH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f3)
+
+          CURRENT_YEAR_MONTH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f1,2)
+          NEW_YEAR_MONTH="$CURRENT_YEAR.$CURRENT_MONTH"
+
+          if [ "$CURRENT_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
+            NEW_PATCH=$((CURRENT_PATCH + 1))
+          else
+            NEW_PATCH=1
+          fi
+
+          NEW_ADDON_VERSION="$NEW_YEAR_MONTH.$NEW_PATCH"
+          echo "new_addon_version=$NEW_ADDON_VERSION" >> $GITHUB_OUTPUT
+          echo "New addon version: $NEW_ADDON_VERSION"
+
+      - name: Create or checkout upgrade branch
+        id: branch
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          BRANCH_NAME="upgrade/penpot-v${{ steps.latest.outputs.latest_minor }}"
+
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME exists on remote, checking it out..."
+            git fetch origin "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME" origin/"$BRANCH_NAME"
+          else
+            echo "Creating new branch $BRANCH_NAME..."
+            git checkout -b "$BRANCH_NAME"
+          fi
+
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Update config.yaml
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" penpot/config.yaml
+          echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
+
+      - name: Update Dockerfile
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          # Update both ARG PENPOT_VERSION occurrences (top + final stage)
+          sed -i "s/^ARG PENPOT_VERSION=.*/ARG PENPOT_VERSION=${{ steps.latest.outputs.latest_minor }}/" penpot/Dockerfile
+          echo "Updated Dockerfile version to ${{ steps.latest.outputs.latest_minor }}"
+
+      - name: Commit changes
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add penpot/config.yaml penpot/Dockerfile
+          FORCE_FLAG="${{ github.event.inputs.force }}"
+
+          if git diff --cached --quiet; then
+            if [ "$FORCE_FLAG" = "true" ]; then
+              echo "No changes but force flag is set - creating empty commit"
+              git commit --allow-empty -m "⬆️ Upgrade penpot to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+            else
+              echo "No changes to commit"
+              exit 0
+            fi
+          else
+            git commit -m "⬆️ Upgrade penpot to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+          fi
+
+      - name: Push branch
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          FORCE_FLAG="${{ github.event.inputs.force }}"
+
+          git fetch origin || true
+
+          if [ "$FORCE_FLAG" = "true" ]; then
+            echo "Force flag set - pushing branch unconditionally..."
+            git push origin "$BRANCH_NAME" --force
+          elif git rev-parse origin/"$BRANCH_NAME" >/dev/null 2>&1; then
+            if [ -n "$(git log origin/"$BRANCH_NAME"..HEAD 2>/dev/null)" ]; then
+              echo "New commits found - pushing updates..."
+              git push origin "$BRANCH_NAME" --force
+            else
+              echo "No new commits to push - branch is up to date"
+            fi
+          else
+            echo "Creating new branch $BRANCH_NAME on remote..."
+            git push origin "$BRANCH_NAME"
+          fi
+
+      - name: Setup GitHub CLI
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        uses: wusatosi/setup-gh@v1
+
+      - name: Create or Update Pull Request
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          echo "Current branch: $(git branch --show-current)"
+
+          LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
+          NEW_ADDON_VERSION="${{ steps.addon_version.outputs.new_addon_version }}"
+          RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+
+          FORCE_FLAG="${{ github.event.inputs.force || 'true' }}"
+
+          OPEN_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state open --json number --jq '.[0].number')
+          ANY_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state all --json number --jq '.[0].number')
+
+          if [ -n "$OPEN_PR" ]; then
+            echo "Open PR #$OPEN_PR found, updating labels..."
+            CURRENT_LABELS=$(gh pr view "$OPEN_PR" --json labels --jq '.labels[].name')
+            echo "Current labels: $CURRENT_LABELS"
+            gh pr edit "$OPEN_PR" --remove-label "pre-release,latest" 2>/dev/null || true
+            gh pr edit "$OPEN_PR" --add-label "$RELEASE_TYPE"
+            echo "PR #$OPEN_PR updated successfully"
+          elif [ "$FORCE_FLAG" = "true" ]; then
+            echo "Force flag is set - creating new PR..."
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "⬆️ Upgrade penpot to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade penpot to version $LATEST_VERSION
+
+            **Changes:**
+            - Updated config.yaml addon version to $NEW_ADDON_VERSION
+            - Updated Dockerfile to use penpot@$LATEST_VERSION
+
+            **Release:** ${{ steps.latest.outputs.release_url }}
+
+            This PR was created automatically by the auto-upgrade workflow (forced recreation)." \
+              --label "auto-upgrade,dependencies,$RELEASE_TYPE"
+            echo "PR created successfully (forced)"
+          elif [ -n "$ANY_PR" ]; then
+            echo "PR #$ANY_PR already exists but is closed/merged - not creating duplicate (use 'force' to recreate)"
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "⬆️ Upgrade penpot to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade penpot to version $LATEST_VERSION
+
+            **Changes:**
+            - Updated config.yaml addon version to $NEW_ADDON_VERSION
+            - Updated Dockerfile to use penpot@$LATEST_VERSION
+
+            **Release:** ${{ steps.latest.outputs.release_url }}
+
+            This PR was created automatically by the auto-upgrade workflow." \
+              --label "auto-upgrade,dependencies,$RELEASE_TYPE"
+            echo "PR created successfully"
+          fi
