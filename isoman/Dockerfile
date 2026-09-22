@@ -36,6 +36,9 @@ COPY --from=0 /builder/ui/package.json /builder/ui/bun.lock ./
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 COPY --from=0 /builder/ui/ ./
+# Patch HA Ingress : HashRouter + base API/WS ingress-aware (voir patch-ui.mjs)
+COPY patch-ui.mjs ./
+RUN bun ./patch-ui.mjs
 RUN bun run build
 
 # Stage 2: Build backend with Go
