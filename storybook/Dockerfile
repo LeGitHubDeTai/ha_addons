@@ -5,6 +5,10 @@ ARG BUILD_ARCH
 ARG STORYBOOK_VERSION=10.6.0
 FROM ${BUILD_FROM}
 
+ARG BUILD_VERSION
+ARG BUILD_ARCH
+ARG BUILD_CONFIG_FILE
+
 LABEL \
   io.hass.version="${BUILD_VERSION}" \
   io.hass.type="addon" \
@@ -28,6 +32,7 @@ RUN apk add --no-cache \
 RUN mkdir -p /storybook-project && cd /storybook-project && \
     npm init -y && \
     npx storybook@${STORYBOOK_VERSION} init --yes --type react --builder vite --package-manager npm --no-dev && \
+    npm pkg set type=module && \
     npm run build-storybook
 
 RUN mkdir -p /usr/share/nginx/html && \
