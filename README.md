@@ -35,6 +35,7 @@
 | [**Mopidy**](./mopidy/) | Serveur musical avec support Spotify/Bandcamp | 6680 |
 | [**ISOMan**](./isoman/) | Gestionnaire d'ISOs Linux | 50145 |
 | [**Penpot**](./penpot/) | Design & prototypage open-source | 9001 |
+| [**Storybook**](./storybook/) | Atelier UI pour développer des composants en isolation | 6006 |
 
 ---
 
@@ -96,11 +97,11 @@ cd ha_addons
 ```
 ha_addons/
 ├── .scripts/              # Scripts partagés (entrée, variables, mounts)
-├── .github/workflows/     # CI/CD (13 workflows)
+├── .github/workflows/     # CI/CD (14 workflows)
 ├── scripts/               # Script de build local
 ├── n8n/                   # Chaque add-on contient :
-├── gitea/                 #   - config.yaml (métadonnées)
-├── syncthing/             #   - Dockerfile
+├── storybook/             #   - config.yaml (métadonnées)
+├── gitea/                 #   - Dockerfile
 ├── planka/                #   - build.yaml
 ├── ...                    #   - logo.png
 └── repository.yaml

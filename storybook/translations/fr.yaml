@@ -1,0 +1,7 @@
+---
+configuration:
+  env_vars_list:
+    name: Liste de variables d'environnement
+    description: |-
+      Liste des variables d'environnement supplémentaires à passer au conteneur.
+      Chaque variable doit être au format KEY: value.
