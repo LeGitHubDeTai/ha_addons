@@ -39,13 +39,13 @@ jobs:
           CONFIG_VERSION=$(grep -E '^version:' mindwtr/config.yaml | sed 's/version: "//' | sed 's/"//')
           echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
 
-          # Get build base from build.yaml
-          BUILD_BASE=$(grep -E 'ghcr.io/home-assistant/amd64-base:' mindwtr/build.yaml | head -1 | sed 's/.*amd64-base://' | tr -d ' ')
+          # Get bun base from build.yaml
+          BUILD_BASE=$(grep -E 'oven/bun:' mindwtr/build.yaml | head -1 | sed 's/.*oven\///' | tr -d ' ')
           echo "build_base=$BUILD_BASE" >> $GITHUB_OUTPUT
 
           echo "Current Mindwtr version: $DOCKERFILE_VERSION"
           echo "Current addon version: $CONFIG_VERSION"
-          echo "Current build base: $BUILD_BASE"
+          echo "Current bun base: $BUILD_BASE"
 
       - name: Get latest mindwtr release
         id: latest

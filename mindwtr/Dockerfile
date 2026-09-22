@@ -1,4 +1,4 @@
-ARG BUILD_FROM
+ARG BUILD_FROM=oven/bun:1.3.5-alpine
 FROM $BUILD_FROM
 
 ARG BUILD_VERSION
@@ -9,7 +9,7 @@ LABEL \
     io.hass.type="addon" \
     io.hass.arch="${BUILD_ARCH}"
 
-# Install build dependencies and Bun
+# Install build dependencies and system tools
 RUN apk add --no-cache \
     bash \
     ca-certificates \
@@ -25,19 +25,12 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
-    && curl -fsSL https://bun.sh/install | bash -s -- 1.3.5 \
-    && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
-    && apk add --no-cache --repository https://dl-cdn.alpinelinux.org/alpine/edge/community \
     sqlite-dev \
     libffi-dev \
     openssl-dev \
     python3-dev \
-    make \
-    g++ \
     && rm -rf /var/cache/apk/*
 
-ENV BUN_INSTALL="/root/.bun"
-ENV PATH="$BUN_INSTALL/bin:$PATH"
 ENV CXXFLAGS="-std=c++20"
 ENV npm_config_cxxstd="gnu++20"
 ENV npm_config_target="22.21.1"
