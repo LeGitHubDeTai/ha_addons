@@ -31,16 +31,21 @@ jobs:
       - name: Get current versions
         id: current
         run: |
-          # Get mindwtr-cloud version from build.yaml
-          BUILD_VERSION=$(grep -E 'ghcr.io/dongdongbh/mindwtr-cloud:' mindwtr/build.yaml | head -1 | sed 's/.*mindwtr-cloud://' | tr -d ' ')
-          echo "build_version=$BUILD_VERSION" >> $GITHUB_OUTPUT
+          # Get Mindwtr version from Dockerfile
+          DOCKERFILE_VERSION=$(grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' mindwtr/Dockerfile | head -1 | sed 's/^v//')
+          echo "dockerfile_version=$DOCKERFILE_VERSION" >> $GITHUB_OUTPUT
 
           # Get addon version from config.yaml
           CONFIG_VERSION=$(grep -E '^version:' mindwtr/config.yaml | sed 's/version: "//' | sed 's/"//')
           echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
 
-          echo "Current mindwtr-cloud version: $BUILD_VERSION"
+          # Get build base from build.yaml
+          BUILD_BASE=$(grep -E 'ghcr.io/home-assistant/amd64-base:' mindwtr/build.yaml | head -1 | sed 's/.*amd64-base://' | tr -d ' ')
+          echo "build_base=$BUILD_BASE" >> $GITHUB_OUTPUT
+
+          echo "Current Mindwtr version: $DOCKERFILE_VERSION"
           echo "Current addon version: $CONFIG_VERSION"
+          echo "Current build base: $BUILD_BASE"
 
       - name: Get latest mindwtr release
         id: latest
@@ -98,19 +103,16 @@ jobs:
       - name: Compare versions and check existing PRs
         id: compare
         run: |
-          CURRENT_BUILD_VERSION="${{ steps.current.outputs.build_version }}"
+          CURRENT_DOCKERFILE_VERSION="${{ steps.current.outputs.dockerfile_version }}"
+          CURRENT_CONFIG_VERSION="${{ steps.current.outputs.config_version }}"
           LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
           RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
 
-          # Strip v prefix for comparison
-          CURRENT_VERSION="${CURRENT_BUILD_VERSION#v}"
-          CURRENT_VERSION="${CURRENT_VERSION:-${CURRENT_BUILD_VERSION}}"
-
           # Check if this is a new version
           IS_NEW_VERSION=false
-          if [ -z "$CURRENT_BUILD_VERSION" ] || [ "$CURRENT_BUILD_VERSION" = "latest" ]; then
+          if [ -z "$CURRENT_DOCKERFILE_VERSION" ]; then
             IS_NEW_VERSION=true
-          elif [ "$(printf '%s\n' "v$LATEST_VERSION" "$CURRENT_BUILD_VERSION" | sort -V | head -n1)" = "$CURRENT_BUILD_VERSION" ] && [ "$CURRENT_BUILD_VERSION" != "v$LATEST_VERSION" ]; then
+          elif [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_DOCKERFILE_VERSION" | sort -V | head -n1)" = "$CURRENT_DOCKERFILE_VERSION" ] && [ "$CURRENT_DOCKERFILE_VERSION" != "$LATEST_VERSION" ]; then
             IS_NEW_VERSION=true
           fi
 
@@ -151,7 +153,7 @@ jobs:
             echo "existing_branch=$EXISTING_BRANCH" >> $GITHUB_OUTPUT
             echo "is_new_version=$IS_NEW_VERSION" >> $GITHUB_OUTPUT
             if [ "$IS_NEW_VERSION" = "true" ]; then
-              echo "New mindwtr version available: $LATEST_VERSION (current: $CURRENT_BUILD_VERSION)"
+              echo "New mindwtr version available: $LATEST_VERSION (current: $CURRENT_DOCKERFILE_VERSION)"
             else
               echo "Release type changed to $RELEASE_TYPE for version $LATEST_VERSION"
             fi
@@ -215,18 +217,18 @@ jobs:
           sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" mindwtr/config.yaml
           echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
 
-      - name: Update build.yaml
+      - name: Update Dockerfile
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
-          sed -i "s|ghcr.io/dongdongbh/mindwtr-cloud:[^ ]*|ghcr.io/dongdongbh/mindwtr-cloud:${{ steps.latest.outputs.latest_version }}|g" mindwtr/build.yaml
-          echo "Updated build.yaml to ghcr.io/dongdongbh/mindwtr-cloud:${{ steps.latest.outputs.latest_version }}"
+          sed -i "s|git clone --depth 1 --branch v[0-9.]\\+\\b|git clone --depth 1 --branch v${{ steps.latest.outputs.latest_version }}|g" mindwtr/Dockerfile
+          echo "Updated Dockerfile to clone Mindwtr v${{ steps.latest.outputs.latest_version }}"
 
       - name: Commit changes
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add mindwtr/config.yaml mindwtr/build.yaml
+          git add mindwtr/config.yaml mindwtr/Dockerfile
           FORCE_FLAG="${{ github.event.inputs.force }}"
 
           if git diff --cached --quiet; then
@@ -302,11 +304,11 @@ jobs:
               --base main \
               --head "$BRANCH_NAME" \
               --title "⬆️ Upgrade mindwtr to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
-              --body "Auto-upgrade mindwtr to version $LATEST_VERSION
+--body "Auto-upgrade mindwtr to version $LATEST_VERSION
 
             **Changes:**
             - Updated config.yaml addon version to $NEW_ADDON_VERSION
-            - Updated build.yaml to use ghcr.io/dongdongbh/mindwtr-cloud:$LATEST_VERSION
+            - Updated Dockerfile to clone Mindwtr v$LATEST_VERSION
 
             **Release:** ${{ steps.latest.outputs.release_url }}
 
@@ -324,7 +326,7 @@ jobs:
 
             **Changes:**
             - Updated config.yaml addon version to $NEW_ADDON_VERSION
-            - Updated build.yaml to use ghcr.io/dongdongbh/mindwtr-cloud:$LATEST_VERSION
+            - Updated Dockerfile to clone Mindwtr v$LATEST_VERSION
 
             **Release:** ${{ steps.latest.outputs.release_url }}
 
