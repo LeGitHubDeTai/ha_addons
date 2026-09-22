@@ -32,7 +32,7 @@ jobs:
         id: current
         run: |
           # Get Mindwtr version from Dockerfile
-          DOCKERFILE_VERSION=$(grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' mindwtr/Dockerfile | head -1 | sed 's/^v//')
+          DOCKERFILE_VERSION=$(grep -oE 'branch v[0-9]+\.[0-9]+\.[0-9]+' mindwtr/Dockerfile | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
           echo "dockerfile_version=$DOCKERFILE_VERSION" >> $GITHUB_OUTPUT
 
           # Get addon version from config.yaml
@@ -217,10 +217,10 @@ jobs:
           sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" mindwtr/config.yaml
           echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
 
-      - name: Update Dockerfile
+- name: Update Dockerfile
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
-          sed -i "s|git clone --depth 1 --branch v[0-9.]\\+\\b|git clone --depth 1 --branch v${{ steps.latest.outputs.latest_version }}|g" mindwtr/Dockerfile
+          sed -i "s|branch v[0-9.]\+|branch v${{ steps.latest.outputs.latest_version }}|g" mindwtr/Dockerfile
           echo "Updated Dockerfile to clone Mindwtr v${{ steps.latest.outputs.latest_version }}"
 
       - name: Commit changes
