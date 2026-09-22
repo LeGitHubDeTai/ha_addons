@@ -1,0 +1,46 @@
+name: Mindwtr
+version: "26.9.2"
+slug: mindwtr
+panel_title: Mindwtr
+panel_icon: "mdi:brain"
+description: Self-hosted mind mapping and task management with cloud sync and REST API
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/mindwtr
+webui: http://[HOST]:[PORT:8080]/
+image: ghcr.io/legithubdetai/ha_addons/mindwtr-{arch}
+arch:
+    - amd64
+    - aarch64
+startup: application
+boot: auto
+hassio_role: "default"
+hassio_api: true
+homeassistant_api: true
+apparmor: true
+ingress: true
+ingress_port: 8080
+backup_exclude:
+    - "mindwtr/.data"
+    - "supervisord.log*"
+map:
+    - config:rw
+    - share:rw
+ports:
+    8787/tcp: null
+    8080/tcp: 8080
+ports_description:
+    8787/tcp: Mindwtr Cloud sync server API (normally not exposed, as Home Assistant Ingress is more secure and is recommended)
+    8080/tcp: Mindwtr web interface
+options:
+    timezone: "Europe/Berlin"
+    mindwtr_cloud_auth_tokens: ""
+    mindwtr_cloud_cors_origin: ""
+    env_vars_list: []
+    cmd_line_args: ""
+schema:
+    timezone: str
+    mindwtr_cloud_auth_tokens: str?
+    mindwtr_cloud_cors_origin: str?
+    env_vars_list: [
+        "match(^[A-Z_0-9]+: .*$)"
+    ]
+    cmd_line_args: str?
