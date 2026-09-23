@@ -1,137 +1,138 @@
 #!/usr/bin/env bashio
+# shellcheck disable=SC1091
 set -euo pipefail
 
-ENV_FILE="/config/.env"
+DATA_DIR="/data"
+ENV_FILE="${DATA_DIR}/fizzy.env"
+mkdir -p "${DATA_DIR}"
+touch "${ENV_FILE}"
 
 bashio::log.info "Initialisation Fizzy"
 
+# Charge les valeurs persistées (si elles existent) pour ne pas régénérer à chaque reboot
+set -a
+# shellcheck disable=SC1090
+[ -s "${ENV_FILE}" ] && source "${ENV_FILE}"
+set +a
+
+# Lecture option HA avec fallback sur l'env du conteneur (envs fournis par Home Assistant / supervisor)
+# Usage: opt <CLE_BASHIO> <NOM_ENV> [defaut]
+opt() {
+    local key="${1}"
+    local env_name="${2}"
+    local default="${3:-}"
+    local val=""
+
+    val="$(bashio::config "${key}" 2>/dev/null || true)"
+    # bashio renvoie "null" quand non défini
+    if [[ "${val}" == "null" ]]; then
+        val=""
+    fi
+    if [[ -z "${val}" ]]; then
+        # fallback : env déjà présent dans le conteneur (Home Assistant, docker -e, .env sourcé)
+        val="${!env_name:-}"
+    fi
+    if [[ -z "${val}" ]]; then
+        val="${default}"
+    fi
+    printf '%s' "${val}"
+}
+
+generate_secret() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -hex 64
+    elif command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import secrets; print(secrets.token_hex(64))'
+    else
+        # fallback busybox : 64 octets random en hex
+        head -c 64 /dev/urandom | od -An -tx1 | tr -d ' \n'
+    fi
+}
+
 # ===============================
-# SECRET_KEY_BASE (jamais modifié)
+# SECRET_KEY_BASE (persisté, jamais régénéré si déjà connu)
 # ===============================
-if [[ ! -f "$ENV_FILE" ]] || ! grep -q "^SECRET_KEY_BASE=" "$ENV_FILE"; then
+SECRET_KEY_BASE="$(opt 'SECRET_KEY_BASE' 'SECRET_KEY_BASE' '')"
+if [[ -z "${SECRET_KEY_BASE}" ]]; then
     bashio::log.info "Génération du SECRET_KEY_BASE"
-    SECRET="$(openssl rand -hex 64)"
-    echo "SECRET_KEY_BASE=${SECRET}" >> "$ENV_FILE"
+    SECRET_KEY_BASE="$(generate_secret)"
 fi
 
 # ===============================
-# CONFIGURATION
+# AUTRES OPTIONS -> ENVS
 # ===============================
+TLS_DOMAIN="$(opt 'TLS_DOMAIN' 'TLS_DOMAIN' '')"
+BASE_URL="$(opt 'BASE_URL' 'BASE_URL' '')"
+MAILER_FROM_ADDRESS="$(opt 'MAILER_FROM_ADDRESS' 'MAILER_FROM_ADDRESS' '')"
+SMTP_ADDRESS="$(opt 'SMTP_ADDRESS' 'SMTP_ADDRESS' '')"
+SMTP_PORT="$(opt 'SMTP_PORT' 'SMTP_PORT' '587')"
+SMTP_USERNAME="$(opt 'SMTP_USERNAME' 'SMTP_USERNAME' '')"
+SMTP_PASSWORD="$(opt 'SMTP_PASSWORD' 'SMTP_PASSWORD' '')"
+SMTP_TLS="$(opt 'SMTP_TLS' 'SMTP_TLS' '')"
+VAPID_PRIVATE_KEY="$(opt 'VAPID_PRIVATE_KEY' 'VAPID_PRIVATE_KEY' '')"
+VAPID_PUBLIC_KEY="$(opt 'VAPID_PUBLIC_KEY' 'VAPID_PUBLIC_KEY' '')"
 
-# TLS_DOMAIN
-TLS_DOMAIN="$(bashio::config 'TLS_DOMAIN')"
-if [[ -n "$TLS_DOMAIN" ]]; then
-    if grep -q "^TLS_DOMAIN=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^TLS_DOMAIN=.*|TLS_DOMAIN=${TLS_DOMAIN}|" "$ENV_FILE"
-    else
-        echo "TLS_DOMAIN=${TLS_DOMAIN}" >> "$ENV_FILE"
-    fi
-    bashio::log.info "TLS_DOMAIN configuré: ${TLS_DOMAIN}"
+# Normalise le booléen HA (true/false) pour Rails
+if [[ "${SMTP_TLS}" == "true" || "${SMTP_TLS}" == "True" || "${SMTP_TLS}" == "1" ]]; then
+    SMTP_TLS="true"
 else
-    bashio::log.info "TLS_DOMAIN non configuré, désactivation du SSL"
-    if grep -q "^DISABLE_SSL=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^DISABLE_SSL=.*|DISABLE_SSL=true|" "$ENV_FILE"
-    else
-        echo "DISABLE_SSL=true" >> "$ENV_FILE"
-    fi
+    SMTP_TLS=""
 fi
 
-# BASE_URL
-BASE_URL="$(bashio::config 'BASE_URL')"
-if [[ -n "$BASE_URL" ]]; then
-    if grep -q "^BASE_URL=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^BASE_URL=.*|BASE_URL=${BASE_URL}|" "$ENV_FILE"
-    else
-        echo "BASE_URL=${BASE_URL}" >> "$ENV_FILE"
-    fi
+# SSL : si pas de TLS_DOMAIN, on désactive explicitement le SSL (usage local / ingress HA)
+if [[ -z "${TLS_DOMAIN}" ]]; then
+    DISABLE_SSL="true"
+    bashio::log.info "TLS_DOMAIN vide -> DISABLE_SSL=true"
+else
+    DISABLE_SSL=""
+    bashio::log.info "TLS_DOMAIN configuré: ${TLS_DOMAIN}"
 fi
 
-# MAILER_FROM_ADDRESS
-MAILER_FROM_ADDRESS="$(bashio::config 'MAILER_FROM_ADDRESS')"
-if [[ -n "$MAILER_FROM_ADDRESS" ]]; then
-    if grep -q "^MAILER_FROM_ADDRESS=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^MAILER_FROM_ADDRESS=.*|MAILER_FROM_ADDRESS=${MAILER_FROM_ADDRESS}|" "$ENV_FILE"
-    else
-        echo "MAILER_FROM_ADDRESS=${MAILER_FROM_ADDRESS}" >> "$ENV_FILE"
-    fi
-fi
+# ===============================
+# EXPORT VERS L'APP (c'est ce que Rails/Thruster lisent)
+# ===============================
+export SECRET_KEY_BASE
+export TLS_DOMAIN
+export DISABLE_SSL
+export BASE_URL
+export MAILER_FROM_ADDRESS
+export SMTP_ADDRESS
+export SMTP_PORT
+export SMTP_USERNAME
+export SMTP_PASSWORD
+export SMTP_TLS
+export VAPID_PRIVATE_KEY
+export VAPID_PUBLIC_KEY
+export RAILS_ENV="production"
+export PORT="80"
 
-# SMTP Configuration
-SMTP_ADDRESS="$(bashio::config 'SMTP_ADDRESS')"
-SMTP_PORT="$(bashio::config 'SMTP_PORT')"
-SMTP_USERNAME="$(bashio::config 'SMTP_USERNAME')"
-SMTP_PASSWORD="$(bashio::config 'SMTP_PASSWORD')"
-SMTP_TLS="$(bashio::config 'SMTP_TLS')"
+# ===============================
+# PERSISTE (sans logger les secrets)
+# ===============================
+{
+    echo "SECRET_KEY_BASE=${SECRET_KEY_BASE}"
+    echo "TLS_DOMAIN=${TLS_DOMAIN}"
+    echo "DISABLE_SSL=${DISABLE_SSL}"
+    echo "BASE_URL=${BASE_URL}"
+    echo "MAILER_FROM_ADDRESS=${MAILER_FROM_ADDRESS}"
+    echo "SMTP_ADDRESS=${SMTP_ADDRESS}"
+    echo "SMTP_PORT=${SMTP_PORT}"
+    echo "SMTP_USERNAME=${SMTP_USERNAME}"
+    echo "SMTP_PASSWORD=${SMTP_PASSWORD}"
+    echo "SMTP_TLS=${SMTP_TLS}"
+    echo "VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}"
+    echo "VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}"
+} > "${ENV_FILE}"
+chmod 600 "${ENV_FILE}"
 
-if [[ -n "$SMTP_ADDRESS" ]]; then
-    # SMTP_ADDRESS
-    if grep -q "^SMTP_ADDRESS=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^SMTP_ADDRESS=.*|SMTP_ADDRESS=${SMTP_ADDRESS}|" "$ENV_FILE"
-    else
-        echo "SMTP_ADDRESS=${SMTP_ADDRESS}" >> "$ENV_FILE"
-    fi
-
-    # SMTP_PORT
-    if grep -q "^SMTP_PORT=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^SMTP_PORT=.*|SMTP_PORT=${SMTP_PORT}|" "$ENV_FILE"
-    else
-        echo "SMTP_PORT=${SMTP_PORT}" >> "$ENV_FILE"
-    fi
-
-    # SMTP_USERNAME
-    if [[ -n "$SMTP_USERNAME" ]]; then
-        if grep -q "^SMTP_USERNAME=" "$ENV_FILE" 2>/dev/null; then
-            sed -i "s|^SMTP_USERNAME=.*|SMTP_USERNAME=${SMTP_USERNAME}|" "$ENV_FILE"
-        else
-            echo "SMTP_USERNAME=${SMTP_USERNAME}" >> "$ENV_FILE"
-        fi
-    fi
-
-    # SMTP_PASSWORD
-    if [[ -n "$SMTP_PASSWORD" ]]; then
-        if grep -q "^SMTP_PASSWORD=" "$ENV_FILE" 2>/dev/null; then
-            sed -i "s|^SMTP_PASSWORD=.*|SMTP_PASSWORD=${SMTP_PASSWORD}|" "$ENV_FILE"
-        else
-            echo "SMTP_PASSWORD=${SMTP_PASSWORD}" >> "$ENV_FILE"
-        fi
-    fi
-
-    # SMTP_TLS
-    if grep -q "^SMTP_TLS=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^SMTP_TLS=.*|SMTP_TLS=${SMTP_TLS}|" "$ENV_FILE"
-    else
-        echo "SMTP_TLS=${SMTP_TLS}" >> "$ENV_FILE"
-    fi
-
-    bashio::log.info "SMTP configuré: ${SMTP_ADDRESS}:${SMTP_PORT}"
-fi
-
-# VAPID Keys
-VAPID_PRIVATE_KEY="$(bashio::config 'VAPID_PRIVATE_KEY')"
-VAPID_PUBLIC_KEY="$(bashio::config 'VAPID_PUBLIC_KEY')"
-
-if [[ -n "$VAPID_PRIVATE_KEY" ]]; then
-    if grep -q "^VAPID_PRIVATE_KEY=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^VAPID_PRIVATE_KEY=.*|VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}|" "$ENV_FILE"
-    else
-        echo "VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}" >> "$ENV_FILE"
-    fi
-fi
-
-if [[ -n "$VAPID_PUBLIC_KEY" ]]; then
-    if grep -q "^VAPID_PUBLIC_KEY=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^VAPID_PUBLIC_KEY=.*|VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}|" "$ENV_FILE"
-    else
-        echo "VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}" >> "$ENV_FILE"
-    fi
-fi
+bashio::log.info "Variables d'environnement exportées (SECRET masqué)"
 
 # ===============================
 # STORAGE DIRECTORY
 # ===============================
 STORAGE_DIR="/rails/storage"
 mkdir -p "$STORAGE_DIR"
-chown -R 1000:1000 "$STORAGE_DIR"
+chown -R 1000:1000 "$STORAGE_DIR" 2>/dev/null || true
 
 # ===============================
 # COPY ENV FILE TO APPLICATION
@@ -144,7 +145,7 @@ cp "$ENV_FILE" /opt/fizzy/.env 2>/dev/null || true
 bashio::log.info "Téléchargement de Fizzy..."
 
 # Download the latest Fizzy release
-FIZZY_VERSION="477c943e0506f109e5bc83ae9dadbe519732c045"
+FIZZY_VERSION="main"
 FIZZY_URL="https://github.com/basecamp/fizzy/archive/refs/heads/${FIZZY_VERSION}.zip"
 
 # Create a temporary directory for download
