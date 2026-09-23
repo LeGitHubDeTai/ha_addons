@@ -1,8 +1,34 @@
 # Penpot - Home Assistant Add-on
 
+## Base de données externe (requis)
+
+L'add-on ne fournit plus de PostgreSQL : il se connecte à **votre** serveur (PostgreSQL 15+),
+que vous gérez vous-même (autre add-on, conteneur dédié, NAS, etc.).
+
+1. Créez le rôle et la base :
+   ```sql
+   CREATE USER penpot WITH PASSWORD 'un-mot-de-passe-sûr';
+   CREATE DATABASE penpot OWNER penpot;
+   ```
+2. Renseignez le groupe `DATABASE` dans la configuration de l'add-on :
+   ```yaml
+   DATABASE:
+     db_host: "192.168.1.10"
+     db_port: 5432
+     db_user: penpot
+     db_password: "un-mot-de-passe-sûr"
+     db_name: penpot
+   ```
+3. Vérifiez que le serveur accepte les connexions depuis Home Assistant
+   (`listen_addresses`, `pg_hba.conf`, pare-feu).
+
+Le backend applique les migrations automatiquement au démarrage.
+Valkey/Redis reste **embarqué et éphémère** par défaut (`REDIS.redis_host: localhost`) ;
+pointez `REDIS` vers un serveur externe si vous préférez.
+
 ## Premier démarrage
 
-1. Démarrez l'add-on et patientez 1 à 3 minutes (initialisation PostgreSQL + migrations backend).
+1. Démarrez l'add-on et patientez 1 à 3 minutes (migrations backend sur votre base).
 2. Ouvrez l'interface (Ingress) : vous arrivez sur la page de connexion Penpot.
 3. Créez votre premier compte via "Create account" (l'inscription est activée par défaut).
 4. (Optionnel) Repassez ensuite `allow_registration` à `false` et redémarrez pour verrouiller l'instance.
@@ -31,8 +57,11 @@ smtp_reply_to: "penpot@example.com"
 
 ## Dépannage
 
+- **`[backend] FATAL: DATABASE.db_host is not configured`** : renseignez votre serveur PostgreSQL
+  dans les options, puis redémarrez.
+- **`still waiting for PostgreSQL ... check host/credentials/firewall`** : l'add-on ne joint pas la base.
+  Vérifiez hôte/port, rôle + mot de passe, `listen_addresses` / `pg_hba.conf` côté serveur et le pare-feu.
 - **Page blanche / 502 au premier démarrage** : le backend migre encore la base. Attendez et rechargez.
 - **L'export SVG/PDF échoue** : l'exporter (Chromium) demande ~1 Go de RAM. Sur Raspberry Pi, limitez les exports simultanés.
-- **Après changement de `db_password`** : le mot de passe du rôle `penpot` est resynchronisé au démarrage.
-  En revanche, changer `secret_key` invalide sessions et invitations : à éviter.
-- **Logs utiles** : superviseur préfixe chaque service (`[backend]`, `[frontend]`, `[postgres]`, ...).
+- **Changer `secret_key` invalide sessions et invitations** : à éviter après le premier démarrage.
+- **Logs utiles** : chaque service est préfixé (`[backend]`, `[frontend]`, `[exporter]`, `[mcp]`, `[valkey]`).

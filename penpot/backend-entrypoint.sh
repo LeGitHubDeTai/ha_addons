@@ -1,30 +1,40 @@
 #!/bin/bash
-# Penpot backend (Clojure/Java). Waits for postgres + valkey, then runs run.sh.
+# Penpot backend (Clojure/Java). Waits for external PostgreSQL + Valkey, then runs run.sh.
 set -e
 
 # shellcheck disable=SC1091
 . /app/penpot-env.sh
 
-if ! command -v valkey-cli >/dev/null 2>&1 && ! command -v redis-cli >/dev/null 2>&1; then
+if [ -z "$PENPOT_DB_HOST" ]; then
+  echo "[backend] FATAL: DATABASE.db_host is not configured. Set your external PostgreSQL host in the add-on options." >&2
+  exit 1
+fi
+
+# Pick a redis CLI (valkey-cli preferred, redis-cli fallback)
+if command -v valkey-cli >/dev/null 2>&1; then
+  REDIS_CLI="valkey-cli"
+elif command -v redis-cli >/dev/null 2>&1; then
+  REDIS_CLI="redis-cli"
+else
   echo "[backend] FATAL: neither valkey-cli nor redis-cli found" >&2
   exit 1
 fi
 
-echo "[backend] waiting for PostgreSQL..."
+echo "[backend] waiting for PostgreSQL at ${PENPOT_DB_HOST}:${PENPOT_DB_PORT}..."
 n=0
-until pg_isready -h localhost -p 5432 -U postgres -q 2>/dev/null; do
+until pg_isready -h "$PENPOT_DB_HOST" -p "$PENPOT_DB_PORT" -U "$PENPOT_DB_USER" -q 2>/dev/null; do
   sleep 2
   n=$((n + 1))
-  if [ $((n % 15)) -eq 0 ]; then echo "[backend] still waiting for PostgreSQL ($((n * 2))s)..."; fi
+  if [ $((n % 15)) -eq 0 ]; then echo "[backend] still waiting for PostgreSQL ${PENPOT_DB_HOST}:${PENPOT_DB_PORT} ($((n * 2))s)... check host/credentials/firewall."; fi
 done
 echo "[backend] PostgreSQL ready."
 
-echo "[backend] waiting for Valkey..."
+echo "[backend] waiting for Valkey at ${PENPOT_REDIS_HOST}:${PENPOT_REDIS_PORT}..."
 n=0
-until (valkey-cli -h localhost -p 6379 ping 2>/dev/null || redis-cli -h localhost -p 6379 ping 2>/dev/null) | grep -q PONG; do
+until "$REDIS_CLI" -h "$PENPOT_REDIS_HOST" -p "$PENPOT_REDIS_PORT" ping 2>/dev/null | grep -q PONG; do
   sleep 2
   n=$((n + 1))
-  if [ $((n % 15)) -eq 0 ]; then echo "[backend] still waiting for Valkey ($((n * 2))s)..."; fi
+  if [ $((n % 15)) -eq 0 ]; then echo "[backend] still waiting for Valkey ${PENPOT_REDIS_HOST}:${PENPOT_REDIS_PORT} ($((n * 2))s)..."; fi
 done
 echo "[backend] Valkey ready."
 

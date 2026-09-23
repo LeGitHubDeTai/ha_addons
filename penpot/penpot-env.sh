@@ -1,14 +1,14 @@
 # Shared Penpot environment for all entrypoints.
 # Sourced (NOT executed): . /app/penpot-env.sh
-# Exports: PENPOT_* vars, TZ, PGDATA helpers.
-# Persists generated secrets in /data/penpot/ so they survive restarts.
+# PostgreSQL is EXTERNAL (managed by the user, e.g. a PostgreSQL server).
+# Valkey runs embedded (ephemeral cache, like the official compose).
+# Persists the generated secret key in /data/penpot/ so it survives restarts.
 
 CONFIG_PATH="/data/options.json"
 DATA_DIR="/data/penpot"
 SECRET_FILE="${DATA_DIR}/.secret_key"
-DBPW_FILE="${DATA_DIR}/.db_password"
 
-mkdir -p "${DATA_DIR}/assets" "${DATA_DIR}/valkey"
+mkdir -p "${DATA_DIR}/assets"
 
 penpot_opt() {
   # $1 = jq key, $2 = default
@@ -39,18 +39,37 @@ else
 fi
 export PENPOT_SECRET_KEY
 
-# --- DB password (persisted) ---
-DBPW_OPT="$(jq --raw-output '.db_password // empty' "$CONFIG_PATH")"
-if [ -n "$DBPW_OPT" ]; then
-  DB_PASSWORD="$DBPW_OPT"
-elif [ -f "$DBPW_FILE" ]; then
-  DB_PASSWORD="$(cat "$DBPW_FILE")"
-else
-  DB_PASSWORD="$(openssl rand -hex 32)"
-  echo -n "$DB_PASSWORD" > "$DBPW_FILE"
-  chmod 600 "$DBPW_FILE"
+# --- External PostgreSQL (managed by the user) ---
+DB_HOST="$(jq --raw-output '.DATABASE.db_host // empty' "$CONFIG_PATH")"
+DB_PORT="$(jq --raw-output '.DATABASE.db_port // 5432' "$CONFIG_PATH")"
+DB_USER="$(jq --raw-output '.DATABASE.db_user // "penpot"' "$CONFIG_PATH")"
+DB_PASSWORD="$(jq --raw-output '.DATABASE.db_password // empty' "$CONFIG_PATH")"
+DB_NAME="$(jq --raw-output '.DATABASE.db_name // "penpot"' "$CONFIG_PATH")"
+
+if [ -z "$DB_HOST" ]; then
+  echo "[penpot-env] FATAL: DATABASE.db_host is not set. Configure an external PostgreSQL server in the add-on options." >&2
 fi
+if [ -z "$DB_PASSWORD" ]; then
+  echo "[penpot-env] WARNING: DATABASE.db_password is empty." >&2
+fi
+
+export PENPOT_DB_HOST="$DB_HOST"
+export PENPOT_DB_PORT="$DB_PORT"
+export PENPOT_DB_USER="$DB_USER"
 export PENPOT_DB_PASSWORD="$DB_PASSWORD"
+export PENPOT_DB_NAME="$DB_NAME"
+export PENPOT_DATABASE_URI="postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}"
+export PENPOT_DATABASE_USERNAME="$DB_USER"
+export PENPOT_DATABASE_PASSWORD="$DB_PASSWORD"
+
+# --- Redis/Valkey (embedded by default, external if configured) ---
+REDIS_HOST="$(jq --raw-output '.REDIS.redis_host // "localhost"' "$CONFIG_PATH")"
+REDIS_PORT="$(jq --raw-output '.REDIS.redis_port // 6379' "$CONFIG_PATH")"
+REDIS_DB="$(jq --raw-output '.REDIS.redis_db // 0' "$CONFIG_PATH")"
+export PENPOT_REDIS_HOST="$REDIS_HOST"
+export PENPOT_REDIS_PORT="$REDIS_PORT"
+export PENPOT_REDIS_DB="$REDIS_DB"
+export PENPOT_REDIS_URI="redis://${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}"
 
 # --- Feature flags ---
 ALLOW_REG="$(jq --raw-output '.allow_registration // true' "$CONFIG_PATH")"
@@ -72,11 +91,7 @@ export PENPOT_PUBLIC_URI="http://localhost:9001"
 export PENPOT_HTTP_SERVER_MAX_BODY_SIZE="367001600"
 export PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE="367001600"
 
-# --- Database / Valkey ---
-export PENPOT_DATABASE_URI="postgresql://localhost/penpot"
-export PENPOT_DATABASE_USERNAME="penpot"
-export PENPOT_DATABASE_PASSWORD="$DB_PASSWORD"
-export PENPOT_REDIS_URI="redis://localhost:6379/0"
+# --- Database / Valkey (see above) ---
 
 # --- Assets storage (filesystem) ---
 export PENPOT_OBJECTS_STORAGE_BACKEND="fs"

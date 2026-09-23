@@ -42,7 +42,6 @@ RUN set -ex; \
         gettext-base \
         nginx \
         supervisor \
-        postgresql \
         postgresql-client \
         valkey \
         openssl \
@@ -170,7 +169,6 @@ RUN mkdir -p /etc/nginx/overrides/main.d \
 # ===============================
 COPY supervisord.conf /etc/supervisord.conf
 COPY hass-nginx.conf /etc/nginx/hass-nginx.conf.template
-COPY postgres-entrypoint.sh /app/postgres-entrypoint.sh
 COPY valkey-entrypoint.sh /app/valkey-entrypoint.sh
 COPY backend-entrypoint.sh /app/backend-entrypoint.sh
 COPY exporter-entrypoint.sh /app/exporter-entrypoint.sh
@@ -180,8 +178,7 @@ COPY hass-nginx-entrypoint.sh /app/hass-nginx-entrypoint.sh
 COPY penpot-env.sh /app/penpot-env.sh
 
 RUN chmod +x /app/*.sh; \
-    mkdir -p /data/penpot/assets /data/penpot/postgres /data/penpot/valkey; \
-    chown -R postgres:postgres /data/penpot/postgres 2>/dev/null || true; \
+    mkdir -p /data/penpot/assets /var/lib/valkey; \
     chown -R penpot:penpot /data/penpot/assets /opt/data; \
     # mime.types fallback (official path may differ on debian nginx)
     [ -f /etc/nginx/mime.types ] || cp /etc/nginx/penpot-mime.types /etc/nginx/mime.types; \

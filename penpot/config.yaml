@@ -1,5 +1,5 @@
 name: Penpot
-version: "26.9.1"
+version: "26.9.4"
 slug: penpot
 panel_icon: "mdi:pen-plus"
 description: Plateforme open-source de design & prototypage (Penpot)
@@ -19,7 +19,6 @@ ingress: true
 ingress_port: 9001
 ingress_stream: true
 backup_exclude:
-  - "penpot/postgres/*"
   - "penpot/*.log"
   - "supervisord.log*"
 ports:
@@ -29,9 +28,18 @@ ports_description:
 options:
   timezone: "Europe/Paris"
   secret_key: ""
-  db_password: ""
   allow_registration: true
   disable_telemetry: true
+  DATABASE:
+    db_host: ""
+    db_port: 5432
+    db_user: penpot
+    db_password: ""
+    db_name: penpot
+  REDIS:
+    redis_host: "localhost"
+    redis_port: 6379
+    redis_db: 0
   smtp_host: ""
   smtp_port: 587
   smtp_username: ""
@@ -41,9 +49,18 @@ options:
 schema:
   timezone: str
   secret_key: str?
-  db_password: str?
   allow_registration: bool
   disable_telemetry: bool
+  DATABASE:
+    db_host: str
+    db_port: int
+    db_user: str
+    db_password: password
+    db_name: str
+  REDIS:
+    redis_host: str
+    redis_port: int
+    redis_db: int
   smtp_host: str?
   smtp_port: int?
   smtp_username: str?
