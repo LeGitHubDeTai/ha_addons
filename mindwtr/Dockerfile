@@ -43,8 +43,8 @@ RUN git clone --depth 1 --branch v1.3.1 https://github.com/dongdongbh/Mindwtr.gi
 RUN cp docker/cloud/entrypoint.sh /usr/local/bin/mindwtr-cloud-entrypoint && \
     chmod +x /usr/local/bin/mindwtr-cloud-entrypoint
 
-# Install all dependencies from Mindwtr root
-RUN bun install --frozen-lockfile --production
+# Install all dependencies (including dev deps for build)
+RUN bun install --frozen-lockfile
 
 # Build the app PWA assets
 RUN bun desktop:web:build
