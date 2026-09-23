@@ -86,8 +86,16 @@ else
 fi
 export PENPOT_FLAGS
 
-# --- Public URI (internal; ingress serves it on 9001) ---
-export PENPOT_PUBLIC_URI="http://localhost:9001"
+# --- Public URI ---
+# Backend/exporter need an absolute URI (emails, generated links, internal fetches).
+# Default http://localhost:9001 works internally (hass-nginx proxies :9001 -> :8080).
+# Set the `public_uri` option (e.g. http://192.168.1.20:9001) for correct links in emails.
+PUBLIC_URI_OPT="$(jq --raw-output '.public_uri // empty' "$CONFIG_PATH")"
+export PENPOT_PUBLIC_URI="${PUBLIC_URI_OPT:-http://localhost:9001}"
+# Frontend (browser) URI: when empty, penpotPublicURI is OMITTED from config.js and
+# the Penpot SPA falls back to window.location.origin — correct for any direct-access
+# hostname. Only force it when the user explicitly sets `public_uri`.
+export FRONTEND_PUBLIC_URI="$PUBLIC_URI_OPT"
 export PENPOT_HTTP_SERVER_MAX_BODY_SIZE="367001600"
 export PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE="367001600"
 

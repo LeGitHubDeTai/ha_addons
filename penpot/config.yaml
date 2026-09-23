@@ -1,5 +1,5 @@
 name: Penpot
-version: "26.9.5"
+version: "26.9.6"
 slug: penpot
 panel_icon: "mdi:pen-plus"
 description: Plateforme open-source de design & prototypage (Penpot)
@@ -15,19 +15,20 @@ init: false
 hassio_role: "default"
 hassio_api: true
 homeassistant_api: true
-ingress: true
-ingress_port: 9001
-ingress_stream: true
+# NOTE: pas d'Ingress HA — Penpot construit ses URL d'API en absolu depuis
+# l'URI publique et ne supporte pas les sous-chemins dynamiques de l'Ingress.
+# L'accès se fait en direct sur le port 9001.
+ports:
+  9001/tcp: 9001
+ports_description:
+  9001/tcp: Penpot Web UI (accès direct, ex. http://homeassistant.local:9001)
 backup_exclude:
   - "penpot/*.log"
   - "supervisord.log*"
-ports:
-  9001/tcp: null
-ports_description:
-  9001/tcp: Penpot Web UI. Normalement non exposé, l'Ingress Home Assistant est recommandé et plus sécurisé. Exposez ce port pour contourner l'Ingress.
 options:
   timezone: "Europe/Paris"
   secret_key: ""
+  public_uri: ""
   allow_registration: true
   disable_telemetry: true
   DATABASE:
@@ -49,6 +50,7 @@ options:
 schema:
   timezone: str
   secret_key: str?
+  public_uri: str?
   allow_registration: bool
   disable_telemetry: bool
   DATABASE:

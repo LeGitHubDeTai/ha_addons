@@ -18,12 +18,16 @@ done
 if [ -n "$PENPOT_FLAGS" ]; then
   sed -i -e "s|^//var penpotFlags = .*;|var penpotFlags = \"$PENPOT_FLAGS\";|g" /var/www/app/js/config.js || true
 fi
-if [ -n "$PENPOT_PUBLIC_URI" ]; then
-  if grep -q "penpotPublicURI" /var/www/app/js/config.js; then
-    echo "[frontend] public URI already present"
-  else
-    echo "var penpotPublicURI = \"$PENPOT_PUBLIC_URI\";" >> /var/www/app/js/config.js
-  fi
+# --- config.js public URI ---
+# The Penpot SPA falls back to window.location.origin when penpotPublicURI is
+# absent — which is exactly what we want for direct access on any hostname.
+# So: strip any stale line, then only write it when `public_uri` is configured.
+sed -i '/^var penpotPublicURI = /d' /var/www/app/js/config.js || true
+if [ -n "$FRONTEND_PUBLIC_URI" ]; then
+  echo "var penpotPublicURI = \"$FRONTEND_PUBLIC_URI\";" >> /var/www/app/js/config.js
+  echo "[frontend] public URI forced to $FRONTEND_PUBLIC_URI"
+else
+  echo "[frontend] no forced public URI (browser will use window.location.origin)"
 fi
 
 # --- nginx config from official template, pointed at localhost ---

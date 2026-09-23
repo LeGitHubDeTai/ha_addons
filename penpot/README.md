@@ -23,7 +23,10 @@ Ou manuellement :
 2. Ajoutez ce dépôt : `https://github.com/LeGitHubDeTai/ha_addons`
 3. Cherchez "Penpot" dans la boutique, cliquez **Installer**.
 4. Renseignez `DATABASE` (voir ci-dessous), puis **Démarrer**.
-5. Ouvrez l'interface via **Ouvrir l'interface utilisateur** (Ingress).
+5. Ouvrez `http://homeassistant.local:9001` (ou `http://<ip-ha>:9001`) dans le navigateur.
+
+> **Pas d'Ingress** : Penpot construit ses URL d'API en absolu et ne supporte pas les
+> sous-chemins de l'Ingress HA. L'accès se fait **uniquement en direct** sur le port 9001.
 
 > Premier démarrage : Penpot exécute les migrations sur votre base (~1-3 min selon la machine).
 > Laissez l'add-on démarrer, puis créez votre compte depuis la page d'inscription.
@@ -33,6 +36,7 @@ Ou manuellement :
 ```yaml
 timezone: Europe/Paris
 secret_key: ""
+public_uri: ""
 allow_registration: true
 disable_telemetry: true
 DATABASE:
@@ -57,6 +61,7 @@ smtp_reply_to: "no-reply@example.com"
 |---|---|---|
 | `timezone` | Fuseau horaire | `Europe/Paris` |
 | `secret_key` | Clé maîtresse Penpot (`PENPOT_SECRET_KEY`). Laisser vide = générée et persistée dans `/data/penpot/.secret_key` | (auto) |
+| `public_uri` | URI publique **vue par le navigateur** (liens d'emails, forçage). Laisser vide = le frontend utilise automatiquement l'URL d'accès (recommandé en local). Ex. `http://192.168.1.20:9001` | (vide = auto) |
 | `allow_registration` | Autoriser la création de comptes (`enable-registration`) | `true` |
 | `disable_telemetry` | Désactiver la télémétrie anonyme Penpot | `true` |
 | `DATABASE.db_host` | Hôte du serveur PostgreSQL externe (**requis**, ex. IP ou nom d'hôte) | (vide) |
@@ -76,10 +81,12 @@ Pour verrouiller l'instance après avoir créé vos comptes : `allow_registratio
 
 ## Accès réseau
 
-- **Ingress (recommandé)** : port interne `9001`, authentification Home Assistant incluse.
-- **Port `9001/tcp`** : exposé à `null` par défaut. Exposez-le si vous voulez contourner l'Ingress
-  (ex. reverse-proxy externe). La vérification d'e-mail et les cookies sécurisés sont désactivés
-  par défaut pour rester compatibles avec un usage en HTTP local ; ne les activez que derrière HTTPS.
+- **Accès direct uniquement** : `http://homeassistant.local:9001` (port mappé par défaut).
+  L'Ingress HA n'est pas supporté (Penpot exige des URL absolues, incompatibles avec les sous-chemins).
+- La vérification d'e-mail et les cookies sécurisés sont désactivés par défaut pour rester
+  compatibles avec un usage en HTTP local ; ne les activez que derrière HTTPS.
+- Si HA est exposé sur internet, protégez l'accès (VPN, reverse-proxy avec auth, pare-feu)
+  plutôt que d'exposer le port 9001 tel quel.
 
 ## Données & sauvegardes
 
