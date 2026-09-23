@@ -1,5 +1,5 @@
 name: Mindwtr
-version: "26.9.9"
+version: "26.9.10"
 slug: mindwtr
 panel_title: Mindwtr
 panel_icon: "mdi:brain"
@@ -19,7 +19,7 @@ apparmor: true
 ingress: true
 ingress_port: 8080
 backup_exclude:
-    - "mindwtr/.data"
+    - "*.log*"
     - "supervisord.log*"
 map:
     - config:rw
@@ -37,7 +37,7 @@ options:
     mindwtr_cloud_max_body_bytes: 2000000
     mindwtr_cloud_max_attachment_bytes: 50000000
     mindwtr_default_cloud_url: ""
-    mindwtr_cloud_data_dir: "/app/cloud_data"
+    mindwtr_cloud_data_dir: "/share/mindwtr"
     env_vars_list: []
     cmd_line_args: ""
 schema:

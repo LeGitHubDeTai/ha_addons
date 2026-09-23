@@ -20,6 +20,7 @@ RUN apk add --no-cache \
     su-exec \
     tzdata \
     wget \
+    jq \
     python3 \
     make \
     g++ \
@@ -33,9 +34,15 @@ ENV CXXFLAGS="-std=c++20"
 ENV npm_config_cxxstd="gnu++20"
 ENV npm_config_target="22.21.1"
 ENV npm_config_disturl="https://nodejs.org/dist"
-ENV MINDWTR_CLOUD_DATA_DIR="/app/cloud_data"
-ENV MINDWTR_CLOUD_AUTH_TOKENS_FILE="/app/cloud_data/auth-tokens"
+# NOTE: MINDWTR_CLOUD_AUTH_TOKENS_FILE is intentionally NOT set by default.
+# Upstream docker/cloud/entrypoint.sh runs `install <FILE> ...` whenever the
+# variable is non-empty. Setting it to a path that does not exist (e.g.
+# /app/cloud_data/auth-tokens with no token configured) makes the cloud
+# process exit with `install: can't stat ...` in a supervisord restart loop.
+# entrypoint.sh / run.sh set it only when a readable token file exists.
+ENV MINDWTR_CLOUD_DATA_DIR="/share/mindwtr"
 ENV MINDWTR_CLOUD_AUTH_TOKENS=""
+ENV MINDWTR_CLOUD_AUTH_TOKENS_FILE=""
 ENV MINDWTR_CLOUD_CORS_ORIGIN=""
 ENV MINDWTR_CLOUD_MAX_BODY_BYTES="2000000"
 ENV MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES="50000000"
@@ -48,9 +55,11 @@ RUN git clone --depth 1 --branch v1.3.1 https://github.com/dongdongbh/Mindwtr.gi
 
 # Copy cloud entrypoint and runtime script
 COPY run.sh /usr/local/bin/mindwtr-cloud-run
+COPY entrypoint.sh /usr/local/bin/mindwtr-entrypoint
 RUN cp docker/cloud/entrypoint.sh /usr/local/bin/mindwtr-cloud-entrypoint && \
     chmod +x /usr/local/bin/mindwtr-cloud-entrypoint && \
-    chmod +x /usr/local/bin/mindwtr-cloud-run
+    chmod +x /usr/local/bin/mindwtr-cloud-run && \
+    chmod +x /usr/local/bin/mindwtr-entrypoint
 
 # Install all dependencies (including dev deps for build)
 RUN bun install --frozen-lockfile
@@ -58,8 +67,8 @@ RUN bun install --frozen-lockfile
 # Build the app PWA assets
 RUN bun desktop:web:build
 
-# Create app directory structure
-RUN mkdir -p /usr/share/nginx/html /app/cloud_data /data
+# Create app directory structure (persist cloud data under /share via HA mapping)
+RUN mkdir -p /usr/share/nginx/html /app/cloud_data /share/mindwtr /data
 
 # Copy built app assets to nginx directory
 RUN cp -r apps/desktop/dist/* /usr/share/nginx/html/
@@ -77,8 +86,8 @@ RUN mkdir -p /docker-entrypoint.d && \
     echo 'fi' >> /docker-entrypoint.d/10-runtime-config.sh && \
     chmod +x /docker-entrypoint.d/10-runtime-config.sh
 
-# Set up cloud data directory
-RUN mkdir -p /app/cloud_data && chown -R 1000:1000 /app/cloud_data /usr/share/nginx/html /data
+# Set up cloud data directory (bun uid 1000 in oven/bun image)
+RUN mkdir -p /app/cloud_data /share/mindwtr && chown -R bun:bun /app/cloud_data /share/mindwtr /usr/share/nginx/html /data 2>/dev/null || chown -R 1000:1000 /app/cloud_data /share/mindwtr /usr/share/nginx/html /data
 
 # Copy nginx config
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -97,4 +106,4 @@ EXPOSE 8787/tcp 8080/tcp
 HEALTHCHECK --interval=1m30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -fsS http://localhost:8787/ready >/dev/null || curl -fsS http://localhost:8787/health >/dev/null || exit 1
 
-ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+ENTRYPOINT ["/usr/local/bin/mindwtr-entrypoint"]
