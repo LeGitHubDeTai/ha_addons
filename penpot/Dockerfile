@@ -1,4 +1,4 @@
-ARG PENPOT_VERSION=2.17
+ARG PENPOT_VERSION=2.18
 
 FROM penpotapp/backend:${PENPOT_VERSION} AS penpot-backend
 FROM penpotapp/frontend:${PENPOT_VERSION} AS penpot-frontend
@@ -9,7 +9,7 @@ FROM debian:trixie-slim
 
 ARG BUILD_VERSION
 ARG BUILD_ARCH
-ARG PENPOT_VERSION=2.17
+ARG PENPOT_VERSION=2.18
 
 LABEL \
   io.hass.version="${BUILD_VERSION}" \
