@@ -29,6 +29,19 @@ until pg_isready -h "$PENPOT_DB_HOST" -p "$PENPOT_DB_PORT" -U "$PENPOT_DB_USER" 
 done
 echo "[backend] PostgreSQL ready."
 
+# Early credential check: fail fast with a clear message instead of
+# waiting minutes for the Java pool to time out.
+echo "[backend] checking PostgreSQL credentials (${PENPOT_DB_USER}@${PENPOT_DB_HOST}:${PENPOT_DB_PORT}/${PENPOT_DB_NAME})..."
+if ! PGPASSWORD="$PENPOT_DB_PASSWORD" psql -h "$PENPOT_DB_HOST" -p "$PENPOT_DB_PORT" -U "$PENPOT_DB_USER" -d "$PENPOT_DB_NAME" -tAc "SELECT 1" 2>/dev/null | grep -q 1; then
+  echo "[backend] FATAL: cannot log in to PostgreSQL as \"${PENPOT_DB_USER}\" on ${PENPOT_DB_HOST}:${PENPOT_DB_PORT}/${PENPOT_DB_NAME}." >&2
+  echo "[backend] FATAL: wrong password, missing role/database, or pg_hba.conf refusing the connection." >&2
+  echo "[backend] FATAL: fix the DATABASE options (db_user/db_password/db_name) and ensure on the server:" >&2
+  echo "[backend] FATAL:   CREATE USER ${PENPOT_DB_USER} WITH PASSWORD '<same-password>';" >&2
+  echo "[backend] FATAL:   CREATE DATABASE ${PENPOT_DB_NAME} OWNER ${PENPOT_DB_USER};" >&2
+  exit 1
+fi
+echo "[backend] PostgreSQL credentials OK."
+
 echo "[backend] waiting for Valkey at ${PENPOT_REDIS_HOST}:${PENPOT_REDIS_PORT}..."
 n=0
 until "$REDIS_CLI" -h "$PENPOT_REDIS_HOST" -p "$PENPOT_REDIS_PORT" ping 2>/dev/null | grep -q PONG; do

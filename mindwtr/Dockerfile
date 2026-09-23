@@ -15,8 +15,6 @@ RUN apk add --no-cache \
     ca-certificates \
     curl \
     git \
-    gnupg \
-    jq \
     nginx \
     supervisor \
     su-exec \
@@ -37,25 +35,25 @@ ENV npm_config_target="22.21.1"
 ENV npm_config_disturl="https://nodejs.org/dist"
 
 # Clone Mindwtr source at specific version
-WORKDIR /tmp/build
-RUN git clone --depth 1 --branch v1.3.1 https://github.com/dongdongbh/Mindwtr.git mindwtr && \
-    rm -rf mindwtr/.git
+WORKDIR /tmp/build/mindwtr
+RUN git clone --depth 1 --branch v1.3.1 https://github.com/dongdongbh/Mindwtr.git . && \
+    rm -rf .git
 
 # Copy cloud entrypoint
-RUN cp /tmp/build/mindwtr/docker/cloud/entrypoint.sh /usr/local/bin/mindwtr-cloud-entrypoint && \
+RUN cp docker/cloud/entrypoint.sh /usr/local/bin/mindwtr-cloud-entrypoint && \
     chmod +x /usr/local/bin/mindwtr-cloud-entrypoint
 
 # Install all dependencies from Mindwtr root
-RUN cd /tmp/build/mindwtr && bun install --frozen-lockfile --production 2>/dev/null || true
+RUN bun install --frozen-lockfile --production
 
 # Build the app PWA assets
-RUN cd /tmp/build/mindwtr && bun desktop:web:build 2>/dev/null || true
+RUN bun desktop:web:build
 
 # Create app directory structure
 RUN mkdir -p /usr/share/nginx/html /app/cloud_data /data
 
 # Copy built app assets to nginx directory
-RUN cp -r /tmp/build/mindwtr/apps/desktop/dist /usr/share/nginx/html/ 2>/dev/null || true
+RUN cp -r apps/desktop/dist/* /usr/share/nginx/html/
 
 # Create runtime config script
 RUN mkdir -p /docker-entrypoint.d && \
