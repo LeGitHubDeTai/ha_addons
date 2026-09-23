@@ -34,15 +34,23 @@ ENV npm_config_cxxstd="gnu++20"
 ENV npm_config_target="22.21.1"
 ENV npm_config_disturl="https://nodejs.org/dist"
 ENV MINDWTR_CLOUD_DATA_DIR="/app/cloud_data"
+ENV MINDWTR_CLOUD_AUTH_TOKENS_FILE="/app/cloud_data/auth-tokens"
+ENV MINDWTR_CLOUD_AUTH_TOKENS=""
+ENV MINDWTR_CLOUD_CORS_ORIGIN=""
+ENV MINDWTR_CLOUD_MAX_BODY_BYTES="2000000"
+ENV MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES="50000000"
+ENV MINDWTR_DEFAULT_CLOUD_URL=""
 
 # Clone Mindwtr source at specific version
 WORKDIR /usr/share/mindwtr
 RUN git clone --depth 1 --branch v1.3.1 https://github.com/dongdongbh/Mindwtr.git . && \
     rm -rf .git
 
-# Copy cloud entrypoint
+# Copy cloud entrypoint and runtime script
+COPY run.sh /usr/local/bin/mindwtr-cloud-run
 RUN cp docker/cloud/entrypoint.sh /usr/local/bin/mindwtr-cloud-entrypoint && \
-    chmod +x /usr/local/bin/mindwtr-cloud-entrypoint
+    chmod +x /usr/local/bin/mindwtr-cloud-entrypoint && \
+    chmod +x /usr/local/bin/mindwtr-cloud-run
 
 # Install all dependencies (including dev deps for build)
 RUN bun install --frozen-lockfile
