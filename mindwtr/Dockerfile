@@ -35,7 +35,7 @@ ENV npm_config_target="22.21.1"
 ENV npm_config_disturl="https://nodejs.org/dist"
 
 # Clone Mindwtr source at specific version
-WORKDIR /tmp/build/mindwtr
+WORKDIR /usr/share/mindwtr
 RUN git clone --depth 1 --branch v1.3.1 https://github.com/dongdongbh/Mindwtr.git . && \
     rm -rf .git
 
@@ -80,8 +80,8 @@ COPY supervisord.conf /etc/supervisord.conf
 # Ensure nginx user exists
 RUN addgroup -S nginx 2>/dev/null; adduser -S -G nginx nginx 2>/dev/null; true
 
-# Clean up
-RUN rm -rf /tmp/build
+# Clean up temporary build files (keep source for bun run)
+RUN rm -rf /tmp/build 2>/dev/null || true
 
 EXPOSE 8787/tcp 8080/tcp
 
