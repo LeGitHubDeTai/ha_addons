@@ -33,6 +33,7 @@ ENV CXXFLAGS="-std=c++20"
 ENV npm_config_cxxstd="gnu++20"
 ENV npm_config_target="22.21.1"
 ENV npm_config_disturl="https://nodejs.org/dist"
+ENV MINDWTR_CLOUD_DATA_DIR="/app/cloud_data"
 
 # Clone Mindwtr source at specific version
 WORKDIR /usr/share/mindwtr
