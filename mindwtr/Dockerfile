@@ -45,11 +45,10 @@ RUN git clone --depth 1 --branch v1.3.1 https://github.com/dongdongbh/Mindwtr.gi
 RUN cp /tmp/build/mindwtr/docker/cloud/entrypoint.sh /usr/local/bin/mindwtr-cloud-entrypoint && \
     chmod +x /usr/local/bin/mindwtr-cloud-entrypoint
 
-# Install cloud dependencies
-RUN cd /tmp/build/mindwtr && bun install --production --frozen-lockfile --filter mindwtr-cloud 2>/dev/null || true
+# Install all dependencies from Mindwtr root
+RUN cd /tmp/build/mindwtr && bun install --frozen-lockfile --production 2>/dev/null || true
 
 # Build the app PWA assets
-RUN cd /tmp/build/mindwtr && bun install --frozen-lockfile 2>/dev/null || true
 RUN cd /tmp/build/mindwtr && bun desktop:web:build 2>/dev/null || true
 
 # Create app directory structure
@@ -89,6 +88,6 @@ RUN rm -rf /tmp/build
 EXPOSE 8787/tcp 8080/tcp
 
 HEALTHCHECK --interval=1m30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -fsS http://localhost:8787/health >/dev/null || exit 1
+    CMD curl -fsS http://localhost:8787/ready >/dev/null || curl -fsS http://localhost:8787/health >/dev/null || exit 1
 
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

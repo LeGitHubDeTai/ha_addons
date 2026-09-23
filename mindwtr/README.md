@@ -11,38 +11,73 @@ Self-hosted mind mapping and task management with cloud sync and REST API.
 
 ## Configuration
 
-The add-on provides the following options:
+### Quick Sync Setup
+
+1. Generate a token (at least 20 characters):
+   ```bash
+   cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 50 | head -n 1
+   ```
+2. Set the sync token and CORS origin in the add-on options:
+
+```yaml
+timezone: "Europe/Paris"
+mindwtr_cloud_auth_tokens: "your_long_random_token_here"
+mindwtr_cloud_cors_origin: "http://homeassistant.local:8080"
+```
+
+3. Restart the add-on and access Mindwtr at `http://<home-assistant-ip>:8080`
+4. In Mindwtr Settings → Sync → Self-Hosted, use: `http://<home-assistant-ip>:8787`
+
+### All Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `timezone` | Set the timezone for the container | `Europe/Berlin` |
-| `mindwtr_cloud_auth_tokens` | Auth token(s) for the cloud server (comma-separated) | `""` |
+| `timezone` | Container timezone | `Europe/Paris` |
+| `mindwtr_cloud_auth_tokens` | Sync token(s), comma-separated (20+ chars) | `""` |
 | `mindwtr_cloud_cors_origin` | CORS origin for the cloud server | `""` |
-| `env_vars_list` | Additional environment variables (format: `KEY: value`) | `[]` |
-| `cmd_line_args` | Command-line arguments to pass to Mindwtr | `""` |
+| `mindwtr_cloud_max_body_bytes` | Max request body size (bytes) | `2000000` |
+| `mindwtr_cloud_max_attachment_bytes` | Max attachment size (bytes) | `50000000` |
+| `mindwtr_default_cloud_url` | Preseed cloud URL for new browsers | `""` |
+| `mindwtr_cloud_data_dir` | Data directory path | `"/app/cloud_data"` |
+| `env_vars_list` | Additional env vars (format: `KEY: value`) | `[]` |
 
-### Setting the auth token
+### Setting Sync Variables
 
-The easiest way to set the auth token is through the `mindwtr_cloud_auth_tokens` option in the add-on configuration, or through `env_vars_list`:
+The easiest way to configure Mindwtr sync variables is through `env_vars_list`:
 
 ```yaml
 env_vars_list:
-  - "MINDWTR_CLOUD_AUTH_TOKENS: your_long_random_token"
-  - "MINDWTR_CLOUD_CORS_ORIGIN: http://<home-assistant-ip>:8080"
+  - "MINDWTR_CLOUD_AUTH_TOKENS: your_token_here"
+  - "MINDWTR_CLOUD_CORS_ORIGIN: http://homeassistant.local:8080"
+  - "MINDWTR_CLOUD_MAX_BODY_BYTES: 2000000"
+  - "MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES: 50000000"
+  - "MINDWTR_DEFAULT_CLOUD_URL: http://homeassistant.local:8787"
 ```
 
-Or use the dedicated option:
+### Multiple Users / Tokens
+
+Multiple tokens are supported, comma-separated. Each distinct token gets its own private dataset:
 
 ```yaml
-mindwtr_cloud_auth_tokens: "your_long_random_token"
-mindwtr_cloud_cors_origin: "http://<home-assistant-ip>:8080"
+mindwtr_cloud_auth_tokens: "alices-long-token,bobs-long-token"
 ```
 
-Multiple tokens are supported, comma-separated. Each distinct token gets its own private dataset.
+Or via `env_vars_list`:
+```yaml
+env_vars_list:
+  - "MINDWTR_CLOUD_AUTH_TOKENS: alices-long-token,bobs-long-token"
+```
 
-### Data persistence
+### Sync Methods
 
-The `share` volume is mapped for data persistence. Set `MINDWTR_CLOUD_DATA_DIR=/share` through `env_vars_list` to store cloud data on the share volume.
+#### Self-Hosted Cloud (Recommended)
+The bundled Mindwtr Cloud server provides full sync and REST API support. Point Mindwtr Settings → Sync → Self-Hosted at `http://<home-assistant-ip>:8787`.
+
+#### WebDAV Sync
+Mindwtr Cloud supports WebDAV sync as an alternative. Configure your Mindwtr client to connect to the WebDAV endpoint at `http://<home-assistant-ip>:8787/webdav` using your auth token.
+
+#### Dropbox Sync
+**Not available in Docker.** Native Dropbox OAuth sync is implemented by the native desktop and mobile apps only. Supplying `VITE_DROPBOX_APP_KEY` or `DROPBOX_APP_KEY` will not enable Dropbox in the Docker runtime. Use the self-hosted cloud server or WebDAV instead.
 
 ### Ports
 
@@ -60,10 +95,7 @@ Access Mindwtr at `http://<home-assistant-ip>:8080` after the add-on starts.
 
 The Cloud sync server is available at `http://<home-assistant-ip>:8787`.
 
-- **Self-Hosted URL**: `http://<home-assistant-ip>:8787`
-- **REST API base URL**: `http://<home-assistant-ip>:8787/v1`
-
-In Mindwtr Settings -> Sync -> Self-Hosted, use:
+In Mindwtr Settings → Sync → Self-Hosted, use:
 ```
 http://<home-assistant-ip>:8787
 ```
