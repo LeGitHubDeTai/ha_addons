@@ -1,54 +1,28 @@
-ARG BUILD_FROM
+# Fizzy est déjà installé dans l'image officielle (build-time).
+# Cet addon se contente d'ajouter : lecture des options HA, persistance /data et démarrage.
+ARG BUILD_FROM=ghcr.io/basecamp/fizzy:main
 FROM ${BUILD_FROM}
+
+ARG BUILD_ARCH
+ARG BUILD_VERSION
 
 LABEL \
   io.hass.version="${BUILD_VERSION}" \
   io.hass.type="addon" \
   io.hass.arch="${BUILD_ARCH}"
 
-# ===============================
-# BASE DEPENDENCIES
-# ===============================
-RUN apk add --no-cache \
-    ca-certificates \
-    curl \
-    bash \
-    bash-completion \
-    shadow \
-    sudo \
-    openssl \
-    unzip \
-    git \
-    sqlite-libs \
-    sqlite-dev \
-    ruby \
-    ruby-bundler \
-    ruby-dev \
-    build-base \
-    libffi-dev \
-    yaml-dev \
-    vips-dev \
-    tzdata \
-    python3
+USER root
 
-# ===============================
-# INSTALL FIZZY
-# ===============================
-RUN mkdir -p /opt/fizzy
+# jq : lecture de /data/options.json | openssl : génération du SECRET_KEY_BASE
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends jq openssl \
+    && rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
-# Copy the startup script
 COPY run.sh /run.sh
 # Anti-CRLF (checkout Windows) + executable
 RUN sed -i 's/\r$//' /run.sh && chmod +x /run.sh
 
-# Create a user for running the application
-RUN groupadd -g 1000 fizzy && \
-    useradd -u 1000 -g fizzy -m -s /bin/bash fizzy
+WORKDIR /rails
+EXPOSE 80 443
 
-# Set proper permissions
-RUN chmod -R 755 /opt/fizzy && \
-    chown -R fizzy:fizzy /opt/fizzy
-
-EXPOSE 80
-
-CMD ["/run.sh"]
+ENTRYPOINT ["/run.sh"]

@@ -31,8 +31,8 @@ jobs:
       - name: Get current versions
         id: current
         run: |
-          # Get fizzy version from run.sh
-          RUN_VERSION=$(grep -E 'FIZZY_VERSION=' fizzy/run.sh | head -1 | sed 's/.*=//' | sed 's/"//g' | sed 's/[[:space:]]*//')
+          # Get pinned upstream image digest from run.sh
+          RUN_VERSION=$(grep -E '^FIZZY_DIGEST=' fizzy/run.sh | head -1 | sed 's/.*=//' | sed 's/"//g' | sed 's/[[:space:]]*//')
           echo "run_version=$RUN_VERSION" >> $GITHUB_OUTPUT
 
           # Get addon version from config.yaml
@@ -42,25 +42,18 @@ jobs:
           echo "Current fizzy run version: $RUN_VERSION"
           echo "Current addon version: $CONFIG_VERSION"
 
-      - name: Get latest fizzy commit
+      - name: Get latest fizzy image
         id: latest
         run: |
-          # Get the latest commit from the main branch
-          LATEST_COMMIT=$(curl -s "https://api.github.com/repos/basecamp/fizzy/commits?per_page=1" | jq -r '.[0].sha')
-          LATEST_COMMIT_DATE=$(curl -s "https://api.github.com/repos/basecamp/fizzy/commits?per_page=1" | jq -r '.[0].commit.author.date')
-          # Format date as YY.M.D
-          DATE_PART=$(echo "$LATEST_COMMIT_DATE" | grep -oP '\d{4}-\d{2}-\d{2}' | sed 's/-//g')
-          YY_PART=${DATE_PART:0:2}
-          MM_PART=${DATE_PART:2:2}
-          DD_PART=${DATE_PART:4:2}
-          FORMATTED_DATE="${YY_PART}.${MM_PART}.${DD_PART}"
+          # Digest courant de l'image upstream (install build-time, plus de pin de commit source)
+          LATEST_DIGEST=$(docker buildx imagetools inspect --raw ghcr.io/basecamp/fizzy:main | sha256sum | awk '{print "sha256:"$1}')
+          TODAY=$(date +%y.%m.%d)
 
-          echo "latest_commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
-          echo "latest_date=$FORMATTED_DATE" >> $GITHUB_OUTPUT
-          echo "latest_commit_raw=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+          echo "latest_commit=$LATEST_DIGEST" >> $GITHUB_OUTPUT
+          echo "latest_date=$TODAY" >> $GITHUB_OUTPUT
+          echo "latest_commit_raw=$LATEST_DIGEST" >> $GITHUB_OUTPUT
 
-          echo "Latest commit: $LATEST_COMMIT"
-          echo "Formatted date: $FORMATTED_DATE"
+          echo "Latest image digest: $LATEST_DIGEST"
 
       - name: Compare versions and check existing PRs
         id: compare
@@ -69,7 +62,7 @@ jobs:
           LATEST_COMMIT="${{ steps.latest.outputs.latest_commit }}"
           LATEST_DATE="${{ steps.latest.outputs.latest_date }}"
 
-          # Check if this is a new commit (compare commit hashes)
+          # Check if this is a new image (compare digests)
           IS_NEW_COMMIT=false
           if [ "$LATEST_COMMIT" != "$CURRENT_RUN_VERSION" ]; then
             IS_NEW_COMMIT=true
@@ -108,7 +101,7 @@ jobs:
             echo "existing_branch=$EXISTING_BRANCH" >> $GITHUB_OUTPUT
             echo "is_new_version=$IS_NEW_COMMIT" >> $GITHUB_OUTPUT
             if [ "$IS_NEW_COMMIT" = "true" ]; then
-              echo "New fizzy commit available: $LATEST_COMMIT (current: $CURRENT_RUN_VERSION)"
+              echo "New fizzy image available: $LATEST_COMMIT (current: $CURRENT_RUN_VERSION)"
             else
               echo "Release type changed for commit $LATEST_COMMIT"
             fi
@@ -173,9 +166,9 @@ jobs:
       - name: Update run.sh
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
-          # Update FIZZY_VERSION in run.sh to pin to latest commit
-          sed -i "s/FIZZY_VERSION=.*/FIZZY_VERSION=\"${{ steps.latest.outputs.latest_commit }}\"/" fizzy/run.sh
-          echo "Updated run.sh FIZZY_VERSION to ${{ steps.latest.outputs.latest_commit }}"
+          # Update FIZZY_DIGEST in run.sh to pin to latest upstream image
+          sed -i "s/^FIZZY_DIGEST=.*/FIZZY_DIGEST=\"${{ steps.latest.outputs.latest_commit }}\"/" fizzy/run.sh
+          echo "Updated run.sh FIZZY_DIGEST to ${{ steps.latest.outputs.latest_commit }}"
 
       - name: Update config.yaml
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
@@ -290,10 +283,10 @@ jobs:
               --base main \
               --head "$BRANCH_NAME" \
               --title "⬆️ fizzy $LATEST_COMMIT (addon $NEW_ADDON_VERSION)" \
-              --body "Auto-upgrade fizzy to commit $LATEST_COMMIT
+              --body "Auto-upgrade fizzy to upstream image $LATEST_COMMIT
 
             **Changes:**
-            - Updated run.sh to pin to commit $LATEST_COMMIT
+            - Updated run.sh to pin upstream image digest $LATEST_COMMIT
             - Updated config.yaml addon version to $NEW_ADDON_VERSION
 
             This PR was created automatically by the auto-upgrade workflow (forced recreation)." \
@@ -308,10 +301,10 @@ jobs:
               --base main \
               --head "$BRANCH_NAME" \
               --title "⬆️ fizzy $LATEST_COMMIT (addon $NEW_ADDON_VERSION)" \
-              --body "Auto-upgrade fizzy to commit $LATEST_COMMIT
+              --body "Auto-upgrade fizzy to upstream image $LATEST_COMMIT
 
             **Changes:**
-            - Updated run.sh to pin to commit $LATEST_COMMIT
+            - Updated run.sh to pin upstream image digest $LATEST_COMMIT
             - Updated config.yaml addon version to $NEW_ADDON_VERSION
 
             This PR was created automatically by the auto-upgrade workflow." \

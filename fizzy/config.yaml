@@ -1,5 +1,5 @@
 name: Fizzy
-version: "26.9.8"
+version: "26.9.9"
 slug: fizzy
 panel_icon: "mdi:view-week"
 description: Kanban tracking tool for issues and ideas by 37signals (Fizzy)
@@ -12,11 +12,12 @@ arch:
 startup: application
 boot: auto
 init: false
-hassio_api: true
 ports:
     80/tcp: 80
+    443/tcp: 443
 ports_description:
     80/tcp: WebUI
+    443/tcp: WebUI HTTPS (si TLS_DOMAIN configuré)
 options:
     SECRET_KEY_BASE: ""
     TLS_DOMAIN: ""
@@ -41,7 +42,3 @@ schema:
     SMTP_TLS: bool
     VAPID_PRIVATE_KEY: str
     VAPID_PUBLIC_KEY: str
-map:
-  - type: addon_config
-    read_only: False
-    path: /config
