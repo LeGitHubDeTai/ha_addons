@@ -1,0 +1,49 @@
+---
+configuration:
+  username:
+    name: Username
+    description: Main user for WebDAV basic authentication.
+  password:
+    name: Password
+    description: Password of the main user. Change the default value!
+  anonymous:
+    name: Anonymous access
+    description: If enabled, no authentication is required (unsafe, local network only).
+  readonly:
+    name: Read only
+    description: If enabled, clients can only read (no create/update/delete).
+  data_dir:
+    name: Main directory
+    description: Main exposed folder (auto-created). E.g. /share/webdav.
+  expose_share:
+    name: Expose /share
+    description: Expose Home Assistant /share folder as virtual "share" directory.
+  expose_media:
+    name: Expose /media
+    description: Expose Home Assistant /media folder as virtual "media" directory.
+  expose_backup:
+    name: Expose /backup
+    description: Expose the /backup folder (handy to fetch backups over WebDAV).
+  expose_config:
+    name: Expose /config
+    description: Expose Home Assistant configuration as virtual "config" directory (sensitive).
+  extra_users:
+    name: Extra users
+    description: List of additional users as {username, password}.
+  ssl:
+    name: Enable TLS
+    description: Encrypt WebDAV traffic directly with the /ssl certificate selected below.
+  certfile:
+    name: Certificate file
+    description: Certificate filename in /ssl (e.g. fullchain.pem).
+  keyfile:
+    name: Private key file
+    description: Private key filename in /ssl (e.g. privkey.pem).
+  debug:
+    name: Debug mode
+    description: Enable verbose WebDAV server logs.
+  prefix:
+    name: URL prefix
+    description: Path prefix (keep / unless behind a subpath reverse-proxy).
+network:
+  6065/tcp: WebDAV server (6065/tcp)

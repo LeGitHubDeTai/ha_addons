@@ -1,0 +1,160 @@
+#!/command/with-contenv bashio
+set -e
+
+CONFIG="/data/options.json"
+WEBDAV_CONF="/etc/webdav.yaml"
+
+USERNAME=$(bashio::config 'username')
+PASSWORD=$(bashio::config 'password')
+ANONYMOUS=$(bashio::config 'anonymous')
+READONLY=$(bashio::config 'readonly')
+DATA_DIR=$(bashio::config 'data_dir')
+EXPOSE_SHARE=$(bashio::config 'expose_share')
+EXPOSE_MEDIA=$(bashio::config 'expose_media')
+EXPOSE_BACKUP=$(bashio::config 'expose_backup')
+EXPOSE_CONFIG=$(bashio::config 'expose_config')
+USE_SSL=$(bashio::config 'ssl')
+CERTFILE=$(bashio::config 'certfile')
+KEYFILE=$(bashio::config 'keyfile')
+DEBUG=$(bashio::config 'debug')
+PREFIX=$(bashio::config 'prefix')
+
+bashio::log.info "Preparation du serveur WebDAV..."
+
+# Dossier principal
+mkdir -p "${DATA_DIR}"
+bashio::log.info "Dossier principal : ${DATA_DIR}"
+
+# Permissions globales
+if bashio::var.true "${READONLY}"; then
+    PERMS="R"
+else
+    PERMS="CRUD"
+fi
+bashio::log.info "Permissions : ${PERMS}"
+
+# TLS / SSL
+TLS="false"
+CERT_PATH=""
+KEY_PATH=""
+if bashio::var.true "${USE_SSL}"; then
+    if [ -f "/ssl/${CERTFILE}" ] && [ -f "/ssl/${KEYFILE}" ]; then
+        TLS="true"
+        CERT_PATH="/ssl/${CERTFILE}"
+        KEY_PATH="/ssl/${KEYFILE}"
+        bashio::log.info "TLS active (${CERTFILE})"
+    else
+        bashio::log.warning "SSL demande mais /ssl/${CERTFILE} ou /ssl/${KEYFILE} introuvable, TLS desactive."
+    fi
+fi
+
+# Construction de la section directories / directory
+# Si au moins un partage expose est actif -> mode multi-dossiers virtuels,
+# sinon le data_dir est servi a la racine (plus simple pour les clients).
+if bashio::var.true "${EXPOSE_SHARE}" \
+    || bashio::var.true "${EXPOSE_MEDIA}" \
+    || bashio::var.true "${EXPOSE_BACKUP}" \
+    || bashio::var.true "${EXPOSE_CONFIG}"; then
+    USE_DIRECTORIES=true
+else
+    USE_DIRECTORIES=false
+fi
+
+# Generer la configuration hacdias/webdav
+{
+    echo "address: 0.0.0.0"
+    echo "port: 6065"
+    echo "tls: ${TLS}"
+    if [ "${TLS}" = "true" ]; then
+        echo "cert: ${CERT_PATH}"
+        echo "key: ${KEY_PATH}"
+    fi
+    echo "prefix: ${PREFIX:-/}"
+    echo "debug: ${DEBUG:-false}"
+    echo "noSniff: false"
+    echo "behindProxy: false"
+
+    if [ "${USE_DIRECTORIES}" = "true" ]; then
+        echo "directories:"
+        echo "  - name: fichiers"
+        echo "    path: ${DATA_DIR}"
+        if bashio::var.true "${EXPOSE_SHARE}" && [ -d "/share" ]; then
+            echo "  - name: share"
+            echo "    path: /share"
+        fi
+        if bashio::var.true "${EXPOSE_MEDIA}" && [ -d "/media" ]; then
+            echo "  - name: media"
+            echo "    path: /media"
+        fi
+        if bashio::var.true "${EXPOSE_BACKUP}" && [ -d "/backup" ]; then
+            echo "  - name: backup"
+            echo "    path: /backup"
+        fi
+        if bashio::var.true "${EXPOSE_CONFIG}"; then
+            if [ -d "/homeassistant" ]; then
+                echo "  - name: config"
+                echo "    path: /homeassistant"
+            elif [ -d "/config" ]; then
+                echo "  - name: config"
+                echo "    path: /config"
+            fi
+        fi
+    else
+        echo "directory: ${DATA_DIR}"
+    fi
+
+    echo "permissions: ${PERMS}"
+    echo "rulesBehavior: overwrite"
+    echo "log:"
+    echo "  format: console"
+    echo "  colors: false"
+    echo "  outputs:"
+    echo "    - stderr"
+    echo "cors:"
+    echo "  enabled: true"
+    echo "  credentials: true"
+    echo "  allowed_hosts:"
+    echo "    - '*'"
+} > "${WEBDAV_CONF}"
+
+# Utilisateurs (auth basique). Si anonymous=true -> aucun user = acces libre.
+if bashio::var.true "${ANONYMOUS}"; then
+    bashio::log.warning "Mode anonyme active : aucune authentification !"
+else
+    {
+        echo "users:"
+        if [ -n "${USERNAME}" ] && [ "${PASSWORD}" != "null" ] && [ -n "${PASSWORD}" ]; then
+            # Echapper pour YAML (chaine entre guillemets)
+            U_ESC=$(printf '%s' "${USERNAME}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+            P_ESC=$(printf '%s' "${PASSWORD}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+            echo "  - username: \"${U_ESC}\""
+            echo "    password: \"${P_ESC}\""
+        fi
+        # Utilisateurs supplementaires (liste extra_users)
+        if [ -f "${CONFIG}" ]; then
+            jq -c '.extra_users // [] | .[]' "${CONFIG}" 2>/dev/null | while read -r u; do
+                EU_USER=$(echo "${u}" | jq -r '.username // empty')
+                EU_PASS=$(echo "${u}" | jq -r '.password // empty')
+                if [ -n "${EU_USER}" ] && [ -n "${EU_PASS}" ]; then
+                    EU_U_ESC=$(printf '%s' "${EU_USER}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+                    EU_P_ESC=$(printf '%s' "${EU_PASS}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+                    echo "  - username: \"${EU_U_ESC}\""
+                    echo "    password: \"${EU_P_ESC}\""
+                fi
+            done
+        fi
+    } >> "${WEBDAV_CONF}"
+
+    if [ -z "${USERNAME}" ] || [ "${PASSWORD}" = "null" ] || [ -z "${PASSWORD}" ]; then
+        if ! grep -q "username:" "${WEBDAV_CONF}"; then
+            bashio::log.warning "Aucun utilisateur defini et mode anonyme desactive : acces libre !"
+            # Retire le bloc users vide pour rester en acces libre propre
+            sed -i '/^users:$/d' "${WEBDAV_CONF}"
+        fi
+    fi
+fi
+
+bashio::log.info "Configuration generee : ${WEBDAV_CONF}"
+bashio::log.info "Demarrage de WebDAV sur le port 6065..."
+
+exec /usr/local/bin/webdav --config "${WEBDAV_CONF}"

@@ -1,0 +1,61 @@
+name: WebDAV
+version: "26.9.1"
+slug: webdav
+description: Serveur WebDAV simple et autonome pour Home Assistant (acces fichiers, sauvegardes, partage)
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/webdav
+image: ghcr.io/legithubdetai/ha_addons/webdav-{arch}
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+hassio_role: default
+webui: http://[HOST]:[PORT:6065]/
+ports:
+  6065/tcp: 6065
+ports_description:
+  6065/tcp: Serveur WebDAV. Exposez ce port pour y acceder depuis vos clients (Windows, macOS, Android, Nextcloud, etc.).
+map:
+  - share:rw
+  - media:rw
+  - backup:rw
+  - homeassistant_config:rw
+  - config:rw
+  - ssl:ro
+  - addon_config:rw
+options:
+  username: hass
+  password: changeme
+  anonymous: false
+  readonly: false
+  data_dir: /share/webdav
+  expose_share: true
+  expose_media: true
+  expose_backup: true
+  expose_config: false
+  extra_users: []
+  ssl: false
+  certfile: fullchain.pem
+  keyfile: privkey.pem
+  debug: false
+  prefix: /
+schema:
+  username: str
+  password: password
+  anonymous: bool
+  readonly: bool
+  data_dir: str
+  expose_share: bool
+  expose_media: bool
+  expose_backup: bool
+  expose_config: bool
+  extra_users:
+    - username: str
+      password: password
+  ssl: bool
+  certfile: str
+  keyfile: str
+  debug: bool
+  prefix: str
+panel_icon: mdi:folder-network
+panel_title: WebDAV
