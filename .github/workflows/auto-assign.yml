@@ -1,0 +1,28 @@
+name: Auto-assign PRs
+
+# Assigne automatiquement toutes les PR (Dependabot, Renovate, auto-upgrade, etc.)
+# a LeGitHubDeTai
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Assign PR to LeGitHubDeTai
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ASSIGNEE: LeGitHubDeTai
+        run: |
+          # Vérifie si déjà assigné pour éviter les appels inutiles
+          CURRENT=$(gh pr view "$PR_NUMBER" --json assignees --jq '.assignees[].login')
+          if echo "$CURRENT" | grep -qx "$ASSIGNEE"; then
+            echo "PR #$PR_NUMBER déjà assignée à $ASSIGNEE"
+          else
+            gh pr edit "$PR_NUMBER" --add-assignee "$ASSIGNEE"
+            echo "PR #$PR_NUMBER assignée à $ASSIGNEE"
+          fi
