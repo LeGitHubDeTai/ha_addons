@@ -1,5 +1,5 @@
 name: WebDAV
-version: "26.9.1"
+version: "26.9.2"
 slug: webdav
 description: Serveur WebDAV simple et autonome pour Home Assistant (acces fichiers, sauvegardes, partage)
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/webdav
@@ -9,6 +9,7 @@ arch:
   - aarch64
 startup: application
 boot: auto
+init: false
 hassio_role: default
 webui: http://[HOST]:[PORT:6065]/
 ports:
