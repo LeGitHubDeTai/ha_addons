@@ -44,9 +44,14 @@ Fizzy is a Kanban tracking tool developed by 37signals (the company behind Basec
 ## Usage
 
 1. Start the addon
-2. Access Fizzy via the WebUI link
+2. Access Fizzy via the WebUI link, or directly inside Home Assistant
+   (sidebar/panel) thanks to Ingress — no port to open
 3. Create your account on first access
 4. Start creating boards and cards
+
+> Note: Ingress is best-effort (same convention as the other addons in this
+> repo). If something looks off inside the HA panel (assets, redirects), use
+> the direct port access (`8095` by default) for the full experience.
 
 ## Email without configuration (Mailpit)
 
