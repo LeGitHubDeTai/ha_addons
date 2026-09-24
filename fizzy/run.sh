@@ -16,6 +16,7 @@ set -a
 set +a
 
 # Lecture option HA avec fallback sur l'env du conteneur (envs fournis par Home Assistant / supervisor)
+# Priorité : /data/options.json (sans API, sans spam) -> bashio::config -> env conteneur -> défaut
 # Usage: opt <CLE_BASHIO> <NOM_ENV> [defaut]
 opt() {
     local key="${1}"
@@ -23,12 +24,13 @@ opt() {
     local default="${3:-}"
     local val=""
 
-    val="$(bashio::config "${key}" 2>/dev/null || true)"
-    # bashio renvoie "null" quand non défini
-    if [[ "${val}" == "null" ]]; then
-        val=""
+    if [[ -f /data/options.json ]] && command -v jq >/dev/null 2>&1; then
+        val="$(jq -r --arg k "${key}" '.[$k] // empty' /data/options.json 2>/dev/null || true)"
     fi
-    if [[ -z "${val}" ]]; then
+    if [[ -z "${val}" || "${val}" == "null" ]] && bashio::config.exists "${key}" >/dev/null 2>&1; then
+        val="$(bashio::config "${key}" 2>/dev/null || true)"
+    fi
+    if [[ -z "${val}" || "${val}" == "null" ]]; then
         # fallback : env déjà présent dans le conteneur (Home Assistant, docker -e, .env sourcé)
         val="${!env_name:-}"
     fi
@@ -180,8 +182,11 @@ bashio::log.info "Installation des dépendances..."
 
 cd /opt/fizzy
 
-# Install Ruby dependencies
-bundle install --deployment --without development test || {
+# Bundler 4 a supprimé les flags --deployment / --without -> passer par `bundle config`
+export BUNDLE_SILENCE_ROOT_WARNING=1
+bundle config set deployment true
+bundle config set without 'development test'
+bundle install || {
     bashio::log.error "Échec de l'installation des gems"
     exit 1
 }
