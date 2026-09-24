@@ -26,7 +26,7 @@ RUN apk add --no-cache \
     ruby-dev \
     build-base \
     libffi-dev \
-    libyaml-dev \
+    yaml-dev \
     vips-dev \
     tzdata \
     python3
