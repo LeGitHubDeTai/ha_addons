@@ -33,8 +33,8 @@ Fizzy is a Kanban tracking tool developed by 37signals (the company behind Basec
 - `TLS_DOMAIN`: Domain for SSL (e.g., `fizzy.example.com`)
 - `BASE_URL`: Full URL where Fizzy is accessible
 - `MAILER_FROM_ADDRESS`: Email address for sending emails
-- `SMTP_ADDRESS`: SMTP server address
-- `SMTP_PORT`: SMTP server port (default: 587)
+- `SMTP_ADDRESS`: SMTP server address (empty = built-in local Mailpit)
+- `SMTP_PORT`: SMTP server port (default: 1025 local, 587 if a server is set)
 - `SMTP_USERNAME`: SMTP username
 - `SMTP_PASSWORD`: SMTP password
 - `SMTP_TLS`: Enable TLS for SMTP (default: false)
@@ -47,6 +47,15 @@ Fizzy is a Kanban tracking tool developed by 37signals (the company behind Basec
 2. Access Fizzy via the WebUI link
 3. Create your account on first access
 4. Start creating boards and cards
+
+## Email without configuration (Mailpit)
+
+No SMTP setup needed to get started: the addon runs a built-in local mail
+server (Mailpit). Account verification codes land in the local mailbox,
+available on port **8097**.
+
+As soon as you fill in `SMTP_ADDRESS` (real provider), it takes over and the
+local mailbox is bypassed (Mailpit keeps running but receives nothing).
 
 ## Documentation
 

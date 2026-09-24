@@ -1,5 +1,5 @@
 name: Fizzy
-version: "26.9.11"
+version: "26.9.12"
 slug: fizzy
 panel_icon: "mdi:view-week"
 description: Kanban tracking tool for issues and ideas by 37signals (Fizzy)
@@ -15,9 +15,11 @@ init: false
 ports:
     80/tcp: 8095
     443/tcp: 8096
+    8025/tcp: 8097
 ports_description:
     80/tcp: WebUI
     443/tcp: WebUI HTTPS (si TLS_DOMAIN configuré)
+    8025/tcp: Boîte mail locale (codes de connexion)
 options:
     SECRET_KEY_BASE: ""
     TLS_DOMAIN: ""

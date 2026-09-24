@@ -71,7 +71,7 @@ TLS_DOMAIN="$(opt 'TLS_DOMAIN' 'TLS_DOMAIN' '')"
 BASE_URL="$(opt 'BASE_URL' 'BASE_URL' '')"
 MAILER_FROM_ADDRESS="$(opt 'MAILER_FROM_ADDRESS' 'MAILER_FROM_ADDRESS' '')"
 SMTP_ADDRESS="$(opt 'SMTP_ADDRESS' 'SMTP_ADDRESS' '')"
-SMTP_PORT="$(opt 'SMTP_PORT' 'SMTP_PORT' '587')"
+SMTP_PORT="$(opt 'SMTP_PORT' 'SMTP_PORT' '')"
 SMTP_USERNAME="$(opt 'SMTP_USERNAME' 'SMTP_USERNAME' '')"
 SMTP_PASSWORD="$(opt 'SMTP_PASSWORD' 'SMTP_PASSWORD' '')"
 SMTP_TLS="$(opt 'SMTP_TLS' 'SMTP_TLS' '')"
@@ -92,6 +92,27 @@ else
     log "TLS_DOMAIN configuré: $TLS_DOMAIN"
 fi
 
+# SMTP local (Mailpit) par défaut -> zéro config.
+# Dès qu'un vrai serveur SMTP est renseigné, il prend le dessus.
+SMTP_LOCAL=false
+if [[ -z "$SMTP_ADDRESS" ]]; then
+    SMTP_ADDRESS="127.0.0.1"
+    if [[ -z "$SMTP_PORT" ]]; then
+        SMTP_PORT="1025"
+    fi
+    SMTP_USERNAME=""
+    SMTP_PASSWORD=""
+    SMTP_TLS=""
+    SMTP_LOCAL=true
+else
+    if [[ -z "$SMTP_PORT" ]]; then
+        SMTP_PORT="587"
+    fi
+fi
+if [[ -z "$MAILER_FROM_ADDRESS" ]]; then
+    MAILER_FROM_ADDRESS="fizzy@localhost"
+fi
+
 export_or_unset 'TLS_DOMAIN' "$TLS_DOMAIN"
 export_or_unset 'DISABLE_SSL' "$DISABLE_SSL"
 export_or_unset 'BASE_URL' "$BASE_URL"
@@ -104,10 +125,20 @@ export_or_unset 'SMTP_TLS' "$SMTP_TLS"
 export_or_unset 'VAPID_PRIVATE_KEY' "$VAPID_PRIVATE_KEY"
 export_or_unset 'VAPID_PUBLIC_KEY' "$VAPID_PUBLIC_KEY"
 
-if [[ -n "${SMTP_ADDRESS:-}" ]]; then
-    log "SMTP configuré: ${SMTP_ADDRESS}:${SMTP_PORT:-587}"
-fi
 log "Variables d'environnement exportées (secrets masqués)"
+
+if [[ "$SMTP_LOCAL" == "true" ]]; then
+    mkdir -p /data/mailpit
+    log "Démarrage du SMTP local (Mailpit)..."
+    /usr/local/bin/mailpit \
+        --smtp 127.0.0.1:1025 \
+        --listen 0.0.0.0:8025 \
+        --data-file /data/mailpit/mailpit.db \
+        >> /data/mailpit/mailpit.log 2>&1 &
+    log "Boîte mail locale dispo sur le port 8097 (codes de connexion)"
+else
+    log "SMTP configuré: ${SMTP_ADDRESS}:${SMTP_PORT}"
+fi
 
 # Stockage persistant : /rails/storage -> /data/storage (SQLite + uploads)
 mkdir -p /data/storage
