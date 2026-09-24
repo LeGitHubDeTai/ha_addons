@@ -38,6 +38,10 @@ RUN sed -i 's/\r$//' /run.sh && chmod +x /run.sh
 COPY local-smtp.rb /rails/config/initializers/zz_fizzy_local_smtp.rb
 RUN sed -i 's/\r$//' /rails/config/initializers/zz_fizzy_local_smtp.rb
 
+# Support Ingress : prefixe dynamique des URLs (SCRIPT_NAME + reecriture reponses)
+COPY ingress.rb /rails/config/initializers/zz_fizzy_ingress.rb
+RUN sed -i 's/\r$//' /rails/config/initializers/zz_fizzy_ingress.rb
+
 WORKDIR /rails
 EXPOSE 80 443 8025
 
