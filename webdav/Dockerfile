@@ -1,5 +1,10 @@
 ARG BUILD_FROM
+ARG BUILD_VERSION
+ARG BUILD_ARCH
 FROM ${BUILD_FROM}
+
+ARG BUILD_VERSION
+ARG BUILD_ARCH
 
 LABEL \
     io.hass.version="${BUILD_VERSION}" \
@@ -7,7 +12,6 @@ LABEL \
     io.hass.arch="${BUILD_ARCH}"
 
 ARG WEBDAV_VERSION=5.15.1
-ARG BUILD_ARCH
 
 RUN set -eux; \
     apk add --no-cache ca-certificates jq openssl wget tar; \
@@ -24,7 +28,7 @@ RUN set -eux; \
     mv /tmp/webdav /usr/local/bin/webdav; \
     chmod +x /usr/local/bin/webdav; \
     rm -f /tmp/webdav.tar.gz; \
-    /usr/local/bin/webdav --version
+    /usr/local/bin/webdav version
 
 COPY root /
 RUN chmod +x /etc/s6-overlay/s6-rc.d/webdav/run
