@@ -37,6 +37,7 @@ Most users can leave this empty.
 ### Notes
 
 - The web UI is served as static files via nginx (`try_files ... /index.html`, health endpoint at `/health`).
+- Upstream `app/index.html` contains a guard that redirects any non-allowlisted hostname to `https://app.requestly.io` (only `localhost`, bare IPs and `*.requestly.io` pass). The add-on build **disables this redirect** so it works behind Home Assistant (Ingress, `homeassistant.local`, DuckDNS, …) — and fails the build if upstream changes the pattern.
 - The upstream app defaults to Requestly cloud services (Firebase) for sync; local rules work without an account. Check [docs](https://docs.requestly.com/general/http-interceptor/overview) for details.
 - Mock Server backend (`@requestly/mock-server`) is a separate npm package and is **not** bundled in this first version — local mocks in the UI cover most use cases.
 
