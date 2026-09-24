@@ -128,6 +128,7 @@ export_or_unset 'VAPID_PUBLIC_KEY' "$VAPID_PUBLIC_KEY"
 log "Variables d'environnement exportées (secrets masqués)"
 
 if [[ "$SMTP_LOCAL" == "true" ]]; then
+    export FIZZY_LOCAL_SMTP="true"
     mkdir -p /data/mailpit
     log "Démarrage du SMTP local (Mailpit)..."
     /usr/local/bin/mailpit \
@@ -137,6 +138,7 @@ if [[ "$SMTP_LOCAL" == "true" ]]; then
         >> /data/mailpit/mailpit.log 2>&1 &
     log "Boîte mail locale dispo sur le port 8097 (codes de connexion)"
 else
+    unset FIZZY_LOCAL_SMTP || true
     log "SMTP configuré: ${SMTP_ADDRESS}:${SMTP_PORT}"
 fi
 

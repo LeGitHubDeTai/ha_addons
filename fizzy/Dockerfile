@@ -34,6 +34,10 @@ COPY run.sh /run.sh
 # Anti-CRLF (checkout Windows) + executable
 RUN sed -i 's/\r$//' /run.sh && chmod +x /run.sh
 
+# Desactive SMTP-AUTH en mode SMTP local (Mailpit) : production.rb force "plain" par defaut
+COPY local-smtp.rb /rails/config/initializers/zz_fizzy_local_smtp.rb
+RUN sed -i 's/\r$//' /rails/config/initializers/zz_fizzy_local_smtp.rb
+
 WORKDIR /rails
 EXPOSE 80 443 8025
 
