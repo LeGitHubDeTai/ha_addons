@@ -37,6 +37,7 @@
 | [**Penpot**](./penpot/) | Design & prototypage open-source | 9001 |
 | [**Storybook**](./storybook/) | Atelier UI pour développer des composants en isolation | 6006 |
 | [**WebDAV**](./webdav/) | Serveur WebDAV (partage fichiers, sauvegardes) | 6065 |
+| [**Requestly**](./requestly/) | Intercepteur HTTP, mocks d'API et débogage réseau | 3000 |
 
 ---
 

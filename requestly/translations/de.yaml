@@ -1,0 +1,7 @@
+---
+configuration:
+  env_vars_list:
+    name: Liste der Umgebungsvariablen
+    description: |-
+      Liste zusätzlicher Umgebungsvariablen für den Container.
+      Jede Variable muss im Format KEY: value angegeben werden.

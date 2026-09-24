@@ -1,0 +1,31 @@
+name: Requestly
+version: "26.9.1"
+slug: requestly
+panel_icon: "mdi:api"
+description: Intercepteur HTTP, mocks d'API et débogage réseau (Requestly)
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/requestly
+webui: http://[HOST]:[PORT:3000]/
+image: ghcr.io/legithubdetai/ha_addons/requestly-{arch}
+arch:
+    - amd64
+    - aarch64
+startup: application
+boot: auto
+hassio_role: "default"
+ingress: true
+ingress_port: 3000
+map:
+    - ssl:ro
+    - backup:rw
+    - share:rw
+    - homeassistant_config:rw
+ports:
+    3000/tcp: null
+ports_description:
+    3000/tcp: Interface web Requestly. Normalement non exposé, Home Assistant Ingress est recommandé. Exposez ce port pour contourner Ingress (par ex. usage avec l'extension navigateur pointée vers cet hôte).
+options:
+    env_vars_list: []
+schema:
+    env_vars_list: [
+      "match(^[A-Z_0-9]+: .*$)"
+    ]
