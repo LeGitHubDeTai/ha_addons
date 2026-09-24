@@ -104,8 +104,8 @@ export_or_unset 'SMTP_TLS' "$SMTP_TLS"
 export_or_unset 'VAPID_PRIVATE_KEY' "$VAPID_PRIVATE_KEY"
 export_or_unset 'VAPID_PUBLIC_KEY' "$VAPID_PUBLIC_KEY"
 
-if [[ -n "$SMTP_ADDRESS" ]]; then
-    log "SMTP configuré: $SMTP_ADDRESS:$SMTP_PORT"
+if [[ -n "${SMTP_ADDRESS:-}" ]]; then
+    log "SMTP configuré: ${SMTP_ADDRESS}:${SMTP_PORT:-587}"
 fi
 log "Variables d'environnement exportées (secrets masqués)"
 

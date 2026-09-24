@@ -1,10 +1,10 @@
 name: Fizzy
-version: "26.9.9"
+version: "26.9.11"
 slug: fizzy
 panel_icon: "mdi:view-week"
 description: Kanban tracking tool for issues and ideas by 37signals (Fizzy)
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/fizzy
-webui: http://[HOST]:[PORT:80]/
+webui: http://[HOST]:[PORT:8095]/
 image: ghcr.io/legithubdetai/ha_addons/fizzy-{arch}
 arch:
   - amd64
@@ -13,8 +13,8 @@ startup: application
 boot: auto
 init: false
 ports:
-    80/tcp: 80
-    443/tcp: 443
+    80/tcp: 8095
+    443/tcp: 8096
 ports_description:
     80/tcp: WebUI
     443/tcp: WebUI HTTPS (si TLS_DOMAIN configuré)
