@@ -1,124 +1,73 @@
 # Mindwtr Add-on
 
-Self-hosted mind mapping and task management with cloud sync and REST API.
+Mind mapping et gestion de tâches auto-hébergés (basé sur [Mindwtr](https://github.com/dongdongbh/Mindwtr), image construite depuis `docker/` upstream).
+
+**Principe : vous ne configurez que la synchronisation, tout le reste est automatique** (dossier de données, ports, CORS, URL Cloud pré-remplie).
 
 ## Installation
 
-1. Go to **Add-ons** in Home Assistant
-2. Click the three dots (⋮) → **Add add-on from URL**
-3. Add the repository URL: `https://github.com/LeGitHubDeTai/ha_addons`
-4. Search for **Mindwtr** and click **Install**
+1. Dans Home Assistant : **Paramètres → Modules complémentaires → ⋮ → Dépôts**, ajoutez `https://github.com/LeGitHubDeTai/ha_addons`
+2. Cherchez **Mindwtr**, installez, démarrez
+3. Ouvrez l'interface web (port `8080` ou via Ingress)
 
-## Configuration
+## Configuration : un seul choix à faire
 
-### Quick Sync Setup
+```yaml
+sync_mode: local
+```
 
-1. Generate a token (at least 20 characters):
+| Mode | Ce que fait l'add-on | À faire dans l'app |
+|------|----------------------|--------------------|
+| `local` (défaut) | Aucun serveur de sync. L'interface web seule. | Rien : les données restent dans ce navigateur (dossiers locaux). |
+| `selfhosted` | Démarre le serveur **Mindwtr Cloud** intégré (sync multi-appareils + API REST). | `Paramètres → Sync → Self-Hosted` : URL `http://<ip-ha>:8787`, jeton = votre `cloud_tokens`. |
+| `webdav` | Aucun serveur. Interface web seule. | `Paramètres → Sync → WebDAV` : URL, identifiant, mot de passe de votre serveur (ex. Nextcloud `https://serveur/remote.php/dav/files/USER/Mindwtr`). |
+| `dropbox` | Aucun serveur. Interface web seule. | Dropbox OAuth **ne fonctionne que dans les apps natives** bureau/mobile (limitation upstream, pas de support dans la vue web/PWA). Utilisez une app native, ou passez en `selfhosted`/`webdav` pour synchroniser depuis le navigateur. |
+
+Si aucun mode n'est configuré, c'est `local` : dossiers locaux uniquement, rien d'autre à faire.
+
+### Mode selfhosted : les 2 champs utiles
+
+```yaml
+sync_mode: selfhosted
+cloud_tokens: "changez-moi-avec-un-jeton-d-au-moins-20-caracteres"
+```
+
+1. Générez un jeton (min. 20 caractères, lettres/chiffres) :
    ```bash
    cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 50 | head -n 1
    ```
-2. Set the sync token and CORS origin in the add-on options:
+2. Collez-le dans `cloud_tokens`, redémarrez l'add-on
+3. Dans l'app : `Paramètres → Sync → Self-Hosted`, URL `http://<ip-home-assistant>:8787` (l'app ajoute `/v1/data` toute seule), puis le même jeton
 
+Plusieurs jetons séparés par des virgules = plusieurs espaces privés sur le même serveur (les appareils avec le même jeton se synchronisent ensemble) :
 ```yaml
-timezone: "Europe/Paris"
-mindwtr_cloud_auth_tokens: "your_long_random_token_here"
-mindwtr_cloud_cors_origin: "http://homeassistant.local:8080"
+cloud_tokens: "jeton-long-d-alice,jeton-long-de-bob"
 ```
 
-3. Restart the add-on and access Mindwtr at `http://<home-assistant-ip>:8080`
-4. In Mindwtr Settings → Sync → Self-Hosted, use: `http://<home-assistant-ip>:8787`
+`cors_origin` : laissez vide dans presque tous les cas. Ne renseignez que si un navigateur d'une autre machine parle **directement** au port `8787` (adresse exacte de la PWA, ex. `http://192.168.1.20:8080`).
 
-### All Options
+## API (mode selfhosted)
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `timezone` | Container timezone | `Europe/Paris` |
-| `mindwtr_cloud_auth_tokens` | Sync token(s), comma-separated (20+ chars) | `""` |
-| `mindwtr_cloud_cors_origin` | CORS origin for the cloud server | `""` |
-| `mindwtr_cloud_max_body_bytes` | Max request body size (bytes) | `2000000` |
-| `mindwtr_cloud_max_attachment_bytes` | Max attachment size (bytes) | `50000000` |
-| `mindwtr_default_cloud_url` | Preseed cloud URL for new browsers | `""` |
-| `mindwtr_cloud_data_dir` | Data directory path | `"/app/cloud_data"` |
-| `env_vars_list` | Additional env vars (format: `KEY: value`) | `[]` |
+Base URL : `http://<ip-home-assistant>:8787/v1` (même jeton Bearer que la sync).
 
-### Setting Sync Variables
-
-The easiest way to configure Mindwtr sync variables is through `env_vars_list`:
-
-```yaml
-env_vars_list:
-  - "MINDWTR_CLOUD_AUTH_TOKENS: your_token_here"
-  - "MINDWTR_CLOUD_CORS_ORIGIN: http://homeassistant.local:8080"
-  - "MINDWTR_CLOUD_MAX_BODY_BYTES: 2000000"
-  - "MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES: 50000000"
-  - "MINDWTR_DEFAULT_CLOUD_URL: http://homeassistant.local:8787"
-```
-
-### Multiple Users / Tokens
-
-Multiple tokens are supported, comma-separated. Each distinct token gets its own private dataset:
-
-```yaml
-mindwtr_cloud_auth_tokens: "alices-long-token,bobs-long-token"
-```
-
-Or via `env_vars_list`:
-```yaml
-env_vars_list:
-  - "MINDWTR_CLOUD_AUTH_TOKENS: alices-long-token,bobs-long-token"
-```
-
-### Sync Methods
-
-#### Self-Hosted Cloud (Recommended)
-The bundled Mindwtr Cloud server provides full sync and REST API support. Point Mindwtr Settings → Sync → Self-Hosted at `http://<home-assistant-ip>:8787`.
-
-#### WebDAV Sync
-Mindwtr Cloud supports WebDAV sync as an alternative. Configure your Mindwtr client to connect to the WebDAV endpoint at `http://<home-assistant-ip>:8787/webdav` using your auth token.
-
-#### Dropbox Sync
-**Not available in Docker.** Native Dropbox OAuth sync is implemented by the native desktop and mobile apps only. Supplying `VITE_DROPBOX_APP_KEY` or `DROPBOX_APP_KEY` will not enable Dropbox in the Docker runtime. Use the self-hosted cloud server or WebDAV instead.
-
-### Ports
-
-- **8080/tcp** - Mindwtr web interface (PWA + API proxy)
-- **8787/tcp** - Mindwtr Cloud sync server API (normally not exposed)
-
-### Volumes
-
-- **config** - Configuration data persistence
-- **share** - Shared data directory for cloud data
-
-## Usage
-
-Access Mindwtr at `http://<home-assistant-ip>:8080` after the add-on starts.
-
-The Cloud sync server is available at `http://<home-assistant-ip>:8787`.
-
-In Mindwtr Settings → Sync → Self-Hosted, use:
-```
-http://<home-assistant-ip>:8787
-```
-
-Mindwtr will automatically append `/v1/data`.
-
-## API
-
-Create a task:
 ```bash
 curl -X POST \
-  -H "Authorization: Bearer your_token_here" \
+  -H "Authorization: Bearer votre_jeton" \
   -H "Content-Type: application/json" \
-  -d '{"input":"Review task"}' \
-  http://<home-assistant-ip>:8787/v1/tasks
+  -d '{"input":"Relire facture /due:tomorrow #finance"}' \
+  http://<ip-home-assistant>:8787/v1/tasks
+
+curl -H "Authorization: Bearer votre_jeton" \
+  "http://<ip-home-assistant>:8787/v1/tasks?status=next"
 ```
 
-List tasks:
-```bash
-curl -H "Authorization: Bearer your_token_here" \
-  "http://<home-assistant-ip>:8787/v1/tasks?status=next"
-```
+## Ports et données
+
+- **8080/tcp** — interface web Mindwtr (proxy `/v1/` vers le Cloud inclus, détection same-origin automatique)
+- **8787/tcp** — API du serveur Cloud (utilisé uniquement en mode `selfhosted`)
+- Données Cloud persistées dans `/share/mindwtr` (mappage `share`)
 
 ## Support
 
-If you encounter issues, check the add-on logs or visit the [GitHub repository](https://github.com/LeGitHubDeTai/ha_addons).
+Logs de l'add-on en cas de problème, ou [dépôt GitHub](https://github.com/LeGitHubDeTai/ha_addons).
+Référence upstream : [Mindwtr `docker/`](https://github.com/dongdongbh/Mindwtr/tree/main/docker) et [docs sync](https://docs.mindwtr.app/data-sync/).

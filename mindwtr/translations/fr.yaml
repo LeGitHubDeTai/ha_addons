@@ -1,0 +1,21 @@
+configuration:
+  sync_mode:
+    name: Mode de synchronisation
+    description: >-
+      local = aucun serveur de sync, données conservées dans ce navigateur (dossiers locaux uniquement).
+      selfhosted = démarre le serveur de sync Mindwtr Cloud intégré (sync multi-appareils + API REST, jeton requis ci-dessous).
+      webdav = aucun serveur ; configurez votre endpoint WebDAV dans l'app (Paramètres → Sync → WebDAV).
+      dropbox = aucun serveur ; Dropbox ne fonctionne que dans les apps natives bureau/mobile, pas dans cette vue web.
+  cloud_tokens:
+    name: Jetons Cloud (mode selfhosted uniquement)
+    description: >-
+      Un ou plusieurs jetons de sync, séparés par des virgules. Chaque jeton doit faire 20 à 512 caractères
+      (lettres/chiffres). Chaque jeton distinct a son propre espace privé : plusieurs personnes peuvent partager
+      un serveur sans voir les données des autres. Les appareils à synchroniser ensemble doivent utiliser le même jeton.
+      Générer un jeton : cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 50 | head -n 1
+  cors_origin:
+    name: Origine CORS (selfhosted, optionnel)
+    description: >-
+      Laissez vide dans presque tous les cas (la sync via l'interface web utilise la même origine, pas besoin de CORS).
+      Ne renseignez que si un navigateur d'une autre machine parle DIRECTEMENT au port 8787 :
+      l'adresse exacte de la PWA avec schéma et port, ex. http://192.168.1.20:8080.

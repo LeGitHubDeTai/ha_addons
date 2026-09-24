@@ -103,7 +103,9 @@ RUN rm -rf /tmp/build 2>/dev/null || true
 
 EXPOSE 8787/tcp 8080/tcp
 
+# Web UI always runs; the cloud server only runs in sync_mode=selfhosted
+# with a token configured (see entrypoint.sh / run.sh).
 HEALTHCHECK --interval=1m30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -fsS http://localhost:8787/ready >/dev/null || curl -fsS http://localhost:8787/health >/dev/null || exit 1
+    CMD sh -c 'curl -fsS http://localhost:8080/ >/dev/null || exit 1; if [ "${SYNC_MODE:-local}" = "selfhosted" ] && [ -n "${MINDWTR_CLOUD_AUTH_TOKENS:-}" ]; then curl -fsS http://localhost:8787/ready >/dev/null || curl -fsS http://localhost:8787/health >/dev/null || exit 1; fi'
 
 ENTRYPOINT ["/usr/local/bin/mindwtr-entrypoint"]
