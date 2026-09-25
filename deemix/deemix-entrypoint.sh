@@ -1,12 +1,26 @@
-#!/usr/bin/env bashio
+#!/bin/bash
 # Point d'entrée Deemix : lit la config Home Assistant, prépare les dossiers
 # et démarre le serveur web (Express + WebSocket) sur le port interne 6596.
 # nginx (port 6595) proxyfie l'accès direct et l'Ingress HA vers ce backend.
 set -euo pipefail
 
+# Charge bashio (fonctions bashio::*) — présent dans les images de base HA.
+for _bashio in /usr/lib/bashio/bashio.sh /usr/local/lib/bashio-standalone.sh; do
+    if [ -f "${_bashio}" ]; then
+        # shellcheck disable=SC1090
+        source "${_bashio}"
+        break
+    fi
+done
+
 MUSIC_DIR="$(bashio::config 'music_folder')"
 CONFIG_DIR="$(bashio::config 'config_folder')"
 SINGLE_USER="$(bashio::config 'single_user')"
+
+# Valeurs par défaut si la config est illisible (ex. test local sans Supervisor)
+[ -z "${MUSIC_DIR}" ] || [ "${MUSIC_DIR}" = "null" ] && MUSIC_DIR="/media/deemix"
+[ -z "${CONFIG_DIR}" ] || [ "${CONFIG_DIR}" = "null" ] && CONFIG_DIR="/share/deemix"
+[ -z "${SINGLE_USER}" ] || [ "${SINGLE_USER}" = "null" ] && SINGLE_USER="true"
 
 bashio::log.info "Dossier musique : ${MUSIC_DIR}"
 bashio::log.info "Dossier config  : ${CONFIG_DIR}"
