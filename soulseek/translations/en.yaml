@@ -1,0 +1,41 @@
+configuration:
+  soulseek_username:
+    name: Soulseek username
+    description: Your Soulseek username (required to connect to the network).
+  soulseek_password:
+    name: Soulseek password
+    description: Your Soulseek password (required to connect to the network).
+  soulseek_description:
+    name: Profile description
+    description: Public profile description shown to other users.
+  web_username:
+    name: Web username
+    description: Login for the slskd web interface.
+  web_password:
+    name: Web password
+    description: Password for the slskd web interface. Change the default value!
+  download_dir:
+    name: Downloads directory
+    description: Folder for completed downloads (e.g. /share/soulseek/downloads).
+  incomplete_dir:
+    name: Incomplete directory
+    description: Folder for in-progress downloads.
+  share_dirs:
+    name: Shared directories
+    description: Folders shared with the Soulseek network (at least one is required).
+  listen_port:
+    name: Soulseek listen port
+    description: Incoming connections port (forward 50300/tcp on your router for best speeds).
+  remote_configuration:
+    name: Remote configuration
+    description: Allow changing slskd settings from the web UI (System > Options).
+  log_level:
+    name: Log level
+    description: Application log verbosity.
+  env_vars_list:
+    name: Extra environment variables
+    description: 'Free environment variables as "KEY: value" (e.g. SLSKD_API_KEY).'
+network:
+  5030/tcp: slskd web interface (HTTP, Ingress recommended)
+  5031/tcp: slskd web interface (HTTPS, self-signed)
+  50300/tcp: Soulseek listening port (forward for best performance)

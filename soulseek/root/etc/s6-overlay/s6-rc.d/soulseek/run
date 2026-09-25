@@ -1,0 +1,116 @@
+#!/command/with-contenv bashio
+set -e
+
+CONFIG_FILE="/data/slskd.yml"
+APP_DIR="/data"
+
+SLSK_USER=$(bashio::config 'soulseek_username')
+SLSK_PASS=$(bashio::config 'soulseek_password')
+SLSK_DESC=$(bashio::config 'soulseek_description')
+WEB_USER=$(bashio::config 'web_username')
+WEB_PASS=$(bashio::config 'web_password')
+DOWNLOAD_DIR=$(bashio::config 'download_dir')
+INCOMPLETE_DIR=$(bashio::config 'incomplete_dir')
+LISTEN_PORT=$(bashio::config 'listen_port')
+REMOTE_CONF=$(bashio::config 'remote_configuration')
+LOG_LEVEL=$(bashio::config 'log_level')
+
+bashio::log.info "Préparation de Soulseek (slskd)..."
+
+mkdir -p "${DOWNLOAD_DIR}" "${INCOMPLETE_DIR}" "${APP_DIR}/logs"
+
+# Dossiers partagés (liste share_dirs) : création + conversion YAML
+SHARE_YAML=""
+while IFS= read -r dir; do
+    [ -z "${dir}" ] && continue
+    mkdir -p "${dir}" || bashio::log.warning "Impossible de créer ${dir}"
+    # Échappement guillemets pour YAML
+    ESC=$(printf '%s' "${dir}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    SHARE_YAML="${SHARE_YAML}    - \"${ESC}\"\n"
+done < <(jq -r '.share_dirs[]?' /data/options.json)
+
+if [ -z "${SHARE_YAML}" ]; then
+    mkdir -p /share/soulseek/share
+    SHARE_YAML='    - "/share/soulseek/share"\n'
+    bashio::log.warning "Aucun dossier partagé valide — utilisation de /share/soulseek/share par défaut."
+fi
+
+if [ -z "${SLSK_USER}" ] || [ "${SLSK_PASS}" = "null" ] || [ -z "${SLSK_PASS}" ]; then
+    bashio::log.warning "Identifiants Soulseek non renseignés : configurez soulseek_username/soulseek_password puis redémarrez. slskd démarrera mais restera déconnecté."
+fi
+
+if [ "${WEB_PASS}" = "slskd" ]; then
+    bashio::log.warning "Mot de passe web par défaut (slskd) — changez web_username/web_password !"
+fi
+
+REMOTE_BOOL="false"
+if bashio::var.true "${REMOTE_CONF}"; then
+    REMOTE_BOOL="true"
+fi
+
+# Échappement des secrets pour YAML entre guillemets
+esc_yaml() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+SLSK_USER_ESC=$(esc_yaml "${SLSK_USER}")
+SLSK_PASS_ESC=$(esc_yaml "${SLSK_PASS}")
+SLSK_DESC_ESC=$(esc_yaml "${SLSK_DESC:-Home Assistant Soulseek}")
+WEB_USER_ESC=$(esc_yaml "${WEB_USER:-slskd}")
+WEB_PASS_ESC=$(esc_yaml "${WEB_PASS:-slskd}")
+DL_ESC=$(esc_yaml "${DOWNLOAD_DIR}")
+INC_ESC=$(esc_yaml "${INCOMPLETE_DIR}")
+
+# Génération de slskd.yml (options HA -> fichier). remote_configuration=true
+# permet aussi de tout ajuster ensuite depuis l'UI web (System > Options).
+printf '%s\n' \
+    "directories:" \
+    "  incomplete: \"${INC_ESC}\"" \
+    "  downloads: \"${DL_ESC}\"" \
+    "shares:" \
+    "  directories:" > "${CONFIG_FILE}"
+printf '%b' "${SHARE_YAML}" >> "${CONFIG_FILE}"
+cat >> "${CONFIG_FILE}" <<EOF
+  filters:
+    - \\.ini\$
+    - Thumbs.db\$
+    - \\.DS_Store\$
+soulseek:
+  username: "${SLSK_USER_ESC}"
+  password: "${SLSK_PASS_ESC}"
+  description: |
+    ${SLSK_DESC_ESC}
+  listen_ip_address: 0.0.0.0
+  listen_port: ${LISTEN_PORT:-50300}
+web:
+  port: 5030
+  ip_address: 0.0.0.0
+  https:
+    disabled: false
+    port: 5031
+  url_base: /
+  authentication:
+    disabled: false
+    username: "${WEB_USER_ESC}"
+    password: "${WEB_PASS_ESC}"
+remote_configuration: ${REMOTE_BOOL}
+logger:
+  no_color: true
+flags:
+  no_logo: false
+EOF
+
+chmod 600 "${CONFIG_FILE}"
+bashio::log.info "Configuration générée : ${CONFIG_FILE}"
+
+# Variables d'environnement libres (env_vars_list, format "CLE: valeur")
+while IFS= read -r line; do
+    [ -z "${line}" ] && continue
+    KEY=$(printf '%s' "${line}" | cut -d: -f1 | tr -d ' ')
+    VAL=$(printf '%s' "${line}" | cut -d: -f2- | sed 's/^ //')
+    if [ -n "${KEY}" ]; then
+        export "${KEY}=${VAL}"
+        bashio::log.info "env: ${KEY} défini"
+    fi
+done < <(jq -r '.env_vars_list[]?' /data/options.json)
+
+bashio::log.info "Démarrage de slskd (web UI :5030, Soulseek :${LISTEN_PORT:-50300})..."
+
+exec /opt/slskd/slskd --config "${CONFIG_FILE}" --app-dir "${APP_DIR}"

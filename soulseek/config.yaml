@@ -1,0 +1,66 @@
+name: Soulseek
+version: "26.9.1"
+slug: soulseek
+panel_title: Soulseek
+panel_icon: mdi:download-network
+description: Client Soulseek auto-hébergé (slskd) avec interface web — recherche et téléchargement P2P
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/soulseek
+image: ghcr.io/legithubdetai/ha_addons/soulseek-{arch}
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: false
+hassio_role: default
+ingress: true
+ingress_port: 5030
+webui: http://[HOST]:[PORT:5030]/
+ports:
+  5030/tcp: null
+  5031/tcp: null
+  50300/tcp: 50300
+ports_description:
+  5030/tcp: Interface web slskd (HTTP). Normalement non exposé, Home Assistant Ingress est recommandé.
+  5031/tcp: Interface web slskd (HTTPS, certificat auto-signé). Optionnel.
+  50300/tcp: Port d'écoute Soulseek (connexions entrantes). Exposez-le pour de meilleures vitesses et moins de blocages.
+map:
+  - share:rw
+  - media:rw
+  - addon_config:rw
+  - backup:rw
+backup_exclude:
+  - "*.db"
+  - "*.db-shm"
+  - "*.db-wal"
+  - "logs/*"
+options:
+  soulseek_username: ""
+  soulseek_password: ""
+  soulseek_description: "Home Assistant Soulseek"
+  web_username: slskd
+  web_password: slskd
+  download_dir: /share/soulseek/downloads
+  incomplete_dir: /share/soulseek/incomplete
+  share_dirs:
+    - /share/soulseek/share
+    - /media
+  listen_port: 50300
+  remote_configuration: true
+  log_level: Information
+  env_vars_list: []
+schema:
+  soulseek_username: str
+  soulseek_password: password
+  soulseek_description: str
+  web_username: str
+  web_password: password
+  download_dir: match(/share/.+|/media/.+)
+  incomplete_dir: match(/share/.+|/media/.+)
+  share_dirs:
+    - match(/share/.+|/media/.+)
+  listen_port: port
+  remote_configuration: bool
+  log_level: list(Trace|Debug|Information|Warning|Error|Critical)
+  env_vars_list:
+    - match(^[A-Z_0-9]+: .*$)
