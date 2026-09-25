@@ -1,0 +1,5 @@
+panel_iframe:
+  deemix_local:
+    title: "Deemix"
+    icon: mdi:music
+    url: "http://homeassistant.local:6595"

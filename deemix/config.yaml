@@ -1,0 +1,38 @@
+name: Deemix
+version: "26.9.1"
+slug: deemix
+panel_icon: "mdi:music"
+description: Téléchargeur de musique Deezer avec interface web (Deemix)
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/deemix
+webui: http://[HOST]:[PORT:6595]/
+image: ghcr.io/legithubdetai/ha_addons/deemix-{arch}
+arch:
+    - amd64
+    - aarch64
+startup: application
+boot: auto
+hassio_role: "default"
+ingress: true
+ingress_port: 6595
+ingress_stream: true
+map:
+    - ssl:ro
+    - backup:rw
+    - share:rw
+    - media:rw
+ports:
+    6595/tcp: null
+ports_description:
+    6595/tcp: Interface web Deemix. Normalement non exposé, Home Assistant Ingress est recommandé. Exposez ce port pour contourner Ingress (par ex. intégration panel_iframe ou client externe).
+options:
+    music_folder: /media/deemix
+    config_folder: /share/deemix
+    single_user: true
+    env_vars_list: []
+schema:
+    music_folder: match(/share/.+|/media/.+|(smb|nfs)://.+)
+    config_folder: match(/share/.+|/media/.+|(smb|nfs)://.+)
+    single_user: bool
+    env_vars_list: [
+      "match(^[A-Z_0-9]+: .*$)"
+    ]

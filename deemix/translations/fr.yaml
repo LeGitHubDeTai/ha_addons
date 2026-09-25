@@ -1,0 +1,15 @@
+configuration:
+  music_folder:
+    name: Dossier musique
+    description: Dossier des téléchargements Deemix (ex. /media/deemix).
+  config_folder:
+    name: Dossier de configuration
+    description: Dossier de configuration Deemix — session Deezer (ARL), réglages et logs (ex. /share/deemix).
+  single_user:
+    name: Mode mono-utilisateur
+    description: Une seule connexion Deezer partagée pour tout le foyer, sans identifiant par session.
+  env_vars_list:
+    name: Variables d'environnement libres
+    description: 'Variables libres au format "CLE: valeur" (ex. DEEMIX_SINGLE_USER).'
+network:
+  6595/tcp: Interface web Deemix (Ingress recommandé)

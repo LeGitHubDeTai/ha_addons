@@ -1,0 +1,15 @@
+configuration:
+  music_folder:
+    name: Musikordner
+    description: Deemix-Downloadordner (z. B. /media/deemix).
+  config_folder:
+    name: Konfigurationsordner
+    description: Deemix-Konfigurationsordner — Deezer-Sitzung (ARL), Einstellungen und Logs (z. B. /share/deemix).
+  single_user:
+    name: Einzelbenutzermodus
+    description: Eine gemeinsame Deezer-Anmeldung für den ganzen Haushalt, keine Anmeldung pro Sitzung.
+  env_vars_list:
+    name: Zusätzliche Umgebungsvariablen
+    description: 'Freie Umgebungsvariablen im Format "KEY: value" (z. B. DEEMIX_SINGLE_USER).'
+network:
+  6595/tcp: Deemix-Weboberfläche (Ingress empfohlen)
