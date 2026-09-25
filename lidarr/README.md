@@ -100,6 +100,16 @@ Les données persistent après mise à jour ou redémarrage.
 
 ---
 
+## 🔀 Variantes (branches de développement)
+
+* [**Lidarr Develop**](../lidarr_develop/) — pré-versions (`develop`), nouveautés en avant-première
+* [**Lidarr Nightly**](../lidarr_nightly/) — builds quotidiens, les plus instables
+
+Les trois variantes peuvent coexister (configurations isolées) : utilisez des dossiers
+racine distincts et n'exposez le port `8686` que sur une seule à la fois.
+
+---
+
 ## 🛠️ Mise à jour
 
 Les mises à jour suivent celles de l'image **LinuxServer.io Lidarr**.

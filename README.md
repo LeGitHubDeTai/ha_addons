@@ -34,6 +34,8 @@
 | [**Obsidian**](./obsidian/) | Gestion de notes et connaissances | 3000 |
 | [**Mopidy**](./mopidy/) | Serveur musical avec support Spotify/Bandcamp | 6680 |
 | [**Lidarr**](./lidarr/) | Gestionnaire de collection musicale (Usenet/BitTorrent) | 8686 |
+| [**Lidarr Develop**](./lidarr_develop/) | Lidarr branche develop (pré-version) | 8686 |
+| [**Lidarr Nightly**](./lidarr_nightly/) | Lidarr builds quotidiens (instable) | 8686 |
 | [**ISOMan**](./isoman/) | Gestionnaire d'ISOs Linux | 50145 |
 | [**Penpot**](./penpot/) | Design & prototypage open-source | 9001 |
 | [**Storybook**](./storybook/) | Atelier UI pour développer des composants en isolation | 6006 |

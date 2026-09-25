@@ -1,0 +1,8 @@
+build_from:
+  amd64: "lscr.io/linuxserver/lidarr:amd64-develop-3.1.6.5078-ls265"
+  aarch64: "lscr.io/linuxserver/lidarr:arm64v8-develop-3.1.6.5078-ls265"
+labels:
+  org.opencontainers.image.title: "Lidarr Develop"
+  org.opencontainers.image.description: "Gestionnaire de collection musicale (Lidarr, branche develop) pour Home Assistant"
+  org.opencontainers.image.source: "https://github.com/LeGitHubDeTai/ha_addons/tree/main/lidarr_develop"
+  org.opencontainers.image.licenses: "GPL-3.0-only"

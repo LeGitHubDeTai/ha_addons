@@ -1,0 +1,16 @@
+---
+configuration:
+  PUID:
+    name: Identifiant utilisateur (PUID)
+    description: |-
+      UID Linux utilisé pour lire/écrire vos fichiers musicaux.
+      0 (root) donne un accès total à /share et /media.
+  PGID:
+    name: Identifiant de groupe (PGID)
+    description: |-
+      GID Linux utilisé pour lire/écrire vos fichiers musicaux.
+      0 (root) donne un accès total à /share et /media.
+  TZ:
+    name: Fuseau horaire
+    description: |-
+      Fuseau horaire utilisé pour l'horodatage dans Lidarr (ex. Europe/Paris).

@@ -1,0 +1,16 @@
+---
+configuration:
+  PUID:
+    name: Benutzer-ID (PUID)
+    description: |-
+      Linux-Benutzer-ID zum Lesen/Schreiben Ihrer Musikdateien.
+      0 (root) gewährt vollen Zugriff auf /share und /media.
+  PGID:
+    name: Gruppen-ID (PGID)
+    description: |-
+      Linux-Gruppen-ID zum Lesen/Schreiben Ihrer Musikdateien.
+      0 (root) gewährt vollen Zugriff auf /share und /media.
+  TZ:
+    name: Zeitzone
+    description: |-
+      Zeitzone für Zeitstempel in Lidarr (z. B. Europe/Berlin).
