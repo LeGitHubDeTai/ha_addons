@@ -1,6 +1,7 @@
-name: Auto-upgrade lidarr
+name: Auto-upgrade lidarr (all branches)
 
-# Workflow to automatically upgrade lidarr addon when new releases are available
+# Single workflow to automatically upgrade all lidarr variants
+# (stable, develop, nightly) when new LinuxServer releases are available.
 on:
   schedule:
     # Run daily at 9:00 AM UTC
@@ -21,6 +22,30 @@ jobs:
       pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
+      ADDON_DIR: ${{ matrix.addon_dir }}
+      DISPLAY_NAME: ${{ matrix.display_name }}
+      TAG_PREFIX: ${{ matrix.tag_prefix }}
+      UPGRADE_BRANCH_PREFIX: ${{ matrix.upgrade_branch_prefix }}
+      PR_SEARCH: ${{ matrix.pr_search }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - addon_dir: lidarr
+            display_name: lidarr
+            tag_prefix: ""
+            upgrade_branch_prefix: lidarr
+            pr_search: lidarr
+          - addon_dir: lidarr_develop
+            display_name: lidarr_develop
+            tag_prefix: "develop-"
+            upgrade_branch_prefix: lidarr-develop
+            pr_search: lidarr_develop
+          - addon_dir: lidarr_nightly
+            display_name: lidarr_nightly
+            tag_prefix: "nightly-"
+            upgrade_branch_prefix: lidarr-nightly
+            pr_search: lidarr_nightly
 
     steps:
       - name: Checkout repository
@@ -31,31 +56,34 @@ jobs:
       - name: Get current versions
         id: current
         run: |
-          # Get lidarr version from build.yaml (extract version from tag like lscr.io/linuxserver/lidarr:amd64-3.1.0.4875-ls42)
-          BUILD_TAG=$(grep -E 'lscr.io/linuxserver/lidarr:' lidarr/build.yaml | head -1 | sed 's/.*://' | sed 's/[[:space:]]*//' | sed 's/"//g')
+          # Get version from build.yaml (tag looks like
+          # lscr.io/linuxserver/lidarr:amd64-3.1.0.4875-ls42 (stable) or
+          # lscr.io/linuxserver/lidarr:amd64-develop-3.1.6.5078-ls265 (develop))
+          BUILD_TAG=$(grep -E 'lscr.io/linuxserver/lidarr:' "$ADDON_DIR/build.yaml" | head -1 | sed 's/.*://' | sed 's/[[:space:]]*//' | sed 's/"//g')
           # Extract version part (3.1.0.4875 from amd64-3.1.0.4875-ls42)
           BUILD_VERSION=$(echo "$BUILD_TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
           echo "build_tag=$BUILD_TAG" >> $GITHUB_OUTPUT
           echo "build_version=$BUILD_VERSION" >> $GITHUB_OUTPUT
 
           # Get addon version from config.yaml
-          CONFIG_VERSION=$(grep -E '^version:' lidarr/config.yaml | sed 's/version: "//' | sed 's/"//')
+          CONFIG_VERSION=$(grep -E '^version:' "$ADDON_DIR/config.yaml" | sed 's/version: "//' | sed 's/"//')
           echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
 
-          echo "Current lidarr build tag: $BUILD_TAG"
-          echo "Current lidarr version: $BUILD_VERSION"
+          echo "Current $DISPLAY_NAME build tag: $BUILD_TAG"
+          echo "Current $DISPLAY_NAME version: $BUILD_VERSION"
           echo "Current addon version: $CONFIG_VERSION"
 
-      - name: Get latest lidarr release
+      - name: Get latest lidarr release for this branch
         id: latest
         run: |
           # Get all releases from linuxserver/docker-lidarr
           LATEST_RELEASE_DATA=$(curl -s "https://api.github.com/repos/linuxserver/docker-lidarr/releases")
 
-          # Extract tag names and find first valid version (X.Y.Z.W-lsNNN)
+          # Extract tag names and find first valid version for this branch
+          # (X.Y.Z.W-lsNNN for stable, develop-X.Y.Z.W-lsNNN, nightly-X.Y.Z.W-lsNNN)
           LATEST_RELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.[].tag_name' | while read -r tag; do
-            # Check if tag follows pattern X.Y.Z.W-lsNNN
-            if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-ls[0-9]+$ ]]; then
+            # Check if tag follows the pattern for this branch
+            if [[ "$tag" =~ ^${TAG_PREFIX}[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-ls[0-9]+$ ]]; then
               echo "$tag"
               break
             fi
@@ -64,8 +92,8 @@ jobs:
           # Get full release data for the found version
           RELEASE_INFO=$(echo "$LATEST_RELEASE_DATA" | jq ".[] | select(.tag_name==\"$LATEST_RELEASE\")")
 
-          # Extract release info
-          LATEST_VERSION=$(echo "$LATEST_RELEASE" | sed 's/-ls[0-9]*//')
+          # Extract release info (strip branch prefix and ls build suffix)
+          LATEST_VERSION=$(echo "$LATEST_RELEASE" | sed "s/^${TAG_PREFIX}//; s/-ls[0-9]*//")
           LATEST_BUILD=$(echo "$LATEST_RELEASE" | grep -oE 'ls[0-9]+')
           IS_PRERELEASE=$(echo "$RELEASE_INFO" | jq -r '.prerelease')
           RELEASE_URL=$(echo "$RELEASE_INFO" | jq -r '.html_url')
@@ -91,13 +119,13 @@ jobs:
       - name: Compare versions and check existing PRs
         id: compare
         run: |
-          CURRENT_LIDARR_VERSION="${{ steps.current.outputs.build_version }}"
+          CURRENT_VERSION="${{ steps.current.outputs.build_version }}"
           LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
           RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
 
           # Check if this is a new version
           IS_NEW_VERSION=false
-          if [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_LIDARR_VERSION" | sort -V | head -n1)" = "$CURRENT_LIDARR_VERSION" ] && [ "$CURRENT_LIDARR_VERSION" != "$LATEST_VERSION" ]; then
+          if [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_VERSION" | sort -V | head -n1)" = "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
             IS_NEW_VERSION=true
           fi
 
@@ -107,7 +135,7 @@ jobs:
 
           if [ "$IS_NEW_VERSION" = "false" ]; then
             # Look for existing PRs for this version
-            PR_LIST=$(gh pr list --search "lidarr $LATEST_VERSION" --json number,labels,headRefName --jq '.[]')
+            PR_LIST=$(gh pr list --search "$PR_SEARCH $LATEST_VERSION" --json number,labels,headRefName --jq '.[]')
 
             if [ -n "$PR_LIST" ]; then
               while IFS= read -r pr; do
@@ -140,7 +168,7 @@ jobs:
             echo "existing_branch=$EXISTING_BRANCH" >> $GITHUB_OUTPUT
             echo "is_new_version=$IS_NEW_VERSION" >> $GITHUB_OUTPUT
             if [ "$IS_NEW_VERSION" = "true" ]; then
-              echo "New lidarr version available: $LATEST_VERSION (current: $CURRENT_LIDARR_VERSION)"
+              echo "New $DISPLAY_NAME version available: $LATEST_VERSION (current: $CURRENT_VERSION)"
             else
               echo "Release type changed to $RELEASE_TYPE for version $LATEST_VERSION"
             fi
@@ -187,7 +215,7 @@ jobs:
             BRANCH_NAME="${{ steps.compare.outputs.existing_branch }}"
             echo "Using existing branch $BRANCH_NAME for label update"
           else
-            BRANCH_NAME="upgrade/lidarr-v${{ steps.latest.outputs.latest_version }}"
+            BRANCH_NAME="upgrade/${UPGRADE_BRANCH_PREFIX}-v${{ steps.latest.outputs.latest_version }}"
           fi
 
           # Check if branch exists on remote
@@ -206,38 +234,39 @@ jobs:
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           # Update version in config.yaml with new addon version
-          sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" lidarr/config.yaml
+          sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" "$ADDON_DIR/config.yaml"
           echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
 
       - name: Update build.yaml
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           # Update version in build.yaml (replace version part in tags, keeping arch prefix and ls suffix)
-          LIDARR_VERSION="${{ steps.latest.outputs.latest_version }}"
+          UPSTREAM_VERSION="${{ steps.latest.outputs.latest_version }}"
           LATEST_BUILD="${{ steps.latest.outputs.latest_build }}"
-          # Replace 3.1.0.4875-ls42 with new version and build number in both lines
-          sed -i "s/[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*-ls[0-9]*/${LIDARR_VERSION}-${LATEST_BUILD}/g" lidarr/build.yaml
-          echo "Updated build.yaml to ${LIDARR_VERSION}-${LATEST_BUILD}"
+          # Replace e.g. 3.1.0.4875-ls42 (stable) or develop-3.1.6.5078-ls265
+          # with the new version and build number in all arch lines
+          sed -i "s/${TAG_PREFIX}[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*-ls[0-9]*/${TAG_PREFIX}${UPSTREAM_VERSION}-${LATEST_BUILD}/g" "$ADDON_DIR/build.yaml"
+          echo "Updated build.yaml to ${TAG_PREFIX}${UPSTREAM_VERSION}-${LATEST_BUILD}"
 
       - name: Commit changes
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add lidarr/config.yaml lidarr/build.yaml
+          git add "$ADDON_DIR/config.yaml" "$ADDON_DIR/build.yaml"
           FORCE_FLAG="${{ github.event.inputs.force }}"
 
           # Check if there are changes to commit
           if git diff --cached --quiet; then
             if [ "$FORCE_FLAG" = "true" ]; then
               echo "No changes but force flag is set - creating empty commit"
-              git commit --allow-empty -m "⬆️ Upgrade lidarr to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+              git commit --allow-empty -m "⬆️ Upgrade $DISPLAY_NAME to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
             else
-              echo "No changes to commit - lidarr version is already up to date on this branch"
+              echo "No changes to commit - $DISPLAY_NAME version is already up to date on this branch"
               exit 0
             fi
           else
-            git commit -m "⬆️ Upgrade lidarr to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+            git commit -m "⬆️ Upgrade $DISPLAY_NAME to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
           fi
 
       - name: Push branch
@@ -312,7 +341,7 @@ jobs:
             # Update title if needed (only for new versions)
             if [ "$IS_NEW_VERSION" = "true" ]; then
               CURRENT_TITLE=$(gh pr view "$OPEN_PR" --json title --jq '.title')
-              NEW_TITLE="⬆️ Upgrade lidarr to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
+              NEW_TITLE="⬆️ Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
               if [ "$CURRENT_TITLE" != "$NEW_TITLE" ]; then
                 gh pr edit "$OPEN_PR" --title "$NEW_TITLE"
                 echo "Updated PR title to: $NEW_TITLE"
@@ -326,12 +355,12 @@ jobs:
             gh pr create \
               --base main \
               --head "$BRANCH_NAME" \
-              --title "⬆️ Upgrade lidarr to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
-              --body "Auto-upgrade lidarr to version $LATEST_VERSION
+              --title "⬆️ Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade $DISPLAY_NAME to version $LATEST_VERSION
 
             **Changes:**
             - Updated config.yaml addon version to $NEW_ADDON_VERSION
-            - Updated build.yaml to use linuxserver/lidarr:${LATEST_VERSION}-${LATEST_BUILD}
+            - Updated build.yaml to use linuxserver/lidarr:${TAG_PREFIX}${LATEST_VERSION}-${LATEST_BUILD}
 
             **Release:** ${{ steps.latest.outputs.release_url }}
 
@@ -346,12 +375,12 @@ jobs:
             gh pr create \
               --base main \
               --head "$BRANCH_NAME" \
-              --title "⬆️ Upgrade lidarr to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
-              --body "Auto-upgrade lidarr to version $LATEST_VERSION
+              --title "⬆️ Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade $DISPLAY_NAME to version $LATEST_VERSION
 
             **Changes:**
             - Updated config.yaml addon version to $NEW_ADDON_VERSION
-            - Updated build.yaml to use linuxserver/lidarr:${LATEST_VERSION}-${LATEST_BUILD}
+            - Updated build.yaml to use linuxserver/lidarr:${TAG_PREFIX}${LATEST_VERSION}-${LATEST_BUILD}
 
             **Release:** ${{ steps.latest.outputs.release_url }}
 
