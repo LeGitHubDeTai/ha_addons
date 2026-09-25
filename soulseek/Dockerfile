@@ -1,7 +1,9 @@
 ARG BUILD_FROM
+FROM ${BUILD_FROM}
+
+# Les ARG déclarés avant FROM doivent être re-déclarés après pour rester en portée
 ARG BUILD_VERSION
 ARG BUILD_ARCH
-FROM ${BUILD_FROM}
 
 LABEL \
     io.hass.version="${BUILD_VERSION}" \
