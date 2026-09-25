@@ -4,12 +4,11 @@
 
 This add-on provides a self-hosted **[Lidarr](https://lidarr.audio/)** instance
 (music collection manager for Usenet and BitTorrent users), based on the official
-**[LinuxServer.io image](https://docs.linuxserver.io/images/docker-lidarr/)**
-and integrated with Home Assistant via Ingress.
+**[LinuxServer.io image](https://docs.linuxserver.io/images/docker-lidarr/)**.
 
-Use it to manage your music library: monitor artists, grab releases automatically
-via indexers (Prowlarr, …) and download clients (SABnzbd, NZBGet, qBittorrent,
-Transmission, …), organize files and fetch metadata.
+The Lidarr web UI is exposed **directly** on port `8686` (no Home Assistant
+Ingress): this allows indexers (Prowlarr, …) and download clients (SABnzbd,
+NZBGet, qBittorrent, Transmission, …) to reach it.
 
 ## Requirements
 
@@ -39,7 +38,8 @@ TZ: Europe/Paris
 
 ## How to use
 
-1. Start the add-on and open it (sidebar via Ingress, or port `8686` if exposed).
+1. Start the add-on and open it via the **Open Web UI** button
+   (`http://[IP_DE_HOME_ASSISTANT]:8686`).
 2. Go through the Lidarr setup wizard if shown.
 3. Add a **Root Folder** under Settings → Media Management, e.g. `/share/music`
    or `/media/music`.
@@ -57,19 +57,23 @@ TZ: Europe/Paris
   Updates): with Docker-based installs, updates are delivered through new
   add-on versions. Automatic in-app updates are disabled by the LinuxServer image.
 
-## Ingress
+## Access (no Ingress)
 
-Lidarr is accessible through Home Assistant's Ingress feature. The
-`ingress_port` is set to `8686`.
+This add-on intentionally does **not** use Home Assistant Ingress. The web UI is
+always exposed directly on the local network:
 
-If Ingress ever renders a blank page, expose port `8686` (Configuration tab →
-Network) and use the direct URL below.
+```
+http://[IP_DE_HOME_ASSISTANT]:8686
+```
+
+The host port can be changed in the add-on's **Network** settings. Direct access
+is required so Prowlarr and download clients can communicate with Lidarr.
 
 ## Port mapping
 
-If you need to expose Lidarr directly (required for other *arr apps or download
-clients running outside Home Assistant), map port `8686/tcp`. Home Assistant
-Ingress remains recommended for browser access.
+Port `8686/tcp` (container) is mapped to host port `8686` by default. The
+Develop and Nightly variants default to host ports `8687` and `8688` so all
+three can run side by side.
 
 ## Available directories
 

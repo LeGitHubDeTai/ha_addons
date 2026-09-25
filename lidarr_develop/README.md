@@ -1,6 +1,6 @@
 # 🧪 Home Assistant Add-on — Lidarr Develop
 
-Accédez à **Lidarr (branche `develop`)** directement depuis Home Assistant, via une interface Web intégrée (Ingress ou HTTP classique).
+Accédez à **Lidarr (branche `develop`)** directement depuis votre réseau local, via son interface Web exposée sur le port `8687`.
 
 Basé sur l'image **LinuxServer.io Lidarr (`develop`)**, cet add-on suit les pré-versions de Lidarr : nouveautés en avant-première, mais stabilité non garantie.
 
@@ -13,7 +13,7 @@ Basé sur l'image **LinuxServer.io Lidarr (`develop`)**, cet add-on suit les pr�
 * Toutes les fonctionnalités de [**Lidarr**](../lidarr/), en version de développement
 * Mises à jour fréquentes (nouvelles fonctionnalités et correctifs en avant-première)
 * Configuration **isolée** de la version stable (stockage privé `lidarr_develop`)
-* Accessible via **Ingress**
+* Interface Web exposée directement sur le port `8687` (pas d'Ingress)
 * Compatible **amd64** et **arm64**
 
 ---
@@ -29,7 +29,7 @@ https://github.com/LeGitHubDeTai/ha_addons
 
 3. Installer l'add-on **Lidarr Develop**
 4. Démarrer
-5. Accéder à Lidarr via **Ingress** (panneau latéral)
+5. Accéder à Lidarr via le bouton **Ouvrir l'interface Web** (port `8687`)
 
 ---
 
@@ -59,23 +59,18 @@ et [**Lidarr Nightly**](../lidarr_nightly/) :
 * chaque variante possède sa **propre configuration** (`/config` isolé) ;
 * utilisez des **dossiers racine distincts** (ex. `/share/music-develop`) pour éviter
   que deux variantes ne réorganisent la même médiathèque ;
-* **un seul add-on à la fois** peut exposer le port `8686` de l'hôte (conflit de port),
-  l'accès via Ingress reste toujours disponible pour les trois.
+* chaque variante expose par défaut un port hôte différent (`8686` stable,
+  `8687` develop, `8688` nightly) — modifiable dans l'onglet **Réseau**.
 
 ---
 
 ## 🌐 Accès à l'interface
 
-### ✔️ Via Ingress (recommandé)
-
-➡️ Automatique, pas de ports à ouvrir.
-
-### ✔️ Via HTTP direct
-
-Exposez le port `8686` dans l'onglet **Réseau** de l'add-on :
+L'add-on n'utilise **pas** l'Ingress de Home Assistant : l'interface Web est
+exposée directement sur le port hôte `8687` (modifiable dans l'onglet **Réseau**).
 
 ```
-http://[IP_DE_HOME_ASSISTANT]:8686
+http://[IP_DE_HOME_ASSISTANT]:8687
 ```
 
 ---

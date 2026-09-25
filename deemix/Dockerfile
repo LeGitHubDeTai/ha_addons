@@ -58,6 +58,13 @@ RUN node --version
 # La CLI est aussi disponible : node /app/packages/cli/dist/main.cjs
 COPY --from=upstream /app /app
 
+# Patch Ingress HA : le client construit des URLs absolues depuis
+# location.origin/host (hors préfixe /api/hassio_ingress/<token>/) et le CSS
+# utilise des url(/fonts/...) absolus. Le script échoue si l'upstream change.
+COPY patch-frontend.py /tmp/patch-frontend.py
+RUN python3 /tmp/patch-frontend.py /app/packages/webui/dist/public \
+    && rm /tmp/patch-frontend.py
+
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY supervisord.conf /etc/supervisord.conf
 COPY deemix-entrypoint.sh /app/deemix-entrypoint.sh

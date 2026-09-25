@@ -14,8 +14,7 @@ init: false
 apparmor: true
 panel_icon: "mdi:weather-night"
 panel_title: Lidarr Nightly
-ingress: true
-ingress_port: 8686
+ingress: false
 backup_exclude:
     - "logs/*"
     - "MediaCover/*"
@@ -39,9 +38,9 @@ environment:
     PGID: "0"
     TZ: Europe/Paris
 ports:
-    8686/tcp: null
+    8686/tcp: 8688
 ports_description:
-    8686/tcp: "Interface web Lidarr. Normalement non exposée, Home Assistant Ingress est recommandé. Exposez ce port pour un accès direct (par ex. intégration avec Prowlarr ou vos clients de téléchargement). Attention : un seul add-on Lidarr à la fois peut exposer le port 8686 de l'hôte."
+    8686/tcp: "Interface web Lidarr, exposée directement sur le réseau local (port hôte 8688 par défaut pour coexister avec les autres variantes)."
 options:
     PUID: 0
     PGID: 0

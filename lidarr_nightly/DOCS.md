@@ -3,8 +3,10 @@
 ## Overview
 
 This add-on provides a **[Lidarr](https://lidarr.audio/) `nightly` branch** instance
-(daily development builds), based on the **[LinuxServer.io `nightly` image](https://docs.linuxserver.io/images/docker-lidarr/)**
-and integrated with Home Assistant via Ingress.
+(daily development builds), based on the **[LinuxServer.io `nightly` image](https://docs.linuxserver.io/images/docker-lidarr/)**.
+
+The web UI is exposed **directly** on host port `8688` (no Home Assistant
+Ingress), so indexers and download clients can reach it.
 
 It tracks the freshest — and least stable — Lidarr code, rebuilt almost daily.
 For daily use, install the stable [**Lidarr**](../lidarr/) add-on (or
@@ -36,7 +38,8 @@ TZ: Europe/Paris
 
 ## How to use
 
-1. Start the add-on and open it (sidebar via Ingress, or port `8686` if exposed).
+1. Start the add-on and open it via the **Open Web UI** button
+   (`http://[IP_DE_HOME_ASSISTANT]:8688`).
 2. Add a **Root Folder** under Settings → Media Management. If you run another
    variant side by side, use a **separate** folder (e.g. `/share/music-nightly`).
 3. Add an **indexer** and a **download client** (completed folder e.g.
@@ -57,18 +60,23 @@ TZ: Europe/Paris
 
 - separate configurations (no shared database);
 - use distinct music root folders per variant;
-- only **one** variant at a time may expose host port `8686` (Ingress always works).
+- distinct default host ports (`8686` stable, `8687` develop, `8688` nightly),
+  changeable in each add-on's **Network** settings.
 
-## Ingress
+## Access (no Ingress)
 
-Lidarr Nightly is accessible through Home Assistant's Ingress feature. The
-`ingress_port` is set to `8686`.
+This add-on intentionally does **not** use Home Assistant Ingress. The web UI is
+always exposed directly on the local network:
+
+```
+http://[IP_DE_HOME_ASSISTANT]:8688
+```
 
 ## Port mapping
 
-Map port `8686/tcp` for direct access (required for other *arr apps or download
-clients running outside Home Assistant). Home Assistant Ingress remains
-recommended for browser access.
+Port `8686/tcp` (container) is mapped to host port `8688` by default so this
+variant can run side by side with the stable (`8686`) and develop (`8687`)
+variants.
 
 ## Available directories
 

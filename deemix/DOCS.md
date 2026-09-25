@@ -54,6 +54,17 @@ env_vars_list: []
 |---|---|
 | `6595/tcp` | Interface web Deemix (Ingress recommandé, exposition optionnelle) |
 
+### Ingress (barre latérale HA)
+
+L'interface est accessible via le bouton *Ouvrir l'interface* (Ingress) :
+le frontend est patché au build pour rester sous le préfixe
+`/api/hassio_ingress/<token>/` (API, WebSocket temps réel, navigation,
+polices et images), et nginx réécrit les chemins absolus restants.
+L'accès direct `http://<homeassistant>:6595` fonctionne aussi (même image).
+
+> Les erreurs `custom-sidebar-json.js` visibles dans la console du navigateur
+> viennent de votre personnalisation du menu HA, pas de cet add-on.
+
 ### Intégration CLI (avancé)
 
 La CLI `deemix` est embarquée dans l'image (`node /app/packages/cli/dist/main.cjs`)

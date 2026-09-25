@@ -14,8 +14,7 @@ init: false
 apparmor: true
 panel_icon: "mdi:music"
 panel_title: Lidarr
-ingress: true
-ingress_port: 8686
+ingress: false
 backup_exclude:
     - "logs/*"
     - "MediaCover/*"
@@ -39,9 +38,9 @@ environment:
     PGID: "0"
     TZ: Europe/Paris
 ports:
-    8686/tcp: null
+    8686/tcp: 8686
 ports_description:
-    8686/tcp: Interface web Lidarr. Normalement non exposée, Home Assistant Ingress est recommandé. Exposez ce port pour un accès direct (par ex. intégration avec Prowlarr ou vos clients de téléchargement).
+    8686/tcp: Interface web Lidarr, exposée directement sur le réseau local.
 options:
     PUID: 0
     PGID: 0

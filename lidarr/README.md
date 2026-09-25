@@ -1,6 +1,6 @@
 # 🎵 Home Assistant Add-on — Lidarr
 
-Accédez à **Lidarr** directement depuis Home Assistant, via une interface Web intégrée (Ingress ou HTTP classique).
+Accédez à **Lidarr** directement depuis votre réseau local, via son interface Web exposée sur le port `8686`.
 
 Basé sur l'image officielle **LinuxServer.io Lidarr**, cet add-on fournit un gestionnaire de collection musicale pour Usenet et BitTorrent, persistant et géré directement par Home Assistant.
 
@@ -10,7 +10,7 @@ Basé sur l'image officielle **LinuxServer.io Lidarr**, cet add-on fournit un ge
 
 * Gestion automatique de votre médiathèque musicale (artistes, albums, qualité, métadonnées)
 * Intégration avec Prowlarr, SABnzbd, NZBGet, qBittorrent, Transmission…
-* Accessible via **Ingress** (panneau latéral Home Assistant)
+* Interface Web exposée directement sur le port `8686` (pas d'Ingress)
 * Configuration persistante dans `/config` (stockage privé de l'add-on)
 * Compatible **amd64** et **arm64**
 * Fuseau horaire, PUID et PGID configurables depuis l'UI
@@ -29,7 +29,7 @@ https://github.com/LeGitHubDeTai/ha_addons
 
 3. Installer l'add-on **Lidarr**
 4. Démarrer
-5. Accéder à Lidarr via **Ingress** (panneau latéral)
+5. Accéder à Lidarr via le bouton **Ouvrir l'interface Web** (port `8686`)
 
 ---
 
@@ -56,20 +56,15 @@ TZ: Europe/Paris
 
 ## 🌐 Accès à l'interface
 
-### ✔️ Via Ingress (recommandé)
-
-➡️ Automatique
-➡️ Affiché directement dans Home Assistant
-➡️ Pas de ports à ouvrir
-
-### ✔️ Via HTTP direct
-
-Si vous souhaitez un accès direct (ou pour connecter Prowlarr / un client de
-téléchargement), exposez le port `8686` dans l'onglet **Réseau** de l'add-on :
+L'add-on n'utilise **pas** l'Ingress de Home Assistant : l'interface Web de Lidarr
+est exposée directement sur le port `8686` (modifiable dans l'onglet **Réseau**).
 
 ```
 http://[IP_DE_HOME_ASSISTANT]:8686
 ```
+
+Ce mode d'accès direct est requis pour connecter Prowlarr et vos clients de
+téléchargement.
 
 ---
 
@@ -106,7 +101,9 @@ Les données persistent après mise à jour ou redémarrage.
 * [**Lidarr Nightly**](../lidarr_nightly/) — builds quotidiens, les plus instables
 
 Les trois variantes peuvent coexister (configurations isolées) : utilisez des dossiers
-racine distincts et n'exposez le port `8686` que sur une seule à la fois.
+racine distincts. Chaque variante expose par défaut un port hôte différent
+(`8686`, `8687` pour Develop, `8688` pour Nightly) — modifiable dans l'onglet
+**Réseau** de chaque add-on.
 
 ---
 
