@@ -1,0 +1,8 @@
+build_from:
+  amd64: "lscr.io/linuxserver/lidarr:amd64-3.1.0.4875-ls42"
+  aarch64: "lscr.io/linuxserver/lidarr:arm64v8-3.1.0.4875-ls42"
+labels:
+  org.opencontainers.image.title: "Lidarr"
+  org.opencontainers.image.description: "Gestionnaire de collection musicale (Lidarr) pour Home Assistant"
+  org.opencontainers.image.source: "https://github.com/LeGitHubDeTai/ha_addons/tree/main/lidarr"
+  org.opencontainers.image.licenses: "GPL-3.0-only"

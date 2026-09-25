@@ -1,0 +1,52 @@
+name: Lidarr
+version: "26.9.1"
+slug: lidarr
+description: Gestionnaire de collection musicale pour Usenet et BitTorrent (Lidarr)
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/lidarr
+webui: http://[HOST]:[PORT:8686]/
+image: ghcr.io/legithubdetai/ha_addons/lidarr-{arch}
+arch:
+    - amd64
+    - aarch64
+startup: application
+boot: auto
+init: false
+apparmor: true
+panel_icon: "mdi:music"
+panel_title: Lidarr
+ingress: true
+ingress_port: 8686
+backup_exclude:
+    - "logs/*"
+    - "MediaCover/*"
+    - "*.db-shm"
+    - "*.db-wal"
+map:
+    - type: addon_config
+      read_only: false
+      path: /config
+    - type: share
+      read_only: false
+      path: /share
+    - type: media
+      read_only: false
+      path: /media
+    - type: backup
+      read_only: false
+      path: /backup
+environment:
+    PUID: "0"
+    PGID: "0"
+    TZ: Europe/Paris
+ports:
+    8686/tcp: null
+ports_description:
+    8686/tcp: Interface web Lidarr. Normalement non exposée, Home Assistant Ingress est recommandé. Exposez ce port pour un accès direct (par ex. intégration avec Prowlarr ou vos clients de téléchargement).
+options:
+    PUID: 0
+    PGID: 0
+    TZ: Europe/Paris
+schema:
+    PUID: int
+    PGID: int
+    TZ: str

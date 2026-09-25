@@ -33,11 +33,14 @@
 | [**Dolibarr**](./dolibarr/) | Système ERP/CRM | 8080 |
 | [**Obsidian**](./obsidian/) | Gestion de notes et connaissances | 3000 |
 | [**Mopidy**](./mopidy/) | Serveur musical avec support Spotify/Bandcamp | 6680 |
+| [**Lidarr**](./lidarr/) | Gestionnaire de collection musicale (Usenet/BitTorrent) | 8686 |
 | [**ISOMan**](./isoman/) | Gestionnaire d'ISOs Linux | 50145 |
 | [**Penpot**](./penpot/) | Design & prototypage open-source | 9001 |
 | [**Storybook**](./storybook/) | Atelier UI pour développer des composants en isolation | 6006 |
 | [**WebDAV**](./webdav/) | Serveur WebDAV (partage fichiers, sauvegardes) | 6065 |
 | [**Requestly**](./requestly/) | Intercepteur HTTP, mocks d'API et débogage réseau | 3000 |
+| [**Deemix**](./deemix/) | Téléchargeur de musique Deezer (MP3/FLAC) avec interface web | 6595 |
+| [**Soulseek**](./soulseek/) | Client Soulseek P2P (slskd) avec interface web | 5030 |
 
 ---
 
