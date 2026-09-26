@@ -1,0 +1,46 @@
+name: YouTube-DLP
+version: "26.9.1"
+slug: youtube-dlp
+panel_icon: "mdi:youtube"
+description: Téléchargeur de vidéos YouTube et autres sites (yt-dlp) avec interface web
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/youtube-dlp
+webui: http://[HOST]:[PORT:5000]/
+image: ghcr.io/legithubdetai/ha_addons/youtube-dlp-{arch}
+arch:
+    - amd64
+    - aarch64
+startup: application
+boot: auto
+hassio_role: "default"
+hassio_api: true
+homeassistant_api: true
+apparmor: true
+ingress: true
+ingress_port: 5000
+ingress_stream: true
+backup_exclude:
+    - "youtube-dlp/.yt-dlp"
+map:
+    - ssl:ro
+    - backup:rw
+    - share:rw
+    - media:rw
+    - config:rw
+ports:
+    5000/tcp: 5000
+ports_description:
+    5000/tcp: Interface web YouTube-DLP. Ingress recommandé, exposition optionnelle.
+options:
+    timezone: "Europe/Berlin"
+    download_folder: /media/youtube-dlp
+    config_folder: /share/youtube-dlp
+    max_parallel: 3
+    env_vars_list: []
+schema:
+    timezone: str
+    download_folder: match(/share/.+|/media/.+|(smb|nfs)://.+)
+    config_folder: match(/share/.+|/media/.+|(smb|nfs)://.+)
+    max_parallel: int
+    env_vars_list: [
+      "match(^[A-Z_0-9]+: .*$)"
+    ]

@@ -1,0 +1,18 @@
+configuration:
+  timezone:
+    name: Fuseau horaire
+    description: Définit le fuseau horaire du conteneur.
+  download_folder:
+    name: Dossier de téléchargement
+    description: Dossier où les vidéos téléchargées sont stockées (ex. /media/youtube-dlp).
+  config_folder:
+    name: Dossier de configuration
+    description: Dossier pour la configuration yt-dlp (ex. /share/youtube-dlp).
+  max_parallel:
+    name: Téléchargements parallèles max
+    description: Nombre maximum de téléchargements simultanés.
+  env_vars_list:
+    name: Variables d'environnement supplémentaires
+    description: 'Variables d''environnement libres au format "CLE: valeur".'
+network:
+  5000/tcp: Interface web YouTube-DLP (Ingress recommandé)

@@ -1,0 +1,18 @@
+configuration:
+  timezone:
+    name: Timezone
+    description: Set the timezone for the container.
+  download_folder:
+    name: Download folder
+    description: Folder where downloaded videos are stored (e.g. /media/youtube-dlp).
+  config_folder:
+    name: Configuration folder
+    description: Folder for yt-dlp configuration and settings (e.g. /share/youtube-dlp).
+  max_parallel:
+    name: Max parallel downloads
+    description: Maximum number of simultaneous downloads.
+  env_vars_list:
+    name: Extra environment variables
+    description: 'Free environment variables as "KEY: value".'
+network:
+  5000/tcp: YouTube-DLP web interface (Ingress recommended)
