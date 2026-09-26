@@ -1,7 +1,7 @@
 name: NZBGet
 version: "26.9.1"
 slug: nzbget
-description: Client de t�l�chargement Usenet (NZBGet) - Client NZB bas� sur le web avec une interface de contr�le distante
+description: Client de téléchargement Usenet (NZBGet) - Client NZB basé sur le web avec une interface de contrôle distante
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/nzbget
 webui: http://[HOST]:[PORT:6789]/
 image: ghcr.io/legithubdetai/ha_addons/nzbget-{arch}
@@ -22,7 +22,7 @@ ports:
     6790/tcp: null
 ports_description:
     6789/tcp: Interface web NZBGet (XML-RPC et HTTP)
-    6790/tcp: Port d'�coute NZBGet (connexions entrantes). Exposez-le pour de meilleures vitesses.
+    6790/tcp: Port d'écoute NZBGet (connexions entrantes). Exposez-le pour de meilleures vitesses.
 map:
     - type: addon_config
       read_only: false

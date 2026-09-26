@@ -3,14 +3,14 @@ configuration:
   PUID:
     name: Identifiant utilisateur (PUID)
     description: |-
-      UID Linux utilis� pour lire/�crire vos fichiers.
-      0 (root) donne un acc�s total � /share et /media.
+      UID Linux utilisé pour lire/écrire vos fichiers.
+      0 (root) donne un accès total à /share et /media.
   PGID:
     name: Identifiant de groupe (PGID)
     description: |-
-      GID Linux utilis� pour lire/�crire vos fichiers.
-      0 (root) donne un acc�s total � /share et /media.
+      GID Linux utilisé pour lire/écrire vos fichiers.
+      0 (root) donne un accès total à /share et /media.
   TZ:
     name: Fuseau horaire
     description: |-
-      Fuseau horaire utilis� pour l'horodatage dans NZBGet (ex. Europe/Paris).
+      Fuseau horaire utilisé pour l'horodatage dans NZBGet (ex. Europe/Paris).

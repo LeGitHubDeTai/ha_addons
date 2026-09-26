@@ -1,4 +1,4 @@
-# NZBGet — bas� sur l'image officielle LinuxServer.io
+# NZBGet — basé sur l'image officielle LinuxServer.io
 # https://docs.linuxserver.io/images/docker-nzbget/
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
@@ -11,13 +11,13 @@ LABEL \
   io.hass.type="addon" \
   io.hass.arch="${BUILD_ARCH}" \
   org.opencontainers.image.title="NZBGet" \
-  org.opencontainers.image.description="Client de t�l�chargement Usenet (NZBGet) pour Home Assistant" \
+  org.opencontainers.image.description="Client de téléchargement Usenet (NZBGet) pour Home Assistant" \
   org.opencontainers.image.source="https://github.com/LeGitHubDeTai/ha_addons/tree/main/nzbget" \
   org.opencontainers.image.licenses="GPL-2.0-or-later"
 
 USER root
 
-# Outils n�cessaires : bash + jq pour lire les options HA (bashio),
+# Outils nécessaires : bash + jq pour lire les options HA (bashio),
 # tzdata pour la gestion du fuseau horaire.
 RUN apk add --no-cache \
     bash \

@@ -33,8 +33,8 @@ jobs:
         run: |
           # Get nzbget version from build.yaml
           BUILD_TAG=$(grep -E 'linuxserver/nzbget:' nzbget/build.yaml | head -1 | sed 's/.*://' | sed 's/[[:space:]]*//' | sed 's/"//g')
-          # Extract version part (24.0 from amd64-24.0-ls42)
-          BUILD_VERSION=$(echo "$BUILD_TAG" | grep -oE '[0-9]+\.[0-9]+' | head -1)
+          # Extract version part (v26.3 from amd64-v26.3-ls265)
+          BUILD_VERSION=$(echo "$BUILD_TAG" | grep -oE 'v[0-9]+\.[0-9]+' | head -1)
           echo "build_tag=$BUILD_TAG" >> $GITHUB_OUTPUT
           echo "build_version=$BUILD_VERSION" >> $GITHUB_OUTPUT
 
@@ -53,9 +53,9 @@ jobs:
           LATEST_RELEASE_DATA=$(curl -s "https://api.github.com/repos/linuxserver/docker-nzbget/releases")
 
           # Extract tag names and find first valid version for stable branch
-          # Pattern: X.Y-lsNNN
+          # Pattern: vX.Y-lsNNN (e.g. v26.3-ls265)
           LATEST_RELEASE=$(echo "$LATEST_RELEASE_DATA" | jq -r '.[].tag_name' | while read -r tag; do
-            if [[ "$tag" =~ ^[0-9]+\.[0-9]+-ls[0-9]+$ ]]; then
+            if [[ "$tag" =~ ^v[0-9]+\.[0-9]+-ls[0-9]+$ ]]; then
               echo "$tag"
               break
             fi
@@ -96,9 +96,11 @@ jobs:
 
           if [ "$IS_NEW_VERSION" = "true" ]; then
             echo "needs_upgrade=true" >> $GITHUB_OUTPUT
+            echo "is_new_version=true" >> $GITHUB_OUTPUT
             echo "New NZBGet version available: $LATEST_VERSION (current: $CURRENT_VERSION)"
           else
             echo "needs_upgrade=false" >> $GITHUB_OUTPUT
+            echo "is_new_version=false" >> $GITHUB_OUTPUT
             echo "Already up-to-date"
           fi
 
@@ -129,7 +131,7 @@ jobs:
         id: branch
         if: steps.compare.outputs.needs_upgrade == 'true'
         run: |
-          BRANCH_NAME="upgrade/nzbget-v${{ steps.latest.outputs.latest_version }}"
+          BRANCH_NAME="upgrade/nzbget-${{ steps.latest.outputs.latest_version }}"
 
           if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
             git fetch origin "$BRANCH_NAME"
@@ -151,8 +153,9 @@ jobs:
         run: |
           UPSTREAM_VERSION="${{ steps.latest.outputs.latest_version }}"
           LATEST_BUILD="${{ steps.latest.outputs.latest_build }}"
-          sed -i "s/nzbget:.*-[0-9.]*-ls[0-9]*/nzbget:${UPSTREAM_VERSION}-${LATEST_BUILD}/g" nzbget/build.yaml
-          echo "Updated build.yaml to nzbget:${UPSTREAM_VERSION}-${LATEST_BUILD}"
+          # Preserve arch prefixes (amd64- / arm64v8-), only replace version+build
+          sed -i -E "s/(amd64-|arm64v8-)v[0-9.]+-ls[0-9]+/\1${UPSTREAM_VERSION}-${LATEST_BUILD}/g" nzbget/build.yaml
+          echo "Updated build.yaml to ${UPSTREAM_VERSION}-${LATEST_BUILD}"
 
       - name: Commit changes
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
@@ -198,6 +201,7 @@ jobs:
         if: steps.compare.outputs.needs_upgrade == 'true'
         run: |
           LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
+          LATEST_BUILD="${{ steps.latest.outputs.latest_build }}"
           NEW_ADDON_VERSION="${{ steps.addon_version.outputs.new_addon_version }}"
           RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
@@ -222,7 +226,7 @@ jobs:
 
             **Changes:**
             - Updated config.yaml addon version to $NEW_ADDON_VERSION
-            - Updated build.yaml to use linuxserver/nzbget:${LATEST_VERSION}-${LATEST_BUILD}
+            - Updated build.yaml to use lscr.io/linuxserver/nzbget:{amd64,arm64v8}-${LATEST_VERSION}-${LATEST_BUILD}
 
             **Release:** ${{ steps.latest.outputs.release_url }}
 
