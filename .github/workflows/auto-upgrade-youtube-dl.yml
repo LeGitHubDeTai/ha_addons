@@ -1,0 +1,145 @@
+name: Auto-upgrade youtube-dl
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force recreate PR even if one already exists'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  auto-upgrade:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current versions
+        id: current
+        run: |
+          CONFIG_VERSION=$(grep -E '^version:' youtube-dl/config.yaml | sed 's/version: "//' | sed 's/"//')
+          echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
+          echo "Current addon version: $CONFIG_VERSION"
+
+      - name: Get latest yt-dlp version
+        id: latest
+        run: |
+          TAG=$(curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest" | grep -o 'yt-dlp-[^"]*' | head -1 | sed 's/yt-dlp-//')
+          if [ -z "$TAG" ]; then
+            TAG=$(curl -fsSL "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest" | jq -r '.tag_name')
+          fi
+          LATEST_VERSION="${TAG#v}"
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "Latest yt-dlp version: $LATEST_VERSION"
+
+      - name: Compare versions and check existing PRs
+        id: compare
+        run: |
+          CURRENT_VERSION="${{ steps.current.outputs.config_version }}"
+          LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
+
+          IS_NEW_VERSION=false
+          if [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_VERSION" | sort -V | head -n1)" = "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            IS_NEW_VERSION=true
+          fi
+
+          if [ "$IS_NEW_VERSION" = "true" ]; then
+            echo "needs_upgrade=true" >> $GITHUB_OUTPUT
+            echo "New youtube-dlp version available: $LATEST_VERSION (current: $CURRENT_VERSION)"
+          else
+            echo "needs_upgrade=false" >> $GITHUB_OUTPUT
+            echo "Already up-to-date"
+          fi
+
+      - name: Generate new addon version
+        id: addon_version
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          CURRENT_YEAR=$(date +%y)
+          CURRENT_MONTH=$(date +%m)
+          CURRENT_MONTH=${CURRENT_MONTH#0}
+          CURRENT_ADDON_VERSION="${{ steps.current.outputs.config_version }}"
+          CURRENT_PATCH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f3)
+          CURRENT_YEAR_MONTH=$(echo $CURRENT_ADDON_VERSION | cut -d. -f1,2)
+          NEW_YEAR_MONTH="$CURRENT_YEAR.$CURRENT_MONTH"
+          if [ "$CURRENT_YEAR_MONTH" = "$NEW_YEAR_MONTH" ]; then
+            NEW_PATCH=$((CURRENT_PATCH + 1))
+          else
+            NEW_PATCH=1
+          fi
+          NEW_ADDON_VERSION="$NEW_YEAR_MONTH.$NEW_PATCH"
+          echo "new_addon_version=$NEW_ADDON_VERSION" >> $GITHUB_OUTPUT
+          echo "New addon version: $NEW_ADDON_VERSION"
+
+      - name: Create or checkout upgrade branch
+        id: branch
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          BRANCH_NAME="upgrade/youtube-dl-v${{ steps.latest.outputs.latest_version }}"
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            git fetch origin "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME" origin/"$BRANCH_NAME"
+          else
+            git checkout -b "$BRANCH_NAME"
+          fi
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Update config.yaml
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
+        run: |
+          sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" youtube-dl/config.yaml
+          echo "Updated config.yaml version"
+
+      - name: Commit changes
+        if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add youtube-dl/config.yaml
+          if git diff --cached --quiet; then
+            if [ "${{ github.event.inputs.force }}" = "true" ]; then
+              git commit --allow-empty -m "⬆️ Upgrade youtube-dl to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+            else
+              exit 0
+            fi
+          else
+            git commit -m "⬆️ Upgrade youtube-dl to ${{ steps.latest.outputs.latest_version }} (addon ${{ steps.addon_version.outputs.new_addon_version }})"
+          fi
+          git push origin "$BRANCH_NAME"
+
+      - name: Setup GitHub CLI
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        uses: wusatosi/setup-gh@v1
+
+      - name: Create or Update Pull Request
+        if: steps.compare.outputs.needs_upgrade == 'true'
+        run: |
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
+          NEW_ADDON_VERSION="${{ steps.addon_version.outputs.new_addon_version }}"
+          IS_NEW_VERSION="${{ steps.compare.outputs.is_new_version }}"
+          OPEN_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$OPEN_PR" ]; then
+            gh pr edit "$OPEN_PR" --add-label "auto-upgrade,dependencies,latest"
+            echo "PR updated"
+          elif [ "$IS_NEW_VERSION" = "true" ]; then
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "⬆️ Upgrade youtube-dl to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
+              --body "Auto-upgrade youtube-dlp to version $LATEST_VERSION" \
+              --label "auto-upgrade,dependencies,latest"
+            echo "PR created"
+          fi

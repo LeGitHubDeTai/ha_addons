@@ -43,6 +43,7 @@
 | [**Requestly**](./requestly/) | Intercepteur HTTP, mocks d'API et débogage réseau | 3000 |
 | [**Deemix**](./deemix/) | Téléchargeur de musique Deezer (MP3/FLAC) avec interface web | 6595 |
 | [**Soulseek**](./soulseek/) | Client Soulseek P2P (slskd) avec interface web | 5030 |
+| [**YouTube-DL**](./youtube-dl/) | Téléchargeur de vidéos YouTube et autres sites (yt-dlp) | 5000 |
 
 ---
 
