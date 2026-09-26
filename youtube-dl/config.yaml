@@ -1,5 +1,5 @@
 name: YouTube-DL
-version: "26.9.2"
+version: "26.9.3"
 slug: youtube-dl
 panel_icon: "mdi:youtube"
 description: Téléchargeur de vidéos YouTube et autres sites (yt-dlp) avec interface web
