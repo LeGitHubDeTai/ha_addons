@@ -3,7 +3,7 @@ version: "26.9.14"
 slug: mindwtr
 panel_title: Mindwtr
 panel_icon: "mdi:brain"
-description: Mind mapping and task management. Choose a sync mode, the rest is automatic.
+description: Self-hosted mind mapping and task management with cloud sync and REST API
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/mindwtr
 webui: http://[HOST]:[PORT:8080]/
 image: ghcr.io/legithubdetai/ha_addons/mindwtr-{arch}
@@ -19,7 +19,7 @@ apparmor: true
 ingress: true
 ingress_port: 8080
 backup_exclude:
-    - "*.log*"
+    - "mindwtr/.data"
     - "supervisord.log*"
 map:
     - config:rw
@@ -28,13 +28,25 @@ ports:
     8787/tcp: null
     8080/tcp: 8080
 ports_description:
-    8787/tcp: Mindwtr Cloud sync server API (only used in "selfhosted" sync mode)
+    8787/tcp: Mindwtr Cloud sync server API (normally not exposed, as Home Assistant Ingress is more secure and is recommended)
     8080/tcp: Mindwtr web interface
 options:
-    sync_mode: local
-    cloud_tokens: ""
-    cors_origin: ""
+    timezone: "Europe/Paris"
+    mindwtr_cloud_auth_tokens: ""
+    mindwtr_cloud_cors_origin: ""
+    mindwtr_cloud_max_body_bytes: 2000000
+    mindwtr_cloud_max_attachment_bytes: 50000000
+    mindwtr_default_cloud_url: ""
+    mindwtr_cloud_data_dir: "/app/cloud_data"
+    env_vars_list: []
+    cmd_line_args: ""
 schema:
-    sync_mode: list(local|selfhosted|webdav|dropbox)
-    cloud_tokens: password?
-    cors_origin: str?
+    timezone: str
+    mindwtr_cloud_auth_tokens: str
+    mindwtr_cloud_cors_origin: str
+    mindwtr_cloud_max_body_bytes: int
+    mindwtr_cloud_max_attachment_bytes: int
+    mindwtr_default_cloud_url: str
+    mindwtr_cloud_data_dir: str
+    env_vars_list: list
+    cmd_line_args: str
