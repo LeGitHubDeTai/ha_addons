@@ -31,22 +31,14 @@ ports_description:
     8787/tcp: Mindwtr Cloud sync server API (normally not exposed, as Home Assistant Ingress is more secure and is recommended)
     8080/tcp: Mindwtr web interface
 options:
-    timezone: "Europe/Paris"
+    sync_mode: local
+    cloud_tokens: ""
+    cors_origin: ""
     mindwtr_cloud_auth_tokens: ""
     mindwtr_cloud_cors_origin: ""
-    mindwtr_cloud_max_body_bytes: 2000000
-    mindwtr_cloud_max_attachment_bytes: 50000000
-    mindwtr_default_cloud_url: ""
-    mindwtr_cloud_data_dir: "/app/cloud_data"
-    env_vars_list: []
-    cmd_line_args: ""
 schema:
-    timezone: str
-    mindwtr_cloud_auth_tokens: str
+    sync_mode: list(local|selfhosted|webdav|dropbox)
+    cloud_tokens: password
+    cors_origin: str
+    mindwtr_cloud_auth_tokens: password
     mindwtr_cloud_cors_origin: str
-    mindwtr_cloud_max_body_bytes: int
-    mindwtr_cloud_max_attachment_bytes: int
-    mindwtr_default_cloud_url: str
-    mindwtr_cloud_data_dir: str
-    env_vars_list: list
-    cmd_line_args: str
