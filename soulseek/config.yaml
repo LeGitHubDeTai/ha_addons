@@ -62,5 +62,6 @@ schema:
   listen_port: port
   remote_configuration: bool
   log_level: list(Trace|Debug|Information|Warning|Error|Critical)
-  env_vars_list:
-    - match(^[A-Z_0-9]+: .*$)
+  env_vars_list: [
+    "match(^[A-Z_0-9]+: .*$)",
+  ]
