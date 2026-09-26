@@ -40,7 +40,8 @@ RUN set -eux; \
     mkdir -p /data /share/soulseek/downloads /share/soulseek/incomplete /share/soulseek/share
 
 COPY root /
-RUN chmod +x /etc/s6-overlay/s6-rc.d/soulseek/run
+COPY ha_entrypoint.sh /ha_entrypoint.sh
+RUN chmod +x /etc/s6-overlay/s6-rc.d/soulseek/run /ha_entrypoint.sh
 
 EXPOSE 5030 5031 50300
 
