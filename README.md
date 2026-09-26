@@ -42,6 +42,7 @@
 | [**WebDAV**](./webdav/) | Serveur WebDAV (partage fichiers, sauvegardes) | 6065 |
 | [**Requestly**](./requestly/) | Intercepteur HTTP, mocks d'API et débogage réseau | 3000 |
 | [**Deemix**](./deemix/) | Téléchargeur de musique Deezer (MP3/FLAC) avec interface web | 6595 |
+| [**NZBGet**](./nzbget/) | Client de téléchargement Usenet | 6789 |
 | [**Soulseek**](./soulseek/) | Client Soulseek P2P (slskd) avec interface web | 5030 |
 | [**YouTube-DL**](./youtube-dl/) | Téléchargeur de vidéos YouTube et autres sites (yt-dlp) | 5000 |
 

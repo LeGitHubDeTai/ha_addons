@@ -1,0 +1,98 @@
+name: NZBGet
+version: "26.9.1"
+slug: nzbget
+description: Client de t�l�chargement Usenet (NZBGet) - Client NZB bas� sur le web avec une interface de contr�le distante
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/nzbget
+webui: http://[HOST]:[PORT:6789]/
+image: ghcr.io/legithubdetai/ha_addons/nzbget-{arch}
+arch:
+    - amd64
+    - aarch64
+startup: application
+boot: auto
+init: false
+apparmor: true
+panel_icon: "mdi:download-network"
+panel_title: NZBGet
+ingress: true
+ingress_port: 6789
+ingress_stream: true
+ports:
+    6789/tcp: 6789
+    6790/tcp: null
+ports_description:
+    6789/tcp: Interface web NZBGet (XML-RPC et HTTP)
+    6790/tcp: Port d'�coute NZBGet (connexions entrantes). Exposez-le pour de meilleures vitesses.
+map:
+    - type: addon_config
+      read_only: false
+      path: /config
+    - type: share
+      read_only: false
+      path: /share
+    - type: media
+      read_only: false
+      path: /media
+    - type: backup
+      read_only: false
+      path: /backup
+environment:
+    PUID: "0"
+    PGID: "0"
+    TZ: Europe/Paris
+options:
+    PUID: 0
+    PGID: 0
+    TZ: Europe/Paris
+    DOWNLOAD_DIR: /share/nzbget/downloads
+    COMPLETED_DIR: /share/nzbget/completed
+    QUEUE_DIR: /share/nzbget/queue
+    INTERFACE_PORT: 6789
+    INTERFACE_BIND: 0.0.0.0
+    READ_PERMISSION: true
+    WRITE_PERMISSION: true
+    BANDWIDTH_MAX: 0
+    BANDWIDTH_UL: 0
+    BANDWIDTH_DL: 0
+    PAR_CHECK: true
+    PAR_REPAIR: true
+    DELETE_INCOMPLETE: false
+    KEEP_DAYS: 7
+    MAIL_ON_WARN: false
+    MAIL_ON_ERROR: false
+    MAIL_FROM: nzbget@localhost
+    MAIL_TO: ""
+    MAIL_SERVER: ""
+    MAIL_PORT: 25
+    MAIL_USER: ""
+    MAIL_PASS: ""
+    env_vars_list: []
+schema:
+    PUID: int
+    PGID: int
+    TZ: str
+    DOWNLOAD_DIR: match(/share/.+|/media/.+)
+    COMPLETED_DIR: match(/share/.+|/media/.+)
+    QUEUE_DIR: match(/share/.+|/media/.+)
+    INTERFACE_PORT: port
+    INTERFACE_BIND: str
+    READ_PERMISSION: bool
+    WRITE_PERMISSION: bool
+    BANDWIDTH_MAX: int
+    BANDWIDTH_UL: int
+    BANDWIDTH_DL: int
+    PAR_CHECK: bool
+    PAR_REPAIR: bool
+    DELETE_INCOMPLETE: bool
+    KEEP_DAYS: int
+    MAIL_ON_WARN: bool
+    MAIL_ON_ERROR: bool
+    MAIL_FROM: str
+    MAIL_TO: str
+    MAIL_SERVER: str
+    MAIL_PORT: int
+    MAIL_USER: str
+    MAIL_PASS: password
+    env_vars_list: [
+      "match(^[A-Z_0-9]+: .*$)"
+    ]

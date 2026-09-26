@@ -1,0 +1,8 @@
+build_from:
+  amd64: lscr.io/linuxserver/nzbget:amd64-24.0-ls42
+  aarch64: lscr.io/linuxserver/nzbget:arm64v8-24.0-ls42
+labels:
+  org.opencontainers.image.title: "NZBGet"
+  org.opencontainers.image.description: "Client de t�l�chargement Usenet (NZBGet) pour Home Assistant"
+  org.opencontainers.image.source: "https://github.com/LeGitHubDeTai/ha_addons/tree/main/nzbget"
+  org.opencontainers.image.licenses: "GPL-2.0-or-later"

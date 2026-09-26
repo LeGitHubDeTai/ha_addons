@@ -1,0 +1,16 @@
+---
+configuration:
+  PUID:
+    name: User ID (PUID)
+    description: |-
+      Linux User ID used to read/write your files.
+      0 (root) gives full access to /share and /media.
+  PGID:
+    name: Group ID (PGID)
+    description: |-
+      Linux Group ID used to read/write your files.
+      0 (root) gives full access to /share and /media.
+  TZ:
+    name: Timezone
+    description: |-
+      Timezone used for timestamps in NZBGet (e.g. Europe/Paris).
