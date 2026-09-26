@@ -27,7 +27,7 @@ RUN apk add --no-cache \
     supervisor \
     tzdata
 
-RUN pip3 install --no-cache-dir \
+RUN pip3 install --no-cache-dir --break-system-packages \
     yt-dlp \
     flask
 

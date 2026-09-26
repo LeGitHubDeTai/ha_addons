@@ -31,7 +31,7 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     yt-dlp \
     flask
 
-RUN mkdir -p /run/nginx /var/log/supervisor /usr/share/yt-dlp
+RUN mkdir -p /run/nginx /var/log/supervisor /usr/share/yt-dlp /tmp/supervisor_logs
 
 COPY supervisord.conf /etc/supervisord.conf
 COPY youtube-dlp-entrypoint.sh /app/youtube-dlp-entrypoint.sh
