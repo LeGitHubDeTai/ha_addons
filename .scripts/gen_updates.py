@@ -204,7 +204,7 @@ jobs:
             VERSION_TYPE=$(grep 'export VERSION_TYPE=' "$script" | sed 's/.*export VERSION_TYPE=//' | sed 's/"//g')
             TAG_PREFIX=$(grep 'export TAG_PREFIX=' "$script" | sed 's/.*export TAG_PREFIX=//' | sed 's/"//g')
             FILES_TO_UPDATE=$(grep 'export FILES_TO_UPDATE=' "$script" | sed 's/.*export FILES_TO_UPDATE=//' | sed 's/"//g')
-            jq -n --arg addon_dir "$ADDON_DIR" \\
+            jq -cn --arg addon_dir "$ADDON_DIR" \\
                   --arg display_name "$DISPLAY_NAME" \\
                   --arg version_arg "$VERSION_ARG" \\
                   --arg use_build_yaml "$USE_BUILD_YAML" \\
