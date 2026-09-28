@@ -5,6 +5,14 @@
 
 set -euo pipefail
 
+# Authenticated GitHub API calls: GH_TOKEN (already exported by the workflows)
+# lifts the harsh 60 req/h unauthenticated rate limit shared by Actions runners.
+# shellcheck disable=SC2034
+GH_API_HEADERS=()
+if [ -n "${GH_TOKEN:-}" ]; then
+    GH_API_HEADERS=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json")
+fi
+
 ########################################
 # Shared functions for auto-upgrade
 ########################################
@@ -67,16 +75,10 @@ get_latest_release() {
     local upstream_repo="$1"
     local version_type="$2"
     local tag_prefix="${3:-}"
-    local gh_token="${GH_TOKEN:-}"
     local result=""
 
     if [ "$version_type" = "direct" ]; then
-        # Use auth for portainer to avoid rate limiting
-        local auth_header=""
-        if [ -n "$gh_token" ]; then
-            auth_header="-H \"Authorization: Bearer $gh_token\" -H \"Accept: application/vnd.github+json\""
-        fi
-        local data=$(curl -s $auth_header "https://api.github.com/repos/${upstream_repo}/releases")
+        local data=$(curl -s "${GH_API_HEADERS[@]}" "https://api.github.com/repos/${upstream_repo}/releases")
         # Validate it's an array
         if ! echo "$data" | jq -e 'type == "array"' > /dev/null 2>&1; then
             echo "ERROR: GitHub API did not return a release array for ${upstream_repo} (repo renamed, deleted or rate-limited?)" >&2
@@ -102,13 +104,13 @@ get_latest_release() {
         fi
         echo "$latest|$release_type|$release_url"
     elif [ "$version_type" = "deemix" ]; then
-        local tag=$(curl -fsSL "https://api.github.com/repos/${upstream_repo}/releases/latest" | jq -r '.tag_name')
+        local tag=$(curl -fsSL "${GH_API_HEADERS[@]}" "https://api.github.com/repos/${upstream_repo}/releases/latest" | jq -r '.tag_name')
         local latest="${tag##*@}"
         local release_url="https://github.com/${upstream_repo}/releases/tag/$tag"
         echo "$latest|latest|$release_url"
     elif [ "$version_type" = "fizzy" ]; then
         # basecamp/fizzy releases are tagged fizzy@<commit-sha>
-        local data=$(curl -s "https://api.github.com/repos/${upstream_repo}/releases")
+        local data=$(curl -s "${GH_API_HEADERS[@]}" "https://api.github.com/repos/${upstream_repo}/releases")
         if ! echo "$data" | jq -e 'type == "array"' > /dev/null 2>&1; then
             echo "ERROR: GitHub API did not return a release array for ${upstream_repo} (repo renamed, deleted or rate-limited?)" >&2
             return 1
@@ -144,7 +146,7 @@ get_latest_release() {
         fi
         echo "$latest|latest|https://github.com/${upstream_repo}/commits/HEAD/${pkg_path}"
     else
-        local data=$(curl -s "https://api.github.com/repos/${upstream_repo}/releases")
+        local data=$(curl -s "${GH_API_HEADERS[@]}" "https://api.github.com/repos/${upstream_repo}/releases")
         if ! echo "$data" | jq -e 'type == "array"' > /dev/null 2>&1; then
             echo "ERROR: GitHub API did not return a release array for ${upstream_repo} (repo renamed, deleted or rate-limited?)" >&2
             return 1
@@ -181,7 +183,7 @@ get_latest_ls_release() {
     local data=""
     local repo=""
     for repo in "linuxserver/${ls_repo}-ls" "linuxserver/${ls_repo}"; do
-        data=$(curl -s "https://api.github.com/repos/${repo}/releases")
+        data=$(curl -s "${GH_API_HEADERS[@]}" "https://api.github.com/repos/${repo}/releases")
         if echo "$data" | jq -e 'type == "array"' > /dev/null 2>&1; then
             break
         fi
