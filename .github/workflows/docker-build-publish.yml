@@ -30,7 +30,7 @@ jobs:
       matrix: ${{ steps.changes.outputs.matrix }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Full history is required so `git diff $BASE_SHA $SHA`
           # works on main after a merge (shallow clones miss BASE_SHA)
@@ -154,7 +154,7 @@ jobs:
       build-matrix: ${{ steps.version-check.outputs.build-matrix }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install yq
         run: |
@@ -239,7 +239,7 @@ jobs:
       build-status: ${{ steps.status.outputs.build-status }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -248,7 +248,7 @@ jobs:
           buildkitd-flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
 
       - name: Cache Docker layers
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ matrix.build.addon }}-${{ matrix.build.version }}
@@ -407,7 +407,7 @@ jobs:
     if: always()
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install yq
         run: |
