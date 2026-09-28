@@ -1,0 +1,21 @@
+configuration:
+  TZ:
+    name: Fuseau horaire
+    description: Définit le fuseau horaire du conteneur.
+  data_dir:
+    name: Dossier de données
+    description: Dossier utilisé par l'add-on pour stocker le cluster PostgreSQL (ex. /share/timescaledb).
+  db_name:
+    name: Base de données
+    description: Nom de la base créée au premier démarrage.
+  db_user:
+    name: Utilisateur de la base
+    description: Rôle de connexion créé au premier démarrage (propriétaire de la base).
+  db_password:
+    name: Mot de passe de la base
+    description: Mot de passe de l'utilisateur de la base (également appliqué au superutilisateur postgres).
+  env_vars_list:
+    name: Variables d'environnement supplémentaires
+    description: 'Variables d''environnement libres au format "CLE: valeur".'
+network:
+  5432/tcp: Base de données PostgreSQL TimescaleDB

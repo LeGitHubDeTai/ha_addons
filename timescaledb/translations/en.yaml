@@ -1,0 +1,21 @@
+configuration:
+  TZ:
+    name: Timezone
+    description: Set the timezone for the container.
+  data_dir:
+    name: Data directory
+    description: Folder used by the add-on to store the PostgreSQL data cluster (e.g. /share/timescaledb).
+  db_name:
+    name: Database name
+    description: Name of the database created on first start.
+  db_user:
+    name: Database user
+    description: Login role created on first start (owner of the database).
+  db_password:
+    name: Database password
+    description: Password of the database user (also set on the postgres superuser).
+  env_vars_list:
+    name: Extra environment variables
+    description: 'Free environment variables as "KEY: value".'
+network:
+  5432/tcp: TimescaleDB PostgreSQL database

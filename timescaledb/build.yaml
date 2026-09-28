@@ -1,0 +1,7 @@
+build_from:
+  amd64: ghcr.io/home-assistant/amd64-base:3.24
+  aarch64: ghcr.io/home-assistant/aarch64-base:3.24
+labels:
+  org.opencontainers.image.title: "TimescaleDB"
+  org.opencontainers.image.description: "Base de données PostgreSQL avec hypertables TimescaleDB"
+  org.opencontainers.image.source: "https://github.com/LeGitHubDeTai/ha_addons/tree/main/timescaledb"

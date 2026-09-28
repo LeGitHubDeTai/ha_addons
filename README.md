@@ -45,6 +45,7 @@
 | [**NZBGet**](./nzbget/) | Client de téléchargement Usenet | 6789 |
 | [**Soulseek**](./soulseek/) | Client Soulseek P2P (slskd) avec interface web | 5030 |
 | [**YouTube-DL**](./youtube-dl/) | Téléchargeur de vidéos YouTube et autres sites (yt-dlp) | 5000 |
+| [**TimescaleDB**](./timescaledb/) | Base de données PostgreSQL avec hypertables (séries temporelles) | 5432 |
 
 ---
 

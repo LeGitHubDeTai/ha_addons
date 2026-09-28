@@ -1,0 +1,111 @@
+#!/command/with-contenv bashio
+set -e
+
+DATA_DIR=$(bashio::config 'data_dir')
+DB_NAME=$(bashio::config 'db_name')
+DB_USER=$(bashio::config 'db_user')
+DB_PASSWORD=$(bashio::config 'db_password')
+HA_TZ=$(bashio::config 'TZ')
+
+if [ -z "${DATA_DIR}" ] || [ "${DATA_DIR}" = "null" ]; then
+    DATA_DIR="/share/timescaledb"
+fi
+if [ -z "${DB_NAME}" ] || [ "${DB_NAME}" = "null" ]; then
+    DB_NAME="homeassistant"
+fi
+if [ -z "${DB_USER}" ] || [ "${DB_USER}" = "null" ]; then
+    DB_USER="hass"
+fi
+if [ -z "${DB_PASSWORD}" ] || [ "${DB_PASSWORD}" = "null" ]; then
+    DB_PASSWORD="changeme"
+    bashio::log.warning "Aucun mot de passe défini : 'changeme' est utilisé (à changer dans les options)."
+fi
+if [ -z "${HA_TZ}" ] || [ "${HA_TZ}" = "null" ]; then
+    HA_TZ="Europe/Paris"
+fi
+export TZ="${HA_TZ}"
+
+PGDATA="${DATA_DIR}/pgdata"
+PGPORT=5432
+SOCKDIR="/run/postgresql"
+
+bashio::log.info "Préparation de TimescaleDB (PostgreSQL)..."
+
+mkdir -p "${DATA_DIR}" "${SOCKDIR}"
+chown postgres:postgres "${DATA_DIR}" "${SOCKDIR}"
+
+if [ ! -f "${PGDATA}/PG_VERSION" ]; then
+    if [ -d "${PGDATA}" ] && [ -n "$(ls -A "${PGDATA}" 2>/dev/null)" ]; then
+        bashio::log.error "Cluster PostgreSQL invalide (PG_VERSION absent) dans ${PGDATA} : nettoyez ce dossier puis redémarrez."
+        exit 1
+    fi
+    bashio::log.info "Initialisation du cluster PostgreSQL dans ${PGDATA}..."
+    mkdir -p "${PGDATA}"
+    chown -R postgres:postgres "${PGDATA}"
+    chmod 700 "${PGDATA}"
+    su-exec postgres initdb -D "${PGDATA}" -U postgres -E UTF8 \
+        --auth-local=trust --auth-host=scram-sha-256 > /dev/null
+fi
+
+CONF="${PGDATA}/postgresql.conf"
+if ! grep -q "ha_addons timescaledb" "${CONF}"; then
+    cat >> "${CONF}" <<EOF
+
+# --- ha_addons timescaledb ---
+listen_addresses = '*'
+port = ${PGPORT}
+unix_socket_directories = '${SOCKDIR}'
+password_encryption = 'scram-sha-256'
+shared_preload_libraries = 'timescaledb'
+EOF
+fi
+
+HBA="${PGDATA}/pg_hba.conf"
+if ! grep -q "ha_addons timescaledb" "${HBA}"; then
+    cat >> "${HBA}" <<'EOF'
+# --- ha_addons timescaledb ---
+host    all    all    0.0.0.0/0    scram-sha-256
+host    all    all    ::/0         scram-sha-256
+EOF
+fi
+
+bashio::log.info "Démarrage temporaire du serveur pour l'initialisation..."
+if ! su-exec postgres pg_ctl -D "${PGDATA}" -w -t 90 \
+        -l "${DATA_DIR}/pg_bootstrap.log" start > /dev/null; then
+    bashio::log.error "Échec du démarrage de PostgreSQL — dernières lignes du journal :"
+    tail -n 50 "${DATA_DIR}/pg_bootstrap.log" >&2 || true
+    exit 1
+fi
+
+bashio::log.info "Création de la base '${DB_NAME}' et de l'utilisateur '${DB_USER}'..."
+su-exec postgres psql -q -h "${SOCKDIR}" -U postgres -d postgres \
+    -v ON_ERROR_STOP=1 \
+    -v "dbuser=${DB_USER}" -v "dbpass=${DB_PASSWORD}" -v "dbname=${DB_NAME}" <<'SQL'
+ALTER USER postgres WITH PASSWORD :'dbpass';
+SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'dbuser', :'dbpass')
+  WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'dbuser') \gexec
+SELECT format('ALTER ROLE %I PASSWORD %L', :'dbuser', :'dbpass') \gexec
+SELECT format('CREATE DATABASE %I OWNER %I', :'dbname', :'dbuser')
+  WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'dbname') \gexec
+SQL
+
+bashio::log.info "Installation de l'extension timescaledb..."
+su-exec postgres psql -q -h "${SOCKDIR}" -U postgres -d "${DB_NAME}" \
+    -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
+
+su-exec postgres pg_ctl -D "${PGDATA}" -m fast -w -t 30 stop > /dev/null
+
+# Variables d'environnement libres (env_vars_list, format "CLE: valeur")
+while IFS= read -r line; do
+    [ -z "${line}" ] && continue
+    KEY=$(printf '%s' "${line}" | cut -d: -f1 | tr -d ' ')
+    VAL=$(printf '%s' "${line}" | cut -d: -f2- | sed 's/^ //')
+    if [ -n "${KEY}" ]; then
+        export "${KEY}=${VAL}"
+        bashio::log.info "env: ${KEY} défini"
+    fi
+done < <(jq -r '.env_vars_list[]?' /data/options.json)
+
+bashio::log.info "Démarrage de TimescaleDB sur le port ${PGPORT} (base: ${DB_NAME}, utilisateur: ${DB_USER})..."
+
+exec su-exec postgres postgres -D "${PGDATA}"

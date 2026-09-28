@@ -1,0 +1,39 @@
+name: TimescaleDB
+version: "26.9.1"
+slug: timescaledb
+panel_title: TimescaleDB
+panel_icon: "mdi:database"
+description: Base de données PostgreSQL avec hypertables TimescaleDB
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/timescaledb
+image: ghcr.io/legithubdetai/ha_addons/timescaledb-{arch}
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: false
+apparmor: true
+hassio_role: default
+ports:
+  5432/tcp: 5432
+ports_description:
+  5432/tcp: Base de données TimescaleDB (PostgreSQL). Exposez ce port pour y accéder depuis vos clients (DBeaver, pgAdmin, Grafana, Node-RED...).
+map:
+  - share:rw
+  - backup:rw
+options:
+  TZ: Europe/Paris
+  data_dir: /share/timescaledb
+  db_name: homeassistant
+  db_user: hass
+  db_password: changeme
+  env_vars_list: []
+schema:
+  TZ: str
+  data_dir: match(/share/.+|/media/.+)
+  db_name: str
+  db_user: str
+  db_password: password
+  env_vars_list: [
+    "match(^[A-Z_0-9]+: .*$)"
+  ]
