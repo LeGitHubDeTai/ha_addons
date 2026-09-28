@@ -57,8 +57,25 @@ p.write_text(s.replace(old, "/* self-hosted (HA addon) : redirection cloud desac
 print("index.html patche : redirection cloud neutralisee")
 EOF
 
+# Patch HA Ingress : basename react-router calcule depuis /api/hassio_ingress/<token>.
+# Sans ça, react-router compare le chemin ingress a des routes type /rules, n'en
+# reconnait aucune et l'ecran reste blanc meme quand le bundle se charge.
+# Les URL absolues du bundle (/assets/...) sont reecrites cote nginx (sub_filter +
+# X-Ingress-Path, cf. nginx.conf), rien a patcher la-dessus.
+COPY patch-ingress.py /tmp/patch-ingress.py
+RUN python3 /tmp/patch-ingress.py
+
 # Build de la web app (vite build -> app/build/)
 RUN cd app && npm run build && ls -la build | head -20
+
+# Garde-fou : nginx reecrit les URL de type /assets/... (cf. nginx.conf), le HTML
+# servi doit donc bien referencer le bundle ainsi. Sinon le build echoue, plutot que
+# de publier une image ou le bundle 404 de nouveau sous ingress.
+RUN if ! grep -q 'src="/assets/' app/build/index.html; then \
+        echo "ERREUR : index.html ne reference pas le bundle via /assets/ (regles sub_filter de nginx.conf inutiles)"; \
+        exit 1; \
+    fi \
+    && echo "OK : bundle reference en /assets/ (sub_filter nginx couvre l'ingress)"
 
 # Garde-fou : le HTML servi ne doit plus contenir la redirection cloud
 RUN if grep -q 'window.location.href = "https://app.requestly.io"' app/build/index.html; then echo "ERREUR : redirection cloud toujours presente dans le build"; exit 1; fi \
