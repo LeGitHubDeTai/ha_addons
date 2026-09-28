@@ -45,12 +45,11 @@ Most users can leave this empty.
 
 Requestly is accessible through Home Assistant's Ingress feature. The `ingress_port` is set to `3000`.
 
-Two build-time adaptations make the SPA work under `/api/hassio_ingress/<token>/` (Home Assistant strips that prefix before the request reaches the container):
+Home Assistant forwards the full URL including `/api/hassio_ingress/<token>/` to nginx (the prefix is **not** stripped). `nginx.conf` removes it before location/cache lookup (`rewrite ^/api/hassio_ingress/[^/]+(.*)$ $1 last`) and rewrites absolute asset URLs (`/assets/…`, `/favicon.png`, `/manifest.json`) in responses with the prefix from the `X-Ingress-Path` header; without that the browser requests `/assets/…` from Home Assistant itself (404, CSS refused as `text/plain`, app stuck on loading screen).
 
-- `patch-ingress.py` (run during the image build) makes react-router use the ingress prefix as `basename`, otherwise no route matches and the page stays blank.
-- `nginx.conf` prepends the prefix (from the `X-Ingress-Path` header set by Home Assistant) to the absolute asset URLs (`/assets/…`, `/favicon.png`, `/manifest.json`) in the served responses — without it the browser would request them from Home Assistant itself and get 404s (CSS refused as `text/plain`).
+`patch-ingress.py` runs during the image build and makes react-router use the ingress prefix as `basename`, otherwise no route matches and the page stays blank.
 
-Both adaptations are skipped/empty for direct access on port `3000`.
+Both adaptations are no-ops for direct access on port `3000` (the header is absent).
 
 Known limitation: a handful of plain absolute links/CTAs inside the upstream UI (`<a href="/">` on the Selenium importer page, “Use now” on the pricing table, `/sessions/draft/mock/` links) are not router-managed and therefore leave the Ingress path. All in-app navigation uses the router and is unaffected.
 
