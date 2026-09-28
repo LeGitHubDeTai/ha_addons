@@ -52,6 +52,8 @@ ADDONS = [
     ("Dolibarr", "dolibarr", "DOLIBARR_VERSION", "false", "Dolibarr/Dolibarr", "calver", "", "config.yaml Dockerfile", "", ""),
     ("Drawnix", "drawnix", "DRAWNIX_VERSION", "false", "plait-board/drawnix", "calver", "v", "config.yaml Dockerfile", "", ""),
     ("Scanopy", "scanopy", "SCANOPY_VERSION", "false", "scanopy/scanopy", "calver", "v", "config.yaml Dockerfile", "", ""),
+    ("N8n", "n8n", "N8N_VERSION", "false", "n8n-io/n8n", "calver", "n8n@", "config.yaml Dockerfile", "", ""),
+    ("Penpot", "penpot", "PENPOT_VERSION", "false", "penpot/penpot", "calver", "", "config.yaml Dockerfile", "", ""),
 ]
 
 TAIL_COMPARE = [
@@ -110,13 +112,20 @@ def git_add_block(d, files_upd):
 for name, d, ver_arg, use_by, up_repo, ver_type, tag_prefix, files_upd, ls_repo, pkg_path in ADDONS:
     lines = header(d, name, ver_arg, use_by, up_repo, ver_type, tag_prefix, files_upd, pkg_path)
 
-    if d == "gitea":
-        # Official gitea/gitea image tracked on the "<minor>-nightly" channel.
-        # Compare MAJOR.MINOR of go-gitea/gitea stable releases.
-        lines += [
-            'CURRENT_MINOR=$(grep -Eo "gitea/gitea:[0-9]+\\.[0-9]+" "$ADDON_DIR"/build.yaml | head -1 | sed "s/.*://" || echo "")',
-            'echo "current_minor=$CURRENT_MINOR" >> $GITHUB_OUTPUT',
-        ]
+    if d in ("gitea", "penpot"):
+        # Minor-tracked addons: the pinned artifact only exists per MAJOR.MINOR
+        # (gitea/gitea:<minor>-nightly image, penpotapp/*:<minor> images).
+        # Compare MAJOR.MINOR of upstream stable releases.
+        if d == "gitea":
+            lines += [
+                'CURRENT_MINOR=$(grep -Eo "gitea/gitea:[0-9]+\\.[0-9]+" "$ADDON_DIR"/build.yaml | head -1 | sed "s/.*://" || echo "")',
+                'echo "current_minor=$CURRENT_MINOR" >> $GITHUB_OUTPUT',
+            ]
+        else:  # penpot: first ARG PENPOT_VERSION in Dockerfile (normalized)
+            lines += [
+                'CURRENT_MINOR=$(grep -m1 -E "^ARG PENPOT_VERSION=" "$ADDON_DIR"/Dockerfile | sed "s/.*=//" | sed \'s/"//g\' | sed "s/[[:space:]]*//g" | sed "s/\\\\r//g" | cut -d. -f1,2 || echo "")',
+                'echo "current_minor=$CURRENT_MINOR" >> $GITHUB_OUTPUT',
+            ]
         lines += config_version_block()
         lines += [
             'IFS="|" read -r LATEST_VERSION RELEASE_TYPE RELEASE_URL <<< "$(get_latest_release "$UPSTREAM_REPO" "$VERSION_TYPE" "$TAG_PREFIX")"',
@@ -134,8 +143,15 @@ for name, d, ver_arg, use_by, up_repo, ver_type, tag_prefix, files_upd, ls_repo,
             'echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT',
             'sed -i "s/^version: .*/version: \\"$NEW_ADDON_VERSION\\"/" "$ADDON_DIR"/config.yaml',
             'ESCAPED_CURRENT=$(printf \'%s\' "$CURRENT_MINOR" | sed \'s/\\./\\\\./g\')',
-            'sed -i "s|gitea/gitea:${ESCAPED_CURRENT}-nightly|gitea/gitea:${LATEST_MINOR}-nightly|g" "$ADDON_DIR"/build.yaml',
         ]
+        if d == "gitea":
+            lines += [
+                'sed -i "s|gitea/gitea:${ESCAPED_CURRENT}-nightly|gitea/gitea:${LATEST_MINOR}-nightly|g" "$ADDON_DIR"/build.yaml',
+            ]
+        else:  # penpot: pin MAJOR.MINOR in both ARG declarations
+            lines += [
+                'sed -i "s/ARG PENPOT_VERSION=.*/ARG PENPOT_VERSION=\\"${LATEST_MINOR}\\"/" "$ADDON_DIR"/Dockerfile',
+            ]
         lines += git_add_block(d, files_upd)
     elif use_by == "true":
         # linuxserver flow: compare FULL image tags (e.g. v1.13.7-ls144),

@@ -35,8 +35,10 @@ RUN apk add --no-cache \
 WORKDIR /data
 COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
 
+# n8n version pinned here (bumped by auto-upgrade; .updates/n8n.sh tracks n8n-io/n8n tags n8n@X.Y.Z)
+ARG N8N_VERSION="2.40.7"
 # Install n8n (simplified for ARM64/AMD64 compatibility)
-RUN npm install -g n8n@2.40.7
+RUN npm install -g n8n@${N8N_VERSION}
 
 RUN mkdir -p /run/nginx
 
