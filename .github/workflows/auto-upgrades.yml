@@ -1,0 +1,271 @@
+name: Auto-upgrades
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force recreate PR even if one already exists (closed/merged)'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  auto-upgrade:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - addon_dir: cloudflared
+            display_name: Cloudflared
+            version_arg: CLOUDFLARED_VERSION
+            use_build_yaml: false
+            upstream_repo: cloudflare/cloudflared
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: deemix
+            display_name: Deemix
+            version_arg: DEEMIX_VERSION
+            use_build_yaml: false
+            upstream_repo: bambanah/deemix
+            version_type: deemix
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: FossFLOW
+            display_name: FossFLOW
+            version_arg: FOSSFLOW_VERSION
+            use_build_yaml: false
+            upstream_repo: Abrar74774/FossFLOW
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: gitea
+            display_name: Gitea
+            version_arg: GITEA_VERSION
+            use_build_yaml: true
+            upstream_repo: go-gitea/gitea
+            version_type: ls
+            tag_prefix: ""
+            files_to_update: "config.yaml build.yaml",
+          - addon_dir: mindwtr
+            display_name: Mindwtr
+            version_arg: MINDWTR_VERSION
+            use_build_yaml: false
+            upstream_repo: dongdongbh/Mindwtr
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: obsidian
+            display_name: Obsidian
+            version_arg: OBSIDIAN_VERSION
+            use_build_yaml: false
+            upstream_repo: obsidianhq/obsidian
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: planka
+            display_name: Planka
+            version_arg: PLANKA_VERSION
+            use_build_yaml: false
+            upstream_repo: plankanban/planka
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: portainer
+            display_name: Portainer
+            version_arg: PORTAINER_VERSION
+            use_build_yaml: false
+            upstream_repo: portainer/portainer
+            version_type: direct
+            tag_prefix: ""
+            files_to_update: "config.yaml build.yaml",
+          - addon_dir: requestly
+            display_name: Requestly
+            version_arg: REQUESTLY_VERSION
+            use_build_yaml: false
+            upstream_repo: requestly/requestly
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: soulseek
+            display_name: Soulseek
+            version_arg: SLSKD_VERSION
+            use_build_yaml: false
+            upstream_repo: slskd/slskd
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: storybook
+            display_name: Storybook
+            version_arg: STORYBOOK_VERSION
+            use_build_yaml: false
+            upstream_repo: storybookjs/storybook
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: syncthing
+            display_name: Syncthing
+            version_arg: SYNCTHING_VERSION
+            use_build_yaml: false
+            upstream_repo: syncthing/syncthing
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: timescaledb
+            display_name: Timescaledb
+            version_arg: TIMESCALEDB_VERSION
+            use_build_yaml: false
+            upstream_repo: timescale/timescaledb
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: webdav
+            display_name: Webdav
+            version_arg: WEBDAV_VERSION
+            use_build_yaml: false
+            upstream_repo: hacdias/webdav
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: youtube-dl
+            display_name: YouTube-dl
+            version_arg: YOUTUBE_DL_VERSION
+            use_build_yaml: false
+            upstream_repo: yt-dlp/yt-dlp
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: youtube-dlp
+            display_name: YouTube-dlp
+            version_arg: YOUTUBE_DLP_VERSION
+            use_build_yaml: false
+            upstream_repo: yt-dlp/yt-dlp
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: isoman
+            display_name: Isoman
+            version_arg: ISOMAN_VERSION
+            use_build_yaml: false
+            upstream_repo: home-assistant/addons-data-isoman
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: nzbget
+            display_name: Nzbget
+            version_arg: NZBGET_VERSION
+            use_build_yaml: true
+            upstream_repo: linuxserver/docker-nzbget
+            version_type: ls
+            tag_prefix: "nzbget"
+            files_to_update: "config.yaml build.yaml",
+          - addon_dir: mopidy
+            display_name: Mopidy
+            version_arg: MOPIDY_VERSION
+            use_build_yaml: false
+            upstream_repo: mopidy/mopidy
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: drawio
+            display_name: Drawio
+            version_arg: DRAWIO_VERSION
+            use_build_yaml: false
+            upstream_repo: jgraph/drawio
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: fizzy
+            display_name: Fizzy
+            version_arg: FIZZY_VERSION
+            use_build_yaml: false
+            upstream_repo: fizzy-org/fizzy
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: lidarr
+            display_name: Lidarr
+            version_arg: 
+            use_build_yaml: true
+            upstream_repo: linuxserver/docker-lidarr
+            version_type: ls
+            tag_prefix: "lidarr"
+            files_to_update: "config.yaml build.yaml",
+          - addon_dir: lidarr_develop
+            display_name: Lidarr-develop
+            version_arg: 
+            use_build_yaml: true
+            upstream_repo: linuxserver/docker-lidarr
+            version_type: ls
+            tag_prefix: "lidarr-develop"
+            files_to_update: "config.yaml build.yaml",
+          - addon_dir: lidarr_nightly
+            display_name: Lidarr-nightly
+            version_arg: 
+            use_build_yaml: true
+            upstream_repo: linuxserver/docker-lidarr
+            version_type: ls
+            tag_prefix: "lidarr-nightly"
+            files_to_update: "config.yaml build.yaml",
+          - addon_dir: docmost
+            display_name: Docmost
+            version_arg: DOCMOST_VERSION
+            use_build_yaml: false
+            upstream_repo: docmost/docmost
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: dolibarr
+            display_name: Dolibarr
+            version_arg: DOLIBARR_VERSION
+            use_build_yaml: false
+            upstream_repo: Dolibarr/Dolibarr
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: drawnix
+            display_name: Drawnix
+            version_arg: DRAWNIX_VERSION
+            use_build_yaml: false
+            upstream_repo: drawnix/drawnix
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+          - addon_dir: scanopy
+            display_name: Scanopy
+            version_arg: SCANOPY_VERSION
+            use_build_yaml: false
+            upstream_repo: scanopy/scanopy
+            version_type: calver
+            tag_prefix: ""
+            files_to_update: "config.yaml Dockerfile",
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run auto-upgrade for ${{ matrix.display_name }}
+        id: upgrade
+        env:
+          ADDON_DIR: ${{ matrix.addon_dir }}
+          DISPLAY_NAME: ${{ matrix.display_name }}
+          VERSION_ARG: ${{ matrix.version_arg }}
+          USE_BUILD_YAML: ${{ matrix.use_build_yaml }}
+          UPSTREAM_REPO: ${{ matrix.upstream_repo }}
+          VERSION_TYPE: ${{ matrix.version_type }}
+          TAG_PREFIX: ${{ matrix.tag_prefix }}
+          FILES_TO_UPDATE: ${{ matrix.files_to_update }}
+          FORCE_FLAG: ${{ github.event.inputs.force || 'true' }}
+        run: |
+          bash .updates/${{ matrix.addon_dir }}.sh
