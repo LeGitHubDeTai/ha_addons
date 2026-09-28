@@ -23,7 +23,6 @@ env:
   # 1. GITHUB_TOKEN (injecté par GitHub Actions, permissions limitées)
   # 2. PAT via secret PACKAGES_PAT (à créer dans repo Settings → Secrets)
   GH_TOKEN_FALLBACK: ""
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   detect-orphans:
@@ -45,8 +44,12 @@ jobs:
 
       - name: Detect dev- packages to remove
         id: collect
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+
+          GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
           DRY_RUN="${{ inputs.dry_run }}"
           echo "### 🧹 Cleanup dev packages" >> $GITHUB_STEP_SUMMARY
@@ -63,9 +66,9 @@ jobs:
           PACKAGES_JSON="[]"
 
           # Construction du header d'authentification
-          AUTH_HEADER="Authorization: token ${GITHUB_TOKEN:-}"
+          AUTH_HEADER="Authorization: token $GITHUB_TOKEN"
           # Si GITHUB_TOKEN est vide (execution locale), essayer avec le fallback PAT
-          if [ -z "${GITHUB_TOKEN:-}" ] || [ "${GITHUB_TOKEN:-}" = "__DEFAULT_GITHUB_TOKEN__" ]; then
+          if [ -z "$GITHUB_TOKEN" ] || [ "$GITHUB_TOKEN" = "__DEFAULT_GITHUB_TOKEN__" ]; then
             if [ -n "${PAT_SECRET:-}" ] && [ "$PAT_SECRET" != "default" ]; then
               AUTH_HEADER="Authorization: token ${PAT_SECRET}"
               echo "Utilisation du PAT pour l'authentification GHCR..."
@@ -80,7 +83,7 @@ jobs:
 
           # Si aucun paquet trouvé avec l'authentification dépôt, essayer API utilisateur
           if [ "$PACKAGES_JSON" = "[]" ] || [ -z "$PACKAGES_JSON" ]; then
-            AUTH_HEADER_USER="Authorization: token ${GITHUB_TOKEN:-}"
+            AUTH_HEADER_USER="Authorization: token $GITHUB_TOKEN"
             if [ -n "${PAT_SECRET:-}" ] && [ "$PAT_SECRET" != "default" ]; then
               AUTH_HEADER_USER="Authorization: token ${PAT_SECRET}"
             fi
