@@ -53,9 +53,12 @@ is_new_version() {
 }
 
 # Get latest GitHub release
+# Args: upstream_repo, version_type, [tag_prefix] (e.g. "v" for tags like v1.2.3)
+# Output: "<version>|<release_type>|<release_url>" (version has tag_prefix stripped)
 get_latest_release() {
     local upstream_repo="$1"
     local version_type="$2"
+    local tag_prefix="${3:-}"
     local gh_token="${GH_TOKEN:-}"
     local result=""
 
@@ -68,16 +71,21 @@ get_latest_release() {
         local data=$(curl -s $auth_header "https://api.github.com/repos/${upstream_repo}/releases")
         # Validate it's an array
         if ! echo "$data" | jq -e 'type == "array"' > /dev/null 2>&1; then
-            echo "ERROR: GitHub API did not return a release array" >&2
-            exit 1
+            echo "ERROR: GitHub API did not return a release array for ${upstream_repo} (repo renamed, deleted or rate-limited?)" >&2
+            return 1
         fi
-        local latest=$(echo "$data" | jq -r '.[].tag_name' | while read -r tag; do
-            if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                echo "$tag"
+        local tag=$(echo "$data" | jq -r '.[].tag_name' | while read -r t; do
+            if [[ "$t" =~ ^${tag_prefix}[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "$t"
                 break
             fi
         done)
-        local release_info=$(echo "$data" | jq ".[] | select(.tag_name==\"$latest\")")
+        if [ -z "$tag" ]; then
+            echo "ERROR: no release tag matching '${tag_prefix}X.Y.Z' found for ${upstream_repo}" >&2
+            return 1
+        fi
+        local latest="${tag#"$tag_prefix"}"
+        local release_info=$(echo "$data" | jq ".[] | select(.tag_name==\"$tag\")")
         local is_prerelease=$(echo "$release_info" | jq -r '.prerelease')
         local release_url=$(echo "$release_info" | jq -r '.html_url')
         local release_type="latest"
@@ -93,16 +101,21 @@ get_latest_release() {
     else
         local data=$(curl -s "https://api.github.com/repos/${upstream_repo}/releases")
         if ! echo "$data" | jq -e 'type == "array"' > /dev/null 2>&1; then
-            echo "ERROR: GitHub API did not return a release array" >&2
-            exit 1
+            echo "ERROR: GitHub API did not return a release array for ${upstream_repo} (repo renamed, deleted or rate-limited?)" >&2
+            return 1
         fi
-        local latest=$(echo "$data" | jq -r '.[].tag_name' | while read -r tag; do
-            if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                echo "$tag"
+        local tag=$(echo "$data" | jq -r '.[].tag_name' | while read -r t; do
+            if [[ "$t" =~ ^${tag_prefix}[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "$t"
                 break
             fi
         done)
-        local release_info=$(echo "$data" | jq ".[] | select(.tag_name==\"$latest\")")
+        if [ -z "$tag" ]; then
+            echo "ERROR: no release tag matching '${tag_prefix}X.Y.Z' found for ${upstream_repo}" >&2
+            return 1
+        fi
+        local latest="${tag#"$tag_prefix"}"
+        local release_info=$(echo "$data" | jq ".[] | select(.tag_name==\"$tag\")")
         local is_prerelease=$(echo "$release_info" | jq -r '.prerelease')
         local release_url=$(echo "$release_info" | jq -r '.html_url')
         local release_type="latest"
@@ -167,6 +180,11 @@ check_pr_status() {
     local release_type="$4"
     local version_type="$5"
     local current_build_version="$6"
+
+    if [ -z "$latest_version" ]; then
+        echo "ERROR: empty latest version for ${display_name} (${addon_dir}): upstream release lookup failed (check UPSTREAM_REPO/VERSION_TYPE/TAG_PREFIX in .updates/${addon_dir}.sh, or delete that script to exclude it from auto-upgrades)" >&2
+        exit 1
+    fi
 
     local is_new_version=false
     local compare_current="$current_build_version"

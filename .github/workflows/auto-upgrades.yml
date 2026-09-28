@@ -124,6 +124,12 @@ jobs:
           IS_NEW_VERSION: ${{ steps.upgrade.outputs.is_new_version }}
           FORCE_FLAG: ${{ github.event.inputs.force || 'true' }}
         run: |
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "ERROR: empty LATEST_VERSION for $DISPLAY_NAME - refusing to create/update PR (upstream lookup failed?)" >&2
+            exit 1
+          fi
+          RELEASE_TYPE="${RELEASE_TYPE:-latest}"
+          LABELS="auto-upgrade,dependencies,$RELEASE_TYPE"
           PR_TITLE="⬆️ Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
           PR_BODY=$(printf "Auto-upgrade %s to version %s\n\n### Changes:\n- Updated config.yaml addon version to %s\n- Updated upstream version to %s\n\n### Release:\n%s\n\nThis PR was created automatically by the auto-upgrade workflow." "$DISPLAY_NAME" "$LATEST_VERSION" "$NEW_ADDON_VERSION" "$LATEST_VERSION" "$RELEASE_URL")
 
@@ -145,12 +151,12 @@ jobs:
             fi
             echo "PR #$OPEN_PR updated successfully"
           elif [ "$FORCE_FLAG" = "true" ]; then
-            gh pr create               --base main               --head "$BRANCH_NAME"               --title "$PR_TITLE"               --body "$PR_BODY"               --label "auto-upgrade,dependencies,$RELEASE_TYPE"
+            gh pr create               --base main               --head "$BRANCH_NAME"               --title "$PR_TITLE"               --body "$PR_BODY"               --label "$LABELS"
             echo "PR created successfully (forced)"
           elif [ -n "$ANY_PR" ]; then
             echo "PR #$ANY_PR already exists but is closed/merged - not creating duplicate"
           elif [ "$IS_NEW_VERSION" = "true" ]; then
-            gh pr create               --base main               --head "$BRANCH_NAME"               --title "$PR_TITLE"               --body "$PR_BODY"               --label "auto-upgrade,dependencies,$RELEASE_TYPE"
+            gh pr create               --base main               --head "$BRANCH_NAME"               --title "$PR_TITLE"               --body "$PR_BODY"               --label "$LABELS"
             echo "PR created successfully"
           else
             echo "No new version and no open PR - nothing to do"
