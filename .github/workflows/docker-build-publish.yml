@@ -24,7 +24,7 @@ env:
 
 jobs:
   detect-changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       addons: ${{ steps.changes.outputs.addons }}
       matrix: ${{ steps.changes.outputs.matrix }}
@@ -147,7 +147,7 @@ jobs:
           echo "matrix=$ADDON_ARRAY" >> $GITHUB_OUTPUT
 
   check-versions:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: detect-changes
     if: needs.detect-changes.outputs.matrix != '[]'
     outputs:
@@ -228,7 +228,7 @@ jobs:
           echo "build-matrix=$BUILD_ARRAY" >> $GITHUB_OUTPUT
 
   build-and-publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [detect-changes, check-versions]
     if: needs.check-versions.outputs.build-matrix != '[]'
     strategy:
@@ -402,7 +402,7 @@ jobs:
           echo "build-status={\"addon\":\"$ADDON\",\"version\":\"$VERSION\",\"status\":\"$STATUS\"}" >> $GITHUB_OUTPUT
 
   summary:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [detect-changes, check-versions, build-and-publish]
     if: always()
     steps:

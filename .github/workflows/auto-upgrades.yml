@@ -16,7 +16,7 @@ env:
 
 jobs:
   discover-addons:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
@@ -56,7 +56,7 @@ jobs:
 
   auto-upgrade:
     needs: discover-addons
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
