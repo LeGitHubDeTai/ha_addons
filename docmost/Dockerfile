@@ -15,6 +15,7 @@ USER root
 # Install additional dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    gettext-base \
     jq \
     nginx \
     supervisor \
