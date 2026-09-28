@@ -22,7 +22,7 @@ RUN apk add --no-cache \
     libc6-compat || true
 
 # Download and extract Drawnix (version bumped by auto-upgrade)
-ARG DRAWNIX_VERSION="0.3.0"
+ARG DRAWNIX_VERSION="0.4.0"
 RUN wget https://github.com/plait-board/drawnix/archive/refs/tags/v${DRAWNIX_VERSION}.zip -O drawnix.zip && \
     unzip drawnix.zip && \
     mv drawnix-${DRAWNIX_VERSION} /builder && \
