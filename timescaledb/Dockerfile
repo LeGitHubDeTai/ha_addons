@@ -37,6 +37,8 @@ RUN apk add --no-cache \
         openssl-dev \
         postgresql${PG_MAJOR}-dev \
         util-linux-dev \
+    && rm -f /usr/bin/pg_config \
+    && mkdir -p /usr/share/man \
     && pg_versions set-default "${PG_MAJOR}" \
     && git clone --depth 1 --branch "${TIMESCALEDB_VERSION}" \
         https://github.com/timescale/timescaledb.git /usr/src/timescaledb \
