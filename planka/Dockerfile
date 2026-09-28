@@ -22,6 +22,10 @@ RUN apk add --no-cache \
 # ===============================
 # INSTALL PLANKA
 # ===============================
+# Upstream version tracked by auto-upgrade (.updates/planka.sh).
+# PLANKA_VERSION records the release that triggered the last rebuild
+# (the prebuild zip is always fetched from the latest release).
+ARG PLANKA_VERSION="2.2.1"
 WORKDIR /opt
 
 RUN curl -fsSL -o planka.zip \

@@ -1,5 +1,10 @@
 ARG BUILD_FROM
 
+# Upstream version tracked by auto-upgrade (.updates/mopidy.sh).
+# Informational only: mopidy comes from Alpine apk (unpinned) + pip extensions
+# below, so a version bump triggers a rebuild that picks up the latest packages.
+ARG MOPIDY_VERSION="4.0.3"
+
 FROM $BUILD_FROM AS build-base
 
 RUN apk add --no-cache \

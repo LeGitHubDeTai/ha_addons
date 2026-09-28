@@ -11,6 +11,7 @@ export UPSTREAM_REPO="aloks98/isoman"
 export VERSION_TYPE="calver"
 export TAG_PREFIX="v"
 export FILES_TO_UPDATE="config.yaml Dockerfile"
+export PKG_PATH=""
 DOCKERFILE_VERSION=$(get_dockerfile_version "$ADDON_DIR" "$VERSION_ARG")
 echo "dockerfile_version=$DOCKERFILE_VERSION" >> $GITHUB_OUTPUT
 CONFIG_VERSION=$(get_config_version "$ADDON_DIR")

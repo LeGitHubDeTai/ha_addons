@@ -1,15 +1,19 @@
 # Fizzy est déjà installé dans l'image officielle (build-time).
 # Cet addon se contente d'ajouter : lecture des options HA, persistance /data et démarrage.
 ARG BUILD_FROM=ghcr.io/basecamp/fizzy:main
+# SHA du commit upstream suivi (mis à jour par le workflow auto-upgrade ; l'image :main est flottante)
+ARG FIZZY_VERSION="477c943"
 FROM ${BUILD_FROM}
 
 ARG BUILD_ARCH
 ARG BUILD_VERSION
+ARG FIZZY_VERSION
 
 LABEL \
   io.hass.version="${BUILD_VERSION}" \
   io.hass.type="addon" \
-  io.hass.arch="${BUILD_ARCH}"
+  io.hass.arch="${BUILD_ARCH}" \
+  org.opencontainers.image.revision="${FIZZY_VERSION}"
 
 USER root
 

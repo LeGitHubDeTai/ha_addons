@@ -5,17 +5,18 @@ source "$SCRIPT_DIR/.scripts/update-lib.sh"
 
 export ADDON_DIR="requestly"
 export DISPLAY_NAME="Requestly"
-export VERSION_ARG="REQUESTLY_VERSION"
+export VERSION_ARG="REQUESTLY_APP_VERSION"
 export USE_BUILD_YAML="false"
-export UPSTREAM_REPO="requestly/requestly"
-export VERSION_TYPE="calver"
+export UPSTREAM_REPO="requestly/interceptor"
+export VERSION_TYPE="node"
 export TAG_PREFIX=""
 export FILES_TO_UPDATE="config.yaml Dockerfile"
+export PKG_PATH="app/package.json"
 DOCKERFILE_VERSION=$(get_dockerfile_version "$ADDON_DIR" "$VERSION_ARG")
 echo "dockerfile_version=$DOCKERFILE_VERSION" >> $GITHUB_OUTPUT
 CONFIG_VERSION=$(get_config_version "$ADDON_DIR")
 echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
-IFS="|" read -r LATEST_VERSION RELEASE_TYPE RELEASE_URL <<< "$(get_latest_release "$UPSTREAM_REPO" "$VERSION_TYPE")"
+IFS="|" read -r LATEST_VERSION RELEASE_TYPE RELEASE_URL <<< "$(get_latest_release "$UPSTREAM_REPO" "$VERSION_TYPE" "$TAG_PREFIX")"
 echo "latest_release=$LATEST_VERSION" >> $GITHUB_OUTPUT
 echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
 echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT

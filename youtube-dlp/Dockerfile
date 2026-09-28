@@ -12,6 +12,11 @@ LABEL \
     io.hass.type="addon" \
     io.hass.arch="${BUILD_ARCH}"
 
+# Upstream version tracked by auto-upgrade (.updates/youtube-dlp.sh).
+# Informational only: yt-dlp is installed from pip (unpinned) so a version
+# bump triggers a rebuild that picks up the latest release.
+ARG YOUTUBE_DLP_VERSION="2026.08.19"
+
 RUN apk add --no-cache \
     bash \
     ca-certificates \

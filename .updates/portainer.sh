@@ -11,16 +11,17 @@ export UPSTREAM_REPO="portainer/portainer"
 export VERSION_TYPE="direct"
 export TAG_PREFIX=""
 export FILES_TO_UPDATE="config.yaml build.yaml"
-BUILD_VERSION=$(grep -Eo "portainer[^:]*:[0-9]+\.[0-9]+\.[0-9]+" "$ADDON_DIR"/build.yaml | head -1 | sed "s/.*://")
+export PKG_PATH=""
+BUILD_VERSION=$(grep -Eo "portainer[^:]*:[0-9]+\.[0-9]+\.[0-9]+" "$ADDON_DIR"/build.yaml | head -1 | sed "s/.*://" || echo "")
 echo "build_version=$BUILD_VERSION" >> $GITHUB_OUTPUT
 CONFIG_VERSION=$(get_config_version "$ADDON_DIR")
 echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
-IFS="|" read -r LATEST_VERSION RELEASE_TYPE RELEASE_URL <<< "$(get_latest_release "$UPSTREAM_REPO" "$VERSION_TYPE")"
+IFS="|" read -r LATEST_VERSION RELEASE_TYPE RELEASE_URL <<< "$(get_latest_release "$UPSTREAM_REPO" "$VERSION_TYPE" "$TAG_PREFIX")"
 echo "latest_release=$LATEST_VERSION" >> $GITHUB_OUTPUT
 echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
 echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
 echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
-COMPARE_RESULT=$(check_pr_status "$ADDON_DIR" "$DISPLAY_NAME" "$LATEST_VERSION" "$RELEASE_TYPE" "$VERSION_TYPE" "$DOCKERFILE_VERSION")
+COMPARE_RESULT=$(check_pr_status "$ADDON_DIR" "$DISPLAY_NAME" "$LATEST_VERSION" "$RELEASE_TYPE" "$VERSION_TYPE" "$BUILD_VERSION")
 echo "$COMPARE_RESULT" | while IFS="=" read -r key value; do echo "$key=$value" >> $GITHUB_OUTPUT; done
 NEEDS_UPGRADE=$(echo "$COMPARE_RESULT" | grep "^needs_upgrade=" | cut -d= -f2)
 [ "$NEEDS_UPGRADE" = "false" ] && echo "Already up-to-date" && exit 0
