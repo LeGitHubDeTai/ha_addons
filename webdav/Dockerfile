@@ -11,7 +11,7 @@ LABEL \
     io.hass.type="addon" \
     io.hass.arch="${BUILD_ARCH}"
 
-ARG WEBDAV_VERSION=5.15.1
+ARG WEBDAV_VERSION="5.16.1"
 
 RUN set -eux; \
     apk add --no-cache ca-certificates jq openssl wget tar; \
