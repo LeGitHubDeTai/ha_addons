@@ -170,20 +170,6 @@ print(f"Generated {len(ADDONS)} addon scripts in {UPDATES_DIR}")
 WORKFLOW_PATH = os.path.join(REPO, ".github", "workflows", "auto-upgrades.yml")
 os.makedirs(os.path.dirname(WORKFLOW_PATH), exist_ok=True)
 
-# Build matrix entries
-matrix_entries = []
-for name, d, ver_arg, use_by, up_repo, ver_type, tag_prefix, files_upd, ls_dir in ADDONS:
-    matrix_entries.append(
-        f"          - addon_dir: {d}\n"
-        f"            display_name: {name}\n"
-        f"            version_arg: {ver_arg}\n"
-        f"            use_build_yaml: {use_by}\n"
-        f"            upstream_repo: {up_repo}\n"
-        f"            version_type: {ver_type}\n"
-        f"            tag_prefix: \"{tag_prefix}\"\n"
-        f"            files_to_update: \"{files_upd}\""
-    )
-
 workflow_content = """name: Auto-upgrades
 
 on:
@@ -201,7 +187,45 @@ env:
   GH_TOKEN: ${{ github.token }}
 
 jobs:
+  discover-addons:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Discover addon scripts
+        id: matrix
+        run: |
+          SCRIPTS=$(find .updates -maxdepth 1 -name '*.sh' -type f | sort)
+          MATRIX="["
+          FIRST=true
+          for script in $SCRIPTS; do
+            ADDON_DIR=$(basename "$script" .sh)
+            DISPLAY_NAME=$(grep 'export DISPLAY_NAME=' "$script" | sed 's/.*export DISPLAY_NAME=//' | sed 's/"//g')
+            VERSION_ARG=$(grep 'export VERSION_ARG=' "$script" | sed 's/.*export VERSION_ARG=//' | sed 's/"//g')
+            USE_BUILD_YAML=$(grep 'export USE_BUILD_YAML=' "$script" | sed 's/.*export USE_BUILD_YAML=//' | sed 's/"//g')
+            UPSTREAM_REPO=$(grep 'export UPSTREAM_REPO=' "$script" | sed 's/.*export UPSTREAM_REPO=//' | sed 's/"//g')
+            VERSION_TYPE=$(grep 'export VERSION_TYPE=' "$script" | sed 's/.*export VERSION_TYPE=//' | sed 's/"//g')
+            TAG_PREFIX=$(grep 'export TAG_PREFIX=' "$script" | sed 's/.*export TAG_PREFIX=//' | sed 's/"//g')
+            FILES_TO_UPDATE=$(grep 'export FILES_TO_UPDATE=' "$script" | sed 's/.*export FILES_TO_UPDATE=//' | sed 's/"//g')
+
+            if [ "$FIRST" = "true" ]; then
+              FIRST=false
+            else
+              MATRIX="$MATRIX,"
+            fi
+            MATRIX="${MATRIX}{\"addon_dir\":\"$ADDON_DIR\",\"display_name\":\"$DISPLAY_NAME\",\"version_arg\":\"$VERSION_ARG\",\"use_build_yaml\":\"$USE_BUILD_YAML\",\"upstream_repo\":\"$UPSTREAM_REPO\",\"version_type\":\"$VERSION_TYPE\",\"tag_prefix\":\"$TAG_PREFIX\",\"files_to_update\":\"$FILES_TO_UPDATE\"}"
+          done
+          MATRIX="$MATRIX]"
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Discovered $(ls .updates/*.sh | wc -l) addon scripts"
+
   auto-upgrade:
+    needs: discover-addons
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -209,13 +233,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-"""
+        include: ${{ fromJson(needs.discover-addons.outputs.matrix) }}
 
-for entry in matrix_entries:
-    workflow_content += entry + ",\n"
-
-workflow_content += """
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
