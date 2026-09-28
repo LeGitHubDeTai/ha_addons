@@ -14,11 +14,11 @@ get_addon_dir() {
     echo "${ADDON_DIR:-$(basename "$(pwd)")}"
 }
 
-# Extract version from Dockerfile ARG
+# Extract version from Dockerfile ARG (fallback to ENV for legacy files)
 get_dockerfile_version() {
     local addon_dir="$1"
     local version_arg="$2"
-    grep -E "ARG ${version_arg}=" "${addon_dir}/Dockerfile" | head -1 | sed 's/.*=//' | sed 's/"//g' | sed 's/[[:space:]]*//'
+    (grep -E "(ARG|ENV) ${version_arg}=" "${addon_dir}/Dockerfile" | head -1 | sed 's/.*=//' | sed 's/"//g' | sed "s/'//g" | sed 's/[[:space:]]*//' || true)
 }
 
 # Extract version from build.yaml (linuxserver style)
@@ -30,7 +30,7 @@ get_build_yaml_version() {
 # Extract version from config.yaml
 get_config_version() {
     local addon_dir="$1"
-    grep -E '^version:' "${addon_dir}/config.yaml" | sed 's/version: "//' | sed 's/"//'
+    (grep -E '^version:' "${addon_dir}/config.yaml" | sed 's/version: "//' | sed 's/"//' || true)
 }
 
 # Extract build.yaml tag for linuxserver
