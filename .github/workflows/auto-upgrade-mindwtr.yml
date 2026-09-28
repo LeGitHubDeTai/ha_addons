@@ -217,7 +217,7 @@ jobs:
           sed -i "s/^version: .*/version: \"${{ steps.addon_version.outputs.new_addon_version }}\"/" mindwtr/config.yaml
           echo "Updated config.yaml version to ${{ steps.addon_version.outputs.new_addon_version }}"
 
-- name: Update Dockerfile
+      - name: Update Dockerfile
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
           sed -i "s|branch v[0-9.]\+|branch v${{ steps.latest.outputs.latest_version }}|g" mindwtr/Dockerfile
@@ -304,7 +304,7 @@ jobs:
               --base main \
               --head "$BRANCH_NAME" \
               --title "⬆️ Upgrade mindwtr to $LATEST_VERSION (addon $NEW_ADDON_VERSION)" \
---body "Auto-upgrade mindwtr to version $LATEST_VERSION
+              --body "Auto-upgrade mindwtr to version $LATEST_VERSION
 
             **Changes:**
             - Updated config.yaml addon version to $NEW_ADDON_VERSION
