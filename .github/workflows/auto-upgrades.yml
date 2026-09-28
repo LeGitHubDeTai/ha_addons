@@ -28,10 +28,7 @@ jobs:
       - name: Discover addon scripts
         id: matrix
         run: |
-          SCRIPTS=$(find .updates -maxdepth 1 -name '*.sh' -type f | sort)
-          MATRIX="["
-          FIRST=true
-          for script in $SCRIPTS; do
+          MATRIX=$(find .updates -maxdepth 1 -name '*.sh' -type f | sort | while read -r script; do
             ADDON_DIR=$(basename "$script" .sh)
             DISPLAY_NAME=$(grep 'export DISPLAY_NAME=' "$script" | sed 's/.*export DISPLAY_NAME=//' | sed 's/"//g')
             VERSION_ARG=$(grep 'export VERSION_ARG=' "$script" | sed 's/.*export VERSION_ARG=//' | sed 's/"//g')
@@ -40,15 +37,8 @@ jobs:
             VERSION_TYPE=$(grep 'export VERSION_TYPE=' "$script" | sed 's/.*export VERSION_TYPE=//' | sed 's/"//g')
             TAG_PREFIX=$(grep 'export TAG_PREFIX=' "$script" | sed 's/.*export TAG_PREFIX=//' | sed 's/"//g')
             FILES_TO_UPDATE=$(grep 'export FILES_TO_UPDATE=' "$script" | sed 's/.*export FILES_TO_UPDATE=//' | sed 's/"//g')
-
-            if [ "$FIRST" = "true" ]; then
-              FIRST=false
-            else
-              MATRIX="$MATRIX,"
-            fi
-            MATRIX="${MATRIX}{"addon_dir":"$ADDON_DIR","display_name":"$DISPLAY_NAME","version_arg":"$VERSION_ARG","use_build_yaml":"$USE_BUILD_YAML","upstream_repo":"$UPSTREAM_REPO","version_type":"$VERSION_TYPE","tag_prefix":"$TAG_PREFIX","files_to_update":"$FILES_TO_UPDATE"}"
-          done
-          MATRIX="$MATRIX]"
+            jq -n --arg addon_dir "$ADDON_DIR"                   --arg display_name "$DISPLAY_NAME"                   --arg version_arg "$VERSION_ARG"                   --arg use_build_yaml "$USE_BUILD_YAML"                   --arg upstream_repo "$UPSTREAM_REPO"                   --arg version_type "$VERSION_TYPE"                   --arg tag_prefix "$TAG_PREFIX"                   --arg files_to_update "$FILES_TO_UPDATE"                   '{addon_dir:$addon_dir, display_name:$display_name, version_arg:$version_arg, use_build_yaml:$use_build_yaml, upstream_repo:$upstream_repo, version_type:$version_type, tag_prefix:$tag_prefix, files_to_update:$files_to_update}'
+          done | jq -s '.')
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "Discovered $(ls .updates/*.sh | wc -l) addon scripts"
 
@@ -83,3 +73,87 @@ jobs:
           FORCE_FLAG: ${{ github.event.inputs.force || 'true' }}
         run: |
           bash .updates/${{ matrix.addon_dir }}.sh
+
+      - name: Commit and push changes
+        if: steps.upgrade.outputs.needs_upgrade == 'true'
+        env:
+          BRANCH_NAME: ${{ steps.upgrade.outputs.branch_name }}
+          DISPLAY_NAME: ${{ matrix.display_name }}
+          NEW_ADDON_VERSION: ${{ steps.upgrade.outputs.new_addon_version }}
+          LATEST_VERSION: ${{ steps.upgrade.outputs.latest_version }}
+          FORCE_FLAG: ${{ github.event.inputs.force || 'true' }}
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git commit -m "Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
+
+          git fetch origin || true
+          if [ "$FORCE_FLAG" = "true" ]; then
+            git push origin "$BRANCH_NAME" --force
+          elif git rev-parse origin/"$BRANCH_NAME" >/dev/null 2>&1; then
+            if [ -n "$(git log origin/"$BRANCH_NAME"..HEAD 2>/dev/null)" ]; then
+              git push origin "$BRANCH_NAME" --force
+            else
+              echo "No new commits to push"
+            fi
+          else
+            git push origin "$BRANCH_NAME"
+          fi
+
+      - name: Create or Update Pull Request
+        if: steps.upgrade.outputs.needs_upgrade == 'true'
+        env:
+          BRANCH_NAME: ${{ steps.upgrade.outputs.branch_name }}
+          DISPLAY_NAME: ${{ matrix.display_name }}
+          LATEST_VERSION: ${{ steps.upgrade.outputs.latest_version }}
+          NEW_ADDON_VERSION: ${{ steps.upgrade.outputs.new_addon_version }}
+          RELEASE_TYPE: ${{ steps.upgrade.outputs.release_type }}
+          RELEASE_URL: ${{ steps.upgrade.outputs.release_url }}
+          IS_NEW_VERSION: ${{ steps.upgrade.outputs.is_new_version }}
+          FORCE_FLAG: ${{ github.event.inputs.force || 'true' }}
+        run: |
+          OPEN_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+          ANY_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state all --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$OPEN_PR" ]; then
+            echo "Open PR #$OPEN_PR found, updating labels..."
+            CURRENT_LABELS=$(gh pr view "$OPEN_PR" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+            if echo "$CURRENT_LABELS" | grep -q "pre-release\|latest"; then
+              gh pr edit "$OPEN_PR" --remove-label "pre-release,latest" 2>/dev/null || true
+            fi
+            gh pr edit "$OPEN_PR" --add-label "$RELEASE_TYPE"
+            if [ "$IS_NEW_VERSION" = "true" ]; then
+              CURRENT_TITLE=$(gh pr view "$OPEN_PR" --json title --jq '.title' 2>/dev/null || echo "")
+              NEW_TITLE="Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
+              if [ "$CURRENT_TITLE" != "$NEW_TITLE" ]; then
+                gh pr edit "$OPEN_PR" --title "$NEW_TITLE"
+              fi
+            fi
+            echo "PR #$OPEN_PR updated successfully"
+          elif [ "$FORCE_FLAG" = "true" ]; then
+            gh pr create               --base main               --head "$BRANCH_NAME"               --title "Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"               --body "Auto-upgrade $DISPLAY_NAME to version $LATEST_VERSION
+
+**Changes:**
+- Updated config.yaml addon version to $NEW_ADDON_VERSION
+- Updated upstream version to $LATEST_VERSION
+
+**Release:** $RELEASE_URL
+
+This PR was created automatically by the auto-upgrade workflow (forced recreation)."               --label "auto-upgrade,dependencies,$RELEASE_TYPE"
+            echo "PR created successfully (forced)"
+          elif [ -n "$ANY_PR" ]; then
+            echo "PR #$ANY_PR already exists but is closed/merged - not creating duplicate"
+          elif [ "$IS_NEW_VERSION" = "true" ]; then
+            gh pr create               --base main               --head "$BRANCH_NAME"               --title "Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"               --body "Auto-upgrade $DISPLAY_NAME to version $LATEST_VERSION
+
+**Changes:**
+- Updated config.yaml addon version to $NEW_ADDON_VERSION
+- Updated upstream version to $LATEST_VERSION
+
+**Release:** $RELEASE_URL
+
+This PR was created automatically by the auto-upgrade workflow."               --label "auto-upgrade,dependencies,$RELEASE_TYPE"
+            echo "PR created successfully"
+          else
+            echo "No new version and no open PR - nothing to do"
+          fi
