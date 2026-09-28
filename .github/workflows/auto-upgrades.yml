@@ -97,7 +97,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git commit -m "Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
+          git commit -m "⬆️ Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
 
           git fetch origin || true
           if [ "$FORCE_FLAG" = "true" ]; then
@@ -124,7 +124,7 @@ jobs:
           IS_NEW_VERSION: ${{ steps.upgrade.outputs.is_new_version }}
           FORCE_FLAG: ${{ github.event.inputs.force || 'true' }}
         run: |
-          PR_TITLE="Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
+          PR_TITLE="⬆️ Upgrade $DISPLAY_NAME to $LATEST_VERSION (addon $NEW_ADDON_VERSION)"
           PR_BODY=$(printf "Auto-upgrade %s to version %s\n\n### Changes:\n- Updated config.yaml addon version to %s\n- Updated upstream version to %s\n\n### Release:\n%s\n\nThis PR was created automatically by the auto-upgrade workflow." "$DISPLAY_NAME" "$LATEST_VERSION" "$NEW_ADDON_VERSION" "$LATEST_VERSION" "$RELEASE_URL")
 
           OPEN_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
