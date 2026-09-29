@@ -32,9 +32,10 @@ RUN apk add --no-cache \
        ln -s /command/with-contenv /usr/bin/with-contenv; \
      fi
 
-# Scripts d'initialisation HA (options -> variables d'environnement LinuxServer)
+# Scripts d'initialisation HA, exécutés par init-custom-files de LinuxServer
+# (/custom-cont-init.d), avant le démarrage des services
 COPY root/ /
 
-RUN chmod +x /etc/cont-init.d/10-lidarr-ha.sh
+RUN chmod +x /custom-cont-init.d/10-lidarr-ha.sh
 
 EXPOSE 8686
