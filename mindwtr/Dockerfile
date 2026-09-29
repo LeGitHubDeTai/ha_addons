@@ -49,7 +49,7 @@ ENV MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES="50000000"
 ENV MINDWTR_DEFAULT_CLOUD_URL=""
 
 # Clone Mindwtr source at specific version (bumped by auto-upgrade)
-ARG MINDWTR_VERSION="1.3.2"
+ARG MINDWTR_VERSION="1.3.3"
 WORKDIR /usr/share/mindwtr
 RUN git clone --depth 1 --branch v${MINDWTR_VERSION} https://github.com/dongdongbh/Mindwtr.git . && \
     rm -rf .git
