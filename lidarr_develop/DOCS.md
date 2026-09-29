@@ -50,6 +50,9 @@ TZ: Europe/Paris
   isolated from the stable and nightly variants.
 - Do **not** update Lidarr from inside its own UI: with Docker-based installs,
   updates are delivered through new add-on versions.
+- The LinuxServer `svc-cron` service is disabled on startup: Lidarr never uses
+  cron, and its verbose logging (`file root:`, `line run-parts …`) only spammed
+  the add-on log.
 - `develop` builds can contain breaking changes or database migrations that
   cannot be downgraded. Back up before updating.
 

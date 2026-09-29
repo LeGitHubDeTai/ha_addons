@@ -56,6 +56,9 @@ TZ: Europe/Paris
 - Do **not** update Lidarr from inside its own UI (Settings → General →
   Updates): with Docker-based installs, updates are delivered through new
   add-on versions. Automatic in-app updates are disabled by the LinuxServer image.
+- The LinuxServer `svc-cron` service is disabled on startup: Lidarr never uses
+  cron, and its verbose logging (`file root:`, `line run-parts …`) only spammed
+  the add-on log.
 
 ## Access (no Ingress)
 

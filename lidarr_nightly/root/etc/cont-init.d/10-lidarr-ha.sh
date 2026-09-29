@@ -29,6 +29,17 @@ export TZ="$HA_TZ"
 
 bashio::log.info "Options HA : PUID=${PUID} PGID=${PGID} TZ=${HA_TZ}"
 
+# Lidarr n'utilise pas cron : désactive le service svc-cron de LinuxServer.
+# Sans cela, busybox crond tourne en niveau verbeux (-l 5) et inonde le journal
+# ("file root:", "line run-parts /etc/periodic/...", "wakeup dt=60", ...).
+# Sans risque : svc-lidarr ne dépend que de init-services.
+if [ -d /etc/s6-overlay/s6-rc.d/svc-cron ]; then
+  touch /etc/s6-overlay/s6-rc.d/svc-cron/down
+  bashio::log.info "Service cron désactivé (inutile pour Lidarr)"
+else
+  bashio::log.info "Aucun service svc-cron détecté, rien à désactiver"
+fi
+
 # Dossiers pratiques créés au premier démarrage (ignorés s'ils existent déjà)
 for _dir in /share/music /share/downloads; do
   if [ ! -d "$_dir" ]; then
