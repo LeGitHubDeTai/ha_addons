@@ -45,7 +45,9 @@ Most users can leave this empty.
 
 Requestly is accessible through Home Assistant's Ingress feature. The `ingress_port` is set to `3000`.
 
-Home Assistant forwards the full URL including `/api/hassio_ingress/<token>/` to nginx (the prefix is **not** stripped). `nginx.conf` removes it before location/cache lookup (`rewrite ^/api/hassio_ingress/[^/]+(.*)$ $1 last`) and rewrites absolute asset URLs (`/assets/…`, `/favicon.png`, `/manifest.json`) in responses with the prefix from the `X-Ingress-Path` header; without that the browser requests `/assets/…` from Home Assistant itself (404, CSS refused as `text/plain`, app stuck on loading screen).
+The Supervisor strips the `/api/hassio_ingress/<slug>/` prefix before forwarding requests to nginx, so nginx always sees clean paths (`/`, `/assets/…`) in both modes. But the *browser* sees the full URL under Ingress, so absolute asset URLs (`/assets/…`, `/favicon.png`, `/manifest.json`) are re-prefixed in responses via nginx `sub_filter` using the `X-Ingress-Path` header; without that the browser requests `/assets/…` from Home Assistant itself (404, app stuck on loading screen).
+
+The `sub_filter` rewriting above was verified end-to-end against real nginx behavior (HTML + JS bundles, including gzip-encoded responses).
 
 `patch-ingress.py` runs during the image build and makes react-router use the ingress prefix as `basename`, otherwise no route matches and the page stays blank.
 
