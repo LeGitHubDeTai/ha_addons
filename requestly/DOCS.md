@@ -45,7 +45,7 @@ Most users can leave this empty.
 
 Requestly is accessible through Home Assistant's Ingress feature. The `ingress_port` is set to `3000`.
 
-The Supervisor strips the `/api/hassio_ingress/<slug>/` prefix before forwarding requests to nginx, so nginx always sees clean paths (`/`, `/assets/…`) in both modes. But the *browser* sees the full URL under Ingress, so absolute asset URLs (`/assets/…`, `/favicon.png`, `/manifest.json`) are re-prefixed in responses via nginx `sub_filter` using the `X-Ingress-Path` header; without that the browser requests `/assets/…` from Home Assistant itself (404, app stuck on loading screen).
+The Supervisor strips the `/api/hassio_ingress/<slug>/` prefix before forwarding requests to nginx, so nginx always sees clean paths (`/`, `/assets/…`) in both modes. But the *browser* sees the full URL under Ingress, so absolute asset URLs (`/assets/…`, `/favicon.png`, `/manifest.json`, plus the root-level `/tree-sitter*.wasm` and SessionBear brand files Vite drops at the build root) are re-prefixed in responses via nginx `sub_filter` using the `X-Ingress-Path` header; without that the browser requests `/assets/…` from Home Assistant itself (404, app stuck on loading screen).
 
 The `sub_filter` rewriting above was verified end-to-end against real nginx behavior (HTML + JS bundles, including gzip-encoded responses).
 

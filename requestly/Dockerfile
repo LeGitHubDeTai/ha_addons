@@ -77,6 +77,17 @@ RUN if ! grep -q 'src="/assets/' app/build/index.html; then \
     fi \
     && echo "OK : bundle reference en /assets/ (sub_filter nginx couvre l'ingress)"
 
+# Garde-fou : les .wasm servis a la racine (cf. regles sub_filter de nginx.conf)
+# doivent bien exister dans le build (viteStaticCopy dest "."). Sinon le build
+# echoue, plutot que de publier une image ou ils 404 sous ingress.
+RUN for f in tree-sitter.wasm tree-sitter-bash.wasm; do \
+        if [ ! -f "app/build/$f" ]; then \
+            echo "ERREUR : app/build/$f manquant (l'upstream a change le build ?)"; \
+            exit 1; \
+        fi; \
+    done \
+    && echo "OK : .wasm racine presents dans le build"
+
 # Garde-fou : le HTML servi ne doit plus contenir la redirection cloud
 RUN if grep -q 'window.location.href = "https://app.requestly.io"' app/build/index.html; then echo "ERREUR : redirection cloud toujours presente dans le build"; exit 1; fi \
     && echo "OK : pas de redirection cloud dans le build"
