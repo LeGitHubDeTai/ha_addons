@@ -63,8 +63,14 @@ jobs:
 
           # Extract release info
           LATEST_VERSION=$(echo "$LATEST_RELEASE" | sed 's/v//')
-          # Extract minor version for build tag (e.g., 1.27 from 1.27.3)
-          MINOR_VERSION=$(echo "$LATEST_VERSION" | cut -d. -f1,2)
+          # Extract minor version for build tag:
+          # Gitea <=1.x uses major.minor nightly tags (e.g. 1.27-nightly),
+          # Gitea >=28 uses major-only nightly tags (e.g. 28-nightly, 28.0-nightly does not exist)
+          if [[ "$LATEST_VERSION" == 1.* ]]; then
+            MINOR_VERSION=$(echo "$LATEST_VERSION" | cut -d. -f1,2)
+          else
+            MINOR_VERSION=$(echo "$LATEST_VERSION" | cut -d. -f1)
+          fi
           IS_PRERELEASE=$(echo "$RELEASE_INFO" | jq -r '.prerelease')
           RELEASE_URL=$(echo "$RELEASE_INFO" | jq -r '.html_url')
 
@@ -94,12 +100,22 @@ jobs:
           LATEST_VERSION="${{ steps.latest.outputs.latest_version }}"
           RELEASE_TYPE="${{ steps.latest.outputs.release_type }}"
 
-          # Compare using minor version (e.g., 1.27 vs 1.26)
-          CURRENT_MINOR=$(echo "$CURRENT_BUILD_VERSION" | sed 's/-nightly//' | cut -d. -f1,2)
+          # Compare using docker nightly tag base (e.g., 1.27 vs 1.26, or 28 vs 1.27)
+          # Gitea <=1.x tracks major.minor, Gitea >=28 tracks major only
+          get_tag_base() {
+            local ver="$1"
+            if [[ "$ver" == 1.* ]]; then
+              echo "$ver" | cut -d. -f1,2
+            else
+              echo "$ver" | cut -d. -f1
+            fi
+          }
+          CURRENT_MINOR=$(get_tag_base "$(echo "$CURRENT_BUILD_VERSION" | sed 's/-nightly//')")
+          MINOR_VERSION_BASE=$(get_tag_base "$MINOR_VERSION")
 
           # Check if this is a new version
           IS_NEW_VERSION=false
-          if [ "$(printf '%s\n' "$MINOR_VERSION" "$CURRENT_MINOR" | sort -V | head -n1)" = "$CURRENT_MINOR" ] && [ "$CURRENT_MINOR" != "$MINOR_VERSION" ]; then
+          if [ "$(printf '%s\n' "$MINOR_VERSION_BASE" "$CURRENT_MINOR" | sort -V | head -n1)" = "$CURRENT_MINOR" ] && [ "$CURRENT_MINOR" != "$MINOR_VERSION_BASE" ]; then
             IS_NEW_VERSION=true
           fi
 
@@ -214,8 +230,9 @@ jobs:
       - name: Update build.yaml
         if: steps.compare.outputs.needs_upgrade == 'true' && (steps.compare.outputs.is_new_version == 'true' || github.event.inputs.force == 'true')
         run: |
-          # Update version in build.yaml (replace gitea/gitea:X.Y-nightly with new minor version)
-          sed -i "s/gitea\/gitea:[0-9]*\.[0-9]*-nightly/gitea\/gitea:${{ steps.latest.outputs.minor_version }}-nightly/g" gitea/build.yaml
+          # Update version in build.yaml (replace gitea/gitea:<tag>-nightly with new tag base)
+          # Matches both 1.27-nightly and 28-nightly styles
+          sed -i "s/gitea\/gitea:[0-9]*\(\.[0-9]*\)\?-nightly/gitea\/gitea:${{ steps.latest.outputs.minor_version }}-nightly/g" gitea/build.yaml
           echo "Updated build.yaml to gitea/gitea:${{ steps.latest.outputs.minor_version }}-nightly"
 
       - name: Commit changes
