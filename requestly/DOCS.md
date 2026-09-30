@@ -47,6 +47,8 @@ Requestly is accessible through Home Assistant's Ingress feature. The `ingress_p
 
 The Supervisor strips the `/api/hassio_ingress/<slug>/` prefix before forwarding requests to nginx, so nginx always sees clean paths (`/`, `/assets/…`) in both modes. But the *browser* sees the full URL under Ingress, so absolute asset URLs (`/assets/…`, `/favicon.png`, `/manifest.json`, plus the root-level `/tree-sitter*.wasm` and SessionBear brand files Vite drops at the build root) are re-prefixed in responses via nginx `sub_filter` using the `X-Ingress-Path` header; without that the browser requests `/assets/…` from Home Assistant itself (404, app stuck on loading screen).
 
+Special case: the bundle loads `/tree-sitter.wasm` through Emscripten with `locateFile: (f) => "/" + f`, i.e. the URL is *built at runtime* and never appears literally, so `sub_filter` cannot rewrite it. The image build therefore injects a small fetch/XHR shim at the top of `index.html` that re-prefixes exactly those two wasm URLs under Ingress (no-op on direct access).
+
 The `sub_filter` rewriting above was verified end-to-end against real nginx behavior (HTML + JS bundles, including gzip-encoded responses).
 
 `patch-ingress.py` runs during the image build and makes react-router use the ingress prefix as `basename`, otherwise no route matches and the page stays blank.

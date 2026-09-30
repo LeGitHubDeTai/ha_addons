@@ -57,6 +57,62 @@ p.write_text(s.replace(old, "/* self-hosted (HA addon) : redirection cloud desac
 print("index.html patche : redirection cloud neutralisee")
 EOF
 
+# Self-host (HA) : le bundle charge tree-sitter*.wasm via Emscripten avec
+# `locateFile: (f) => "/" + f` (URL construite a l'execution, jamais en
+# litteral : sub_filter ne peut pas la voir — verifie sur l'image publiee).
+# Sous ingress, /tree-sitter.wasm sort du prefixe -> 404 HA.
+# On injecte donc un shim fetch/XHR en tete de index.html, qui re-prefixe ces
+# URLs sous ingress (no-op en acces direct). Independant des noms minifies,
+# teste avec node (syntaxe + comportement ingress/direct).
+# Le build echoue volontairement si l'ancre upstream change, pour le detecter.
+RUN python3 <<'PYEOF'
+import pathlib
+p = pathlib.Path("app/index.html")
+s = p.read_text()
+marker = "HA-INGRESS-WASM-SHIM"
+assert marker not in s, "shim wasm deja present dans app/index.html ?!"
+anchor = "<head>"
+assert s.count(anchor) == 1, "ancre <head> introuvable ou ambigue dans app/index.html (l'upstream a change ?)"
+shim = """
+<script>
+/* HA-INGRESS-WASM-SHIM : l'app charge /tree-sitter*.wasm en absolu (Emscripten
+   locateFile => "/" + f), ce qui sort du prefixe ingress -> 404. Ce shim
+   re-prefixe ces requetes fetch/XHR sous ingress. No-op en acces direct. */
+(function () {
+  var m = window.location.pathname.match(/^\\/api\\/hassio_ingress\\/[^/]+/);
+  if (!m) return;
+  var prefix = m[0];
+  var ROOTS = { "/tree-sitter.wasm": 1, "/tree-sitter-bash.wasm": 1 };
+  function fixUrl(u) {
+    try {
+      var p = new URL(u, window.location.href);
+      if (p.origin === window.location.origin && ROOTS[p.pathname]) {
+        return prefix + p.pathname + p.search;
+      }
+    } catch (e) {}
+    return u;
+  }
+  var origFetch = window.fetch;
+  window.fetch = function (input, init) {
+    if (typeof input === "string") {
+      input = fixUrl(input);
+    } else if (typeof Request !== "undefined" && input instanceof Request) {
+      var u = fixUrl(input.url);
+      if (u !== input.url) input = new Request(new URL(u, window.location.href).href, input);
+    }
+    return origFetch.call(this, input, init);
+  };
+  var origOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, url, async, user, password) {
+    return origOpen.call(this, method, fixUrl(url), async, user, password);
+  };
+})();
+</script>
+"""
+p.write_text(s.replace(anchor, anchor + shim, 1))
+print("index.html patche : shim wasm ingress injecte")
+PYEOF
+
 # Patch HA Ingress : basename react-router calcule depuis /api/hassio_ingress/<token>.
 # Sans ça, react-router compare le chemin ingress a des routes type /rules, n'en
 # reconnait aucune et l'ecran reste blanc meme quand le bundle se charge.
@@ -87,6 +143,10 @@ RUN for f in tree-sitter.wasm tree-sitter-bash.wasm; do \
         fi; \
     done \
     && echo "OK : .wasm racine presents dans le build"
+
+# Garde-fou : le shim wasm doit avoir survécu a la compilation dans le HTML
+RUN if ! grep -q 'HA-INGRESS-WASM-SHIM' app/build/index.html; then echo "ERREUR : shim wasm absent du build"; exit 1; fi \
+    && echo "OK : shim wasm present dans le build"
 
 # Garde-fou : le HTML servi ne doit plus contenir la redirection cloud
 RUN if grep -q 'window.location.href = "https://app.requestly.io"' app/build/index.html; then echo "ERREUR : redirection cloud toujours presente dans le build"; exit 1; fi \
