@@ -12,7 +12,7 @@ export VERSION_TYPE="calver"
 export TAG_PREFIX="v"
 export FILES_TO_UPDATE="config.yaml build.yaml"
 export PKG_PATH=""
-CURRENT_MINOR=$(grep -Eo "gitea/gitea:[0-9]+\.[0-9]+" "$ADDON_DIR"/build.yaml | head -1 | sed "s/.*://" || echo "")
+CURRENT_MINOR=$(grep -Eo "gitea/gitea:[0-9]+(\.[0-9]+)?" "$ADDON_DIR"/build.yaml | head -1 | sed "s/.*://" || echo "")
 echo "current_minor=$CURRENT_MINOR" >> $GITHUB_OUTPUT
 CONFIG_VERSION=$(get_config_version "$ADDON_DIR")
 echo "config_version=$CONFIG_VERSION" >> $GITHUB_OUTPUT
@@ -20,7 +20,12 @@ IFS="|" read -r LATEST_VERSION RELEASE_TYPE RELEASE_URL <<< "$(get_latest_releas
 echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
 echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
 echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
-LATEST_MINOR=$(echo "$LATEST_VERSION" | cut -d. -f1,2)
+LATEST_MINOR=$(echo "$LATEST_VERSION" | cut -d. -f1)
+# Gitea <=1.x uses major.minor nightly tags (e.g. 1.27-nightly),
+# Gitea >=28 uses major-only nightly tags (e.g. 28-nightly, no 28.0-nightly on Docker Hub)
+if [ "$(echo "$LATEST_VERSION" | cut -d. -f1)" = "1" ]; then
+  LATEST_MINOR=$(echo "$LATEST_VERSION" | cut -d. -f1,2)
+fi
 echo "latest_minor=$LATEST_MINOR" >> $GITHUB_OUTPUT
 COMPARE_RESULT=$(check_pr_status "$ADDON_DIR" "$DISPLAY_NAME" "$LATEST_MINOR" "$RELEASE_TYPE" "$VERSION_TYPE" "$CURRENT_MINOR")
 echo "$COMPARE_RESULT" | while IFS="=" read -r key value; do echo "$key=$value" >> $GITHUB_OUTPUT; done
