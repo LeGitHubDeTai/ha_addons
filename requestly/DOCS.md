@@ -47,7 +47,7 @@ Requestly is accessible through Home Assistant's Ingress feature. The `ingress_p
 
 The Supervisor strips the `/api/hassio_ingress/<slug>/` prefix before forwarding requests to nginx, so nginx always sees clean paths (`/`, `/assets/…`) in both modes. But the *browser* sees the full URL under Ingress, so absolute asset URLs (`/assets/…`, `/favicon.png`, `/manifest.json`, plus the root-level `/tree-sitter*.wasm` and SessionBear brand files Vite drops at the build root) are re-prefixed in responses via nginx `sub_filter` using the `X-Ingress-Path` header; without that the browser requests `/assets/…` from Home Assistant itself (404, app stuck on loading screen).
 
-Special case: the bundle loads `/tree-sitter.wasm` through Emscripten with `locateFile: (f) => "/" + f`, i.e. the URL is *built at runtime* and never appears literally, so `sub_filter` cannot rewrite it. The image build therefore injects a small fetch/XHR shim at the top of `index.html` that re-prefixes exactly those two wasm URLs under Ingress (no-op on direct access).
+Special case: the bundle loads `/tree-sitter.wasm` through Emscripten with `locateFile: (f) => "/" + f`, i.e. the URL is *built at runtime* and never appears literally, so `sub_filter` cannot rewrite it — and Vite's CSS preload links are built the same way. The image build therefore injects a small fetch/XHR/DOM shim at the top of `index.html` that re-prefixes exactly the local asset URLs (wasm, `/assets/…`, favicon, manifest) under Ingress (no-op on direct access). The shim itself is written so `sub_filter` cannot rewrite it, and the build fails loudly if that ever changes.
 
 The `sub_filter` rewriting above was verified end-to-end against real nginx behavior (HTML + JS bundles, including gzip-encoded responses).
 

@@ -75,24 +75,43 @@ anchor = "<head>"
 assert s.count(anchor) == 1, "ancre <head> introuvable ou ambigue dans app/index.html (l'upstream a change ?)"
 shim = """
 <script>
-/* HA-INGRESS-WASM-SHIM : l'app charge tree-sitter*.wasm en absolu (Emscripten
-   locateFile => slash + f), ce qui sort du prefixe ingress -> 404. Ce shim
-   re-prefixe ces requetes fetch/XHR sous ingress. No-op en acces direct.
-   ATTENTION : ne jamais ecrire ici de litteral guillemet + slash + chemin
-   (genre quote slash tree-sitter.wasm) : sub_filter le reecrirait au serving
-   et neutraliserait le shim (vecu en 26.9.9 : ROOTS prefixe, comparaison
-   morte). D'ou des cles SANS slash initial ci-dessous. */
+/* HA-INGRESS-WASM-SHIM : sous ingress, le bundle fabrique a l execution des URL
+   absolues locales (Emscripten slash+f, preload CSS Vite) qui sortent du
+   prefixe et finissent en 404. Ce shim re-prefixe fetch, XHR et les href-src
+   crees dynamiquement. No-op en acces direct.
+   CONTRAINTE D ECRITURE : aucun literal guillemet-slash-chemin dans ce bloc,
+   sub_filter le reecrirait au serving (deja vecu). D ou cles sans slash et
+   morceaux de chaines concatenes. */
 (function () {
   var m = window.location.pathname.match(/^\\/api\\/hassio_ingress\\/[^/]+/);
   if (!m) return;
   var prefix = m[0];
-  var ROOTS = { "tree-sitter.wasm": 1, "tree-sitter-bash.wasm": 1 };
+  var FILES = { "tree-sitter.wasm": 1, "tree-sitter-bash.wasm": 1, "favicon.png": 1, "manifest.json": 1, "sessionBearFavicon.png": 1, "sessionBear_lg.svg": 1 };
+  var ASSETS = "/" + "assets/";
+  function isLocalAsset(pathname) {
+    if (!pathname || pathname.charAt(0) !== "/") return false;
+    if (FILES[pathname.slice(1)]) return true;
+    return pathname.slice(0, 8) === ASSETS;
+  }
   function fixUrl(u) {
     try {
       var p = new URL(u, window.location.href);
-      if (p.origin === window.location.origin && ROOTS[p.pathname.replace(/^\\//, "")]) {
+      if (p.origin === window.location.origin && isLocalAsset(p.pathname)) {
         return prefix + p.pathname + p.search;
       }
+    } catch (e) {}
+    return u;
+  }
+  function fixEl(el, attr) {
+    try {
+      var v = el.getAttribute(attr);
+      if (!v) return;
+      var p = new URL(v, window.location.href);
+      if (p.origin === window.location.origin && isLocalAsset(p.pathname)) {
+        el.setAttribute(attr, prefix + p.pathname + p.search);
+      }
+    } catch (e) {}
+  }
     } catch (e) {}
     return u;
   }
@@ -110,6 +129,34 @@ shim = """
   XMLHttpRequest.prototype.open = function (method, url, async, user, password) {
     return origOpen.call(this, method, fixUrl(url), async, user, password);
   };
+  try {
+    [["HTMLLinkElement", "href"], ["HTMLScriptElement", "src"], ["HTMLImageElement", "src"]].forEach(function (pair) {
+      var Ctor = window[pair[0]];
+      if (!Ctor) return;
+      var desc = Object.getOwnPropertyDescriptor(Ctor.prototype, pair[1]);
+      if (!desc || !desc.set) return;
+      Object.defineProperty(Ctor.prototype, pair[1], {
+        configurable: true,
+        enumerable: desc.enumerable,
+        get: desc.get,
+        set: function (v) { desc.set.call(this, fixUrl(v)); }
+      });
+    });
+  } catch (e) {}
+  try {
+    var observer = new MutationObserver(function (muts) {
+      for (var i = 0; i < muts.length; i++) {
+        var nodes = muts[i].addedNodes;
+        for (var j = 0; j < nodes.length; j++) {
+          var n = nodes[j];
+          if (!n || !n.tagName) continue;
+          if (n.tagName === "LINK") fixEl(n, "href");
+          else if (n.tagName === "SCRIPT" || n.tagName === "IMG") fixEl(n, "src");
+        }
+      }
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  } catch (e) {}
 })();
 </script>
 """
@@ -152,15 +199,14 @@ RUN for f in tree-sitter.wasm tree-sitter-bash.wasm; do \
 RUN if ! grep -q 'HA-INGRESS-WASM-SHIM' app/build/index.html; then echo "ERREUR : shim wasm absent du build"; exit 1; fi \
     && echo "OK : shim wasm present dans le build"
 
-# Garde-fou anti auto-collision (vecu en 26.9.9) : on rejoue ici, avec un
-# prefixe factice, les substitutions sub_filter de nginx.conf sur le HTML
-# compile, et on exige que les cles ROOTS du shim restent SANS slash initial.
-# Si un futur littéral "/..." se glisse dans le shim, sub_filter le reecrirait
-# au serving et neutraliserait la comparaison -> le build echoue au lieu de
+# Garde-fou anti auto-collision (vecu en 26.9.9 avec ROOTS prefixe par
+# sub_filter) : on rejoue ici, avec un prefixe factice, les substitutions
+# sub_filter de nginx.conf sur le HTML compile, et on exige que le bloc shim
+# complet ressorte INCHANGE. Tout futur literal "/..." glisse dans le shim
+# (qui le neutraliserait au serving) fait donc echouer le build au lieu de
 # publier un shim mort.
 RUN python3 <<'PYEOF'
 import pathlib, re
-s = pathlib.Path("app/build/index.html").read_text()
 P = "/api/hassio_ingress/TESTTOKEN"
 rules = [
     ('"/assets/', '"' + P + '/assets/'),
@@ -184,12 +230,14 @@ rules = [
     ('"/sessionBear_lg.svg', '"' + P + '/sessionBear_lg.svg'),
     ("'/sessionBear_lg.svg", "'" + P + '/sessionBear_lg.svg'),
 ]
+m = re.search(r"<script>\s*/\* HA-INGRESS-WASM-SHIM \*/.*?</script>", pathlib.Path("app/build/index.html").read_text(), re.DOTALL)
+assert m, "bloc shim introuvable dans le HTML compile (shim absent ?)"
+pre = m.group(0)
+rewritten = pre
 for old, new in rules:
-    s = s.replace(old, new)
-m = re.search(r"ROOTS\s*=\s*\{([^}]*)\}", s)
-assert m, "ROOTS introuvable dans le HTML reecrit (shim absent ?)"
-assert "TESTTOKEN" not in m.group(1), "AUTO-COLLISION : sub_filter a reecrit les cles ROOTS du shim : " + m.group(1)
-print("OK : cles ROOTS intactes apres emulation sub_filter : " + m.group(1).strip())
+    rewritten = rewritten.replace(old, new)
+assert rewritten == pre, "AUTO-COLLISION : sub_filter modifie le shim au serving"
+print("OK : shim inchange apres emulation sub_filter")
 PYEOF
 
 # Garde-fou : le HTML servi ne doit plus contenir la redirection cloud
