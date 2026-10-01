@@ -112,9 +112,6 @@ shim = """
       }
     } catch (e) {}
   }
-    } catch (e) {}
-    return u;
-  }
   var origFetch = window.fetch;
   window.fetch = function (input, init) {
     if (typeof input === "string") {
@@ -241,8 +238,14 @@ rewritten = pre
 for old, new in rules:
     rewritten = rewritten.replace(old, new)
 assert rewritten == pre, "AUTO-COLLISION : sub_filter modifie le shim au serving"
+pathlib.Path("/tmp/shim-check.js").write_text(pre)
 print("OK : shim inchange apres emulation sub_filter")
 PYEOF
+
+# Garde-fou : le shim extrait doit etre du JavaScript valide. Vecu : 3 lignes
+# dupliquees dans la source => SyntaxError au serving => shim mort, fetch non
+# patche, 404 wasm (le builder contient node, autant l'utiliser).
+RUN node --check /tmp/shim-check.js && echo "OK : shim syntaxe valide"
 
 # Garde-fou : le HTML servi ne doit plus contenir la redirection cloud
 RUN if grep -q 'window.location.href = "https://app.requestly.io"' app/build/index.html; then echo "ERREUR : redirection cloud toujours presente dans le build"; exit 1; fi \
