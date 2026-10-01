@@ -238,8 +238,9 @@ rewritten = pre
 for old, new in rules:
     rewritten = rewritten.replace(old, new)
 assert rewritten == pre, "AUTO-COLLISION : sub_filter modifie le shim au serving"
-pathlib.Path("/tmp/shim-check.js").write_text(pre)
-print("OK : shim inchange apres emulation sub_filter")
+inner = pre[pre.find(">") + 1:pre.rfind("</script>")]
+pathlib.Path("/tmp/shim-check.js").write_text(inner)
+print("OK : shim inchange apres emulation sub_filter (JS extrait pour node --check)")
 PYEOF
 
 # Garde-fou : le shim extrait doit etre du JavaScript valide. Vecu : 3 lignes
