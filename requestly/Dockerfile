@@ -75,18 +75,22 @@ anchor = "<head>"
 assert s.count(anchor) == 1, "ancre <head> introuvable ou ambigue dans app/index.html (l'upstream a change ?)"
 shim = """
 <script>
-/* HA-INGRESS-WASM-SHIM : l'app charge /tree-sitter*.wasm en absolu (Emscripten
-   locateFile => "/" + f), ce qui sort du prefixe ingress -> 404. Ce shim
-   re-prefixe ces requetes fetch/XHR sous ingress. No-op en acces direct. */
+/* HA-INGRESS-WASM-SHIM : l'app charge tree-sitter*.wasm en absolu (Emscripten
+   locateFile => slash + f), ce qui sort du prefixe ingress -> 404. Ce shim
+   re-prefixe ces requetes fetch/XHR sous ingress. No-op en acces direct.
+   ATTENTION : ne jamais ecrire ici de litteral guillemet + slash + chemin
+   (genre quote slash tree-sitter.wasm) : sub_filter le reecrirait au serving
+   et neutraliserait le shim (vecu en 26.9.9 : ROOTS prefixe, comparaison
+   morte). D'ou des cles SANS slash initial ci-dessous. */
 (function () {
   var m = window.location.pathname.match(/^\\/api\\/hassio_ingress\\/[^/]+/);
   if (!m) return;
   var prefix = m[0];
-  var ROOTS = { "/tree-sitter.wasm": 1, "/tree-sitter-bash.wasm": 1 };
+  var ROOTS = { "tree-sitter.wasm": 1, "tree-sitter-bash.wasm": 1 };
   function fixUrl(u) {
     try {
       var p = new URL(u, window.location.href);
-      if (p.origin === window.location.origin && ROOTS[p.pathname]) {
+      if (p.origin === window.location.origin && ROOTS[p.pathname.replace(/^\\//, "")]) {
         return prefix + p.pathname + p.search;
       }
     } catch (e) {}
@@ -147,6 +151,46 @@ RUN for f in tree-sitter.wasm tree-sitter-bash.wasm; do \
 # Garde-fou : le shim wasm doit avoir survécu a la compilation dans le HTML
 RUN if ! grep -q 'HA-INGRESS-WASM-SHIM' app/build/index.html; then echo "ERREUR : shim wasm absent du build"; exit 1; fi \
     && echo "OK : shim wasm present dans le build"
+
+# Garde-fou anti auto-collision (vecu en 26.9.9) : on rejoue ici, avec un
+# prefixe factice, les substitutions sub_filter de nginx.conf sur le HTML
+# compile, et on exige que les cles ROOTS du shim restent SANS slash initial.
+# Si un futur littéral "/..." se glisse dans le shim, sub_filter le reecrirait
+# au serving et neutraliserait la comparaison -> le build echoue au lieu de
+# publier un shim mort.
+RUN python3 <<'PYEOF'
+import pathlib, re
+s = pathlib.Path("app/build/index.html").read_text()
+P = "/api/hassio_ingress/TESTTOKEN"
+rules = [
+    ('"/assets/', '"' + P + '/assets/'),
+    ("'/assets/", "'" + P + '/assets/'),
+    ('`/assets/', '`' + P + '/assets/'),
+    ('url(/assets/', 'url(' + P + '/assets/'),
+    ('url("/assets/', 'url("' + P + '/assets/'),
+    ("url('/assets/", "url('" + P + '/assets/'),
+    ('"/favicon.png', '"' + P + '/favicon.png'),
+    ("'/favicon.png", "'" + P + '/favicon.png'),
+    ('"/manifest.json', '"' + P + '/manifest.json'),
+    ("'/manifest.json", "'" + P + '/manifest.json'),
+    ('"/tree-sitter.wasm', '"' + P + '/tree-sitter.wasm'),
+    ("'/tree-sitter.wasm", "'" + P + '/tree-sitter.wasm'),
+    ('`/tree-sitter.wasm', '`' + P + '/tree-sitter.wasm'),
+    ('"/tree-sitter-bash.wasm', '"' + P + '/tree-sitter-bash.wasm'),
+    ("'/tree-sitter-bash.wasm", "'" + P + '/tree-sitter-bash.wasm'),
+    ('`/tree-sitter-bash.wasm', '`' + P + '/tree-sitter-bash.wasm'),
+    ('"/sessionBearFavicon.png', '"' + P + '/sessionBearFavicon.png'),
+    ("'/sessionBearFavicon.png", "'" + P + '/sessionBearFavicon.png'),
+    ('"/sessionBear_lg.svg', '"' + P + '/sessionBear_lg.svg'),
+    ("'/sessionBear_lg.svg", "'" + P + '/sessionBear_lg.svg'),
+]
+for old, new in rules:
+    s = s.replace(old, new)
+m = re.search(r"ROOTS\s*=\s*\{([^}]*)\}", s)
+assert m, "ROOTS introuvable dans le HTML reecrit (shim absent ?)"
+assert "TESTTOKEN" not in m.group(1), "AUTO-COLLISION : sub_filter a reecrit les cles ROOTS du shim : " + m.group(1)
+print("OK : cles ROOTS intactes apres emulation sub_filter : " + m.group(1).strip())
+PYEOF
 
 # Garde-fou : le HTML servi ne doit plus contenir la redirection cloud
 RUN if grep -q 'window.location.href = "https://app.requestly.io"' app/build/index.html; then echo "ERREUR : redirection cloud toujours presente dans le build"; exit 1; fi \
