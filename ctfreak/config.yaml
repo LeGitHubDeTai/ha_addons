@@ -1,0 +1,40 @@
+name: CTFREAK
+version: "26.10.1"
+slug: ctfreak
+panel_title: CTFREAK
+panel_icon: "mdi:timer-cog"
+description: Planificateur de tâches IT auto-hébergé (CTFREAK) - ordonnance, exécute et surveille vos scripts et commandes sur vos serveurs
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/ctfreak
+image: ghcr.io/legithubdetai/ha_addons/ctfreak-{arch}
+arch:
+    - amd64
+startup: application
+boot: auto
+init: false
+apparmor: true
+hassio_role: default
+ingress: true
+ingress_port: 6700
+ingress_stream: true
+webui: http://[HOST]:[PORT:6700]/
+ports:
+    6700/tcp: null
+ports_description:
+    6700/tcp: Interface web CTFREAK. Ingress recommandé, exposition optionnelle.
+map:
+    - addon_config:rw
+    - share:rw
+    - media:rw
+    - backup:rw
+backup_exclude:
+    - "ctfreak/logs/*"
+options:
+    TZ: Europe/Paris
+    data_dir: /share/ctfreak
+    env_vars_list: []
+schema:
+    TZ: str
+    data_dir: match(/share/.+|/media/.+)
+    env_vars_list: [
+      "match(^[A-Z_0-9]+: .*$)"
+    ]

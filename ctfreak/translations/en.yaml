@@ -1,0 +1,12 @@
+configuration:
+  TZ:
+    name: Timezone
+    description: Set the timezone used to schedule tasks.
+  data_dir:
+    name: Data directory
+    description: Folder used by CTFREAK to store its configuration, embedded database and execution logs (e.g. /share/ctfreak).
+  env_vars_list:
+    name: Extra environment variables
+    description: 'Free environment variables as "KEY: value".'
+network:
+  6700/tcp: CTFREAK web interface (Ingress recommended)

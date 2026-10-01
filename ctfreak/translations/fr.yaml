@@ -1,0 +1,12 @@
+configuration:
+  TZ:
+    name: Fuseau horaire
+    description: Définit le fuseau horaire utilisé pour planifier les tâches.
+  data_dir:
+    name: Dossier de données
+    description: Dossier utilisé par CTFREAK pour stocker sa configuration, sa base de données embarquée et ses journaux d'exécution (ex. /share/ctfreak).
+  env_vars_list:
+    name: Variables d'environnement supplémentaires
+    description: 'Variables d''environnement libres au format "CLE: valeur".'
+network:
+  6700/tcp: Interface web CTFREAK (Ingress recommandé)
