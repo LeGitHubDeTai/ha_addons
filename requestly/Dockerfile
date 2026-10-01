@@ -206,7 +206,7 @@ RUN if ! grep -q 'HA-INGRESS-WASM-SHIM' app/build/index.html; then echo "ERREUR 
 # (qui le neutraliserait au serving) fait donc echouer le build au lieu de
 # publier un shim mort.
 RUN python3 <<'PYEOF'
-import pathlib, re
+import pathlib
 P = "/api/hassio_ingress/TESTTOKEN"
 rules = [
     ('"/assets/', '"' + P + '/assets/'),
@@ -230,7 +230,6 @@ rules = [
     ('"/sessionBear_lg.svg', '"' + P + '/sessionBear_lg.svg'),
     ("'/sessionBear_lg.svg", "'" + P + '/sessionBear_lg.svg'),
 ]
-m = None
 html = pathlib.Path("app/build/index.html").read_text()
 idx = html.find("HA-INGRESS-WASM-SHIM")
 assert idx != -1, "bloc shim introuvable dans le HTML compile (shim absent ?)"
