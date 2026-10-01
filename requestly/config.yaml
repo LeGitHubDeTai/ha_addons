@@ -1,5 +1,5 @@
 name: Requestly
-version: "26.9.11"
+version: "26.9.12"
 slug: requestly
 panel_icon: "mdi:api"
 description: Intercepteur HTTP, mocks d'API et débogage réseau (Requestly)
