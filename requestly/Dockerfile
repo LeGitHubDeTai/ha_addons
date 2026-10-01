@@ -230,9 +230,14 @@ rules = [
     ('"/sessionBear_lg.svg', '"' + P + '/sessionBear_lg.svg'),
     ("'/sessionBear_lg.svg", "'" + P + '/sessionBear_lg.svg'),
 ]
-m = re.search(r"<script>\s*/\* HA-INGRESS-WASM-SHIM \*/.*?</script>", pathlib.Path("app/build/index.html").read_text(), re.DOTALL)
-assert m, "bloc shim introuvable dans le HTML compile (shim absent ?)"
-pre = m.group(0)
+m = None
+html = pathlib.Path("app/build/index.html").read_text()
+idx = html.find("HA-INGRESS-WASM-SHIM")
+assert idx != -1, "bloc shim introuvable dans le HTML compile (shim absent ?)"
+start = html.rfind("<script", 0, idx)
+end = html.find("</script>", idx)
+assert start != -1 and end != -1, "balises script du shim introuvables"
+pre = html[start:end + len("</script>")]
 rewritten = pre
 for old, new in rules:
     rewritten = rewritten.replace(old, new)
