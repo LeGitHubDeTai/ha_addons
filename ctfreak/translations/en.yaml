@@ -5,6 +5,15 @@ configuration:
   data_dir:
     name: Data directory
     description: Folder used by CTFREAK to store its configuration, embedded database and execution logs (e.g. /share/ctfreak).
+  external_url:
+    name: External URL
+    description: Public URL of your CTFREAK instance (e.g. https://ctfreak.example.com). Required behind a reverse proxy or Home Assistant Ingress for OIDC login and notification links to work.
+  http_port:
+    name: HTTP port
+    description: Internal HTTP port CTFREAK listens on. Must match ingress_port in config.yaml.
+  config_json:
+    name: Global settings (JSON)
+    description: 'JSON merged into CTFREAK config.json for Settings -> Global options (e.g. {"timeout":"1h","retentionPeriod":30}).'
   env_vars_list:
     name: Extra environment variables
     description: 'Free environment variables as "KEY: value".'

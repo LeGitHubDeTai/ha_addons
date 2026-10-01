@@ -37,6 +37,6 @@ RUN chmod +x /usr/local/bin/ctfreak-entrypoint.sh
 EXPOSE 6700
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:6700/ || exit 1
+    CMD curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6700/ | grep -qE '^[2-4][0-9]{2}$' || exit 1
 
 ENTRYPOINT ["/usr/local/bin/ctfreak-entrypoint.sh"]

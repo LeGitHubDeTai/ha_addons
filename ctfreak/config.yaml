@@ -1,5 +1,5 @@
 name: CTFREAK
-version: "26.10.1"
+version: "26.10.2"
 slug: ctfreak
 panel_title: CTFREAK
 panel_icon: "mdi:timer-cog"
@@ -31,10 +31,16 @@ backup_exclude:
 options:
     TZ: Europe/Paris
     data_dir: /share/ctfreak
+    external_url: ""
+    http_port: 6700
+    config_json: ""
     env_vars_list: []
 schema:
     TZ: str
     data_dir: match(/share/.+|/media/.+)
+    external_url: str
+    http_port: port
+    config_json: str
     env_vars_list: [
       "match(^[A-Z_0-9]+: .*$)"
     ]
