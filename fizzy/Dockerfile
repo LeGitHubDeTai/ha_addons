@@ -2,7 +2,7 @@
 # Cet addon se contente d'ajouter : lecture des options HA, persistance /data et démarrage.
 ARG BUILD_FROM=ghcr.io/basecamp/fizzy:main
 # SHA du commit upstream suivi (mis à jour par le workflow auto-upgrade ; l'image :main est flottante)
-ARG FIZZY_VERSION="a703bf1"
+ARG FIZZY_VERSION="d157d2c"
 FROM ${BUILD_FROM}
 
 ARG BUILD_ARCH
