@@ -8,9 +8,6 @@ configuration:
   external_url:
     name: External URL
     description: Public URL of your CTFREAK instance (e.g. https://ctfreak.example.com). Required behind a reverse proxy or Home Assistant Ingress for OIDC login and notification links to work.
-  http_port:
-    name: HTTP port
-    description: Internal HTTP port CTFREAK listens on. Must match ingress_port in config.yaml.
   config_json:
     name: Global settings (JSON)
     description: 'JSON merged into CTFREAK config.json for Settings -> Global options (e.g. {"timeout":"1h","retentionPeriod":30}).'
@@ -18,4 +15,4 @@ configuration:
     name: Extra environment variables
     description: 'Free environment variables as "KEY: value".'
 network:
-  6700/tcp: CTFREAK web interface (Ingress recommended)
+  6701/tcp: CTFREAK web interface (Ingress recommended)

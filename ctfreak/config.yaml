@@ -14,13 +14,13 @@ init: false
 apparmor: true
 hassio_role: default
 ingress: true
-ingress_port: 6700
+ingress_port: 6701
 ingress_stream: true
-webui: http://[HOST]:[PORT:6700]/
+webui: http://[HOST]:[PORT:6701]/
 ports:
-    6700/tcp: null
+    6701/tcp: null
 ports_description:
-    6700/tcp: Interface web CTFREAK. Ingress recommandé, exposition optionnelle.
+    6701/tcp: Interface web CTFREAK. Ingress recommandé, exposition optionnelle.
 map:
     - addon_config:rw
     - share:rw
@@ -32,14 +32,12 @@ options:
     TZ: Europe/Paris
     data_dir: /share/ctfreak
     external_url: ""
-    http_port: 6700
     config_json: ""
     env_vars_list: []
 schema:
     TZ: str
     data_dir: match(/share/.+|/media/.+)
     external_url: str
-    http_port: port
     config_json: str
     env_vars_list: [
       "match(^[A-Z_0-9]+: .*$)"

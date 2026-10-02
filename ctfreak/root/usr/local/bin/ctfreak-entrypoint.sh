@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Entrypoint CTFREAK : applique les options de l'add-on Home Assistant
-# (TZ, data_dir, external_url, http_port, config_json) puis lance le binaire
+# (TZ, data_dir, external_url, config_json) puis lance le binaire
 # upstream `ctfreak -c <data_dir> run`.
 set -e
 
@@ -17,12 +17,11 @@ fi
 HA_TZ="$(bashio::config 'TZ')"
 DATA_DIR="$(bashio::config 'data_dir')"
 EXTERNAL_URL="$(bashio::config 'external_url')"
-HTTP_PORT="$(bashio::config 'http_port')"
 CONFIG_JSON="$(bashio::config 'config_json')"
 
 export TZ="$HA_TZ"
 
-bashio::log.info "Options HA : TZ=${HA_TZ} data_dir=${DATA_DIR} http_port=${HTTP_PORT} external_url=${EXTERNAL_URL}"
+bashio::log.info "Options HA : TZ=${HA_TZ} data_dir=${DATA_DIR} external_url=${EXTERNAL_URL}"
 
 if [ ! -d "$DATA_DIR" ]; then
   mkdir -p "$DATA_DIR" || bashio::log.warning "Impossible de créer ${DATA_DIR}"
@@ -45,4 +44,4 @@ if [ -n "$EXTERNAL_URL" ]; then
   RUN_ARGS="$RUN_ARGS -set-external-url=${EXTERNAL_URL}"
 fi
 
-exec /usr/bin/ctfreak -c "$DATA_DIR" run -n "$HTTP_PORT" $RUN_ARGS
+exec /usr/bin/ctfreak -c "$DATA_DIR" run $RUN_ARGS

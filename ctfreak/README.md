@@ -16,7 +16,6 @@
 | `TZ` | Fuseau horaire utilisé pour planifier les tâches | `Europe/Paris` |
 | `data_dir` | Dossier de données (configuration, base embarquée, journaux) | `/share/ctfreak` |
 | `external_url` | URL publique de l'instance (ex. `https://ctfreak.example.com`). Requise derrière un reverse proxy ou Ingress pour la connexion OIDC et les liens de notifications | *vide* |
-| `http_port` | Port HTTP interne d'écoute de CTFREAK. Doit correspondre à `ingress_port` | `6700` |
 | `config_json` | JSON fusionné dans le `config.json` de CTFREAK (paramètres Settings → Global, ex. `{"timeout":"1h","retentionPeriod":30}`) | *vide* |
 | `env_vars_list` | Variables d'environnement supplémentaires au format `CLE: valeur` (ex. `HTTPS_PROXY`) | *vide* |
 
@@ -24,13 +23,15 @@
 
 | Port | Description |
 |------|-------------|
-| `6700/tcp` | Interface web CTFREAK. Normalement non exposé — Home Assistant Ingress est recommandé. |
+| `6701/tcp` | Interface web CTFREAK (via nginx). Normalement non exposé — Home Assistant Ingress est recommandé. |
 
 ## Ingress
 
 L'add-on supporte Home Assistant Ingress : l'interface web est accessible directement depuis le panneau Home Assistant, sans exposer le port sur le réseau local.
 
-Pour un fonctionnement correct derrière Ingress (liens de notifications, connexion OIDC), définissez l'option `external_url` avec l'URL complète du panneau de l'add-on dans Home Assistant (elle contient le préfixe `/hassio_ingress/<token>/`).
+Un nginx interne (port 6701) sert de reverse proxy vers CTFREAK (port 6700) et corrige les URLs de l'API : CTFREAK construit ses URLs depuis `window.location.origin`, ce qui ignore le préfixe `/hassio_ingress/<token>/` d'Ingress. Le nginx réécrit le JS pour inclure ce préfixe.
+
+Pour un fonctionnement correct derrière Ingress (liens de notifications, connexion OIDC), définissez l'option `external_url` avec l'URL publique de votre instance.
 
 ## Support
 
