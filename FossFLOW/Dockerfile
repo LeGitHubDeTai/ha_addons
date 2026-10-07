@@ -19,7 +19,7 @@ RUN apk add --no-cache \
     curl
 
 # Install FossFLOW from upstream
-ARG FOSSFLOW_VERSION=1.0.4
+ARG FOSSFLOW_VERSION="1.0.5"
 RUN cd /tmp \
     && curl -L "https://github.com/Abrar74774/FossFLOW/archive/refs/tags/v${FOSSFLOW_VERSION}.zip" -o fossflow.zip \
     && unzip fossflow.zip \
