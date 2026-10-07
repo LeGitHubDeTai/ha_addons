@@ -36,7 +36,7 @@ WORKDIR /data
 COPY n8n-entrypoint.sh /app/n8n-entrypoint.sh
 
 # n8n version pinned here (bumped by auto-upgrade; .updates/n8n.sh tracks n8n-io/n8n tags n8n@X.Y.Z)
-ARG N8N_VERSION="2.42.0"
+ARG N8N_VERSION="2.42.4"
 # Install n8n (simplified for ARM64/AMD64 compatibility)
 RUN npm install -g n8n@${N8N_VERSION}
 
