@@ -1,5 +1,5 @@
 name: Lidarr Nightly
-version: "26.9.3"
+version: "26.10.1"
 slug: lidarr_nightly
 description: Gestionnaire de collection musicale — branche nightly (builds quotidiens instables)
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/lidarr_nightly
