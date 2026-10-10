@@ -1,6 +1,6 @@
 build_from:
-  amd64: lscr.io/linuxserver/nzbget:amd64-v26.3-ls266
-  aarch64: lscr.io/linuxserver/nzbget:arm64v8-v26.3-ls266
+  amd64: lscr.io/linuxserver/nzbget:amd64-v26.3-ls267
+  aarch64: lscr.io/linuxserver/nzbget:arm64v8-v26.3-ls267
 labels:
   org.opencontainers.image.title: "NZBGet"
   org.opencontainers.image.description: "Client de téléchargement Usenet (NZBGet) pour Home Assistant"

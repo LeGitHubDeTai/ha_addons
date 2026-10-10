@@ -1,5 +1,5 @@
 name: NZBGet
-version: "26.10.1"
+version: "26.10.2"
 slug: nzbget
 description: Client de téléchargement Usenet (NZBGet) - Client NZB basé sur le web avec une interface de contrôle distante
 url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/nzbget
