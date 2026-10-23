@@ -11,7 +11,7 @@ LABEL \
     io.hass.arch="${BUILD_ARCH}"
 
 # Version upstream slskd — mise à jour par le workflow auto-upgrade-soulseek
-ARG SLSKD_VERSION="0.26.1"
+ARG SLSKD_VERSION="0.26.2"
 
 RUN set -eux; \
     apk add --no-cache \
