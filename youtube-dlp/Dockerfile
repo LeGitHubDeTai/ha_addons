@@ -15,7 +15,7 @@ LABEL \
 # Upstream version tracked by auto-upgrade (.updates/youtube-dlp.sh).
 # Informational only: yt-dlp is installed from pip (unpinned) so a version
 # bump triggers a rebuild that picks up the latest release.
-ARG YOUTUBE_DLP_VERSION="2026.10.21"
+ARG YOUTUBE_DLP_VERSION="2026.10.26"
 
 RUN apk add --no-cache \
     bash \
