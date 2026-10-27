@@ -1,5 +1,5 @@
 name: Deemix
-version: "26.9.3"
+version: "26.10.1"
 slug: deemix
 panel_icon: "mdi:music"
 description: Téléchargeur de musique Deezer avec interface web (Deemix)

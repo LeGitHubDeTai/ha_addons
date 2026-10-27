@@ -8,7 +8,7 @@ ARG BUILD_VERSION
 ARG BUILD_ARCH
 
 # Version de l'app upstream (packages/webui/package.json). Mise à jour par le workflow auto-upgrade-deemix.
-ARG DEEMIX_VERSION=4.7.0
+ARG DEEMIX_VERSION="4.7.2"
 
 # Application précompilée (turbo build) depuis l'image officielle
 FROM ghcr.io/bambanah/deemix:v${DEEMIX_VERSION} AS upstream
