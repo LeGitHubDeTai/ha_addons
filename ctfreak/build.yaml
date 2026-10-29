@@ -1,5 +1,5 @@
 build_from:
-  amd64: jypsoftware/ctfreak:1.41.0
+  amd64: jypsoftware/ctfreak:1.42.0
 labels:
   org.opencontainers.image.title: "CTFREAK"
   org.opencontainers.image.description: "Planificateur de tâches IT auto-hébergé (CTFREAK) - ordonnance, exécute et surveille vos scripts et commandes sur vos serveurs"
