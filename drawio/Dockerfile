@@ -1,6 +1,6 @@
 FROM ghcr.io/hassio-addons/base:21.0.0
 
-ARG DRAWIO_VERSION="32.6.9"
+ARG DRAWIO_VERSION="32.6.10"
 
 RUN apk add --no-cache unzip curl nginx
 
