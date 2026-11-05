@@ -21,6 +21,11 @@
 
 À noter :
 
+- **Construction depuis les sources** : les binaires précompilés upstream
+  (releases GitHub) contiennent des instructions BMI2 (`sarx`/`shlx`/`shrx`)
+  qui provoquent un crash silencieux (SIGILL) au démarrage sur les CPU sans
+  BMI2 (avant Haswell, anciennes VM). L'add-on compile donc Kanzo avec
+  l'outilchain Alpine pour garantir l'ISA de base (x86-64 / armv8).
 - Au premier démarrage, l'add-on crée `config.toml` avec `port = 4242`, `listen = "0.0.0.0"` et `mcp_http = true` (le serveur MCP est disponible sur `/mcp`).
 - L'écoute est forcée sur `0.0.0.0` dans le conteneur, nécessaire pour l'Ingress HA ; l'exposition réseau réelle reste maîtrisée par les options de port de l'add-on.
 

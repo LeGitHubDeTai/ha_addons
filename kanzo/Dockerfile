@@ -1,14 +1,29 @@
-# Kanzo — binaire Linux statique (musl) téléchargé depuis les releases GitHub.
+# Kanzo — compilé depuis les sources (crates.io), en multi-étapes.
+#
+# Pourquoi pas le binaire précompilé upstream ? Les releases x86_64
+# contiennent des instructions BMI2 (sarx/shlx/shrx) qui provoquent un
+# SIGILL au démarrage sur les CPU sans BMI2 (avant Haswell, anciennes VM) :
+# kanzo meurt silencieusement avant même d'imprimer "Kanzo board at ...".
+# La compilation locale avec l'outilchain Alpine produit un binaire à
+# l'ISA de base (x86-64 / armv8), compatible avec tous les CPU supportés.
+#
 # https://github.com/emanuele-em/kanzo
 ARG BUILD_FROM
 ARG BUILD_VERSION
 ARG BUILD_ARCH
 
+# --- Étape 1 : compilation du binaire ---
+FROM rust:1-alpine AS kanzo-builder
+ARG KANZO_VERSION="0.3.0"
+# build-base = gcc, musl-dev, make (requis pour rusqlite/sqlite3.c)
+RUN apk add --no-cache build-base ca-certificates \
+  && cargo install kanzo --version "${KANZO_VERSION}" --locked
+
+# --- Étape 2 : image finale ---
 FROM ${BUILD_FROM}
 
 ARG BUILD_VERSION
 ARG BUILD_ARCH
-ARG KANZO_VERSION="0.3.0"
 
 LABEL \
     io.hass.version="${BUILD_VERSION}" \
@@ -20,27 +35,14 @@ RUN apk add --no-cache \
     ca-certificates \
     curl \
     jq \
-    tar \
-    xz \
     tzdata \
   && mkdir -p /usr/local/lib /share /media /backup \
   && curl -fL -sS https://raw.githubusercontent.com/LeGitHubDeTai/ha_addons/main/.scripts/bashio-standalone.sh \
       -o /usr/local/lib/bashio-standalone.sh \
   && chmod 644 /usr/local/lib/bashio-standalone.sh
 
-# --- binaire upstream multi-arch (x86_64 / aarch64 musl) ---
-RUN set -eux; \
-    case "${BUILD_ARCH}" in \
-        "amd64") KANZO_TARGET="x86_64-unknown-linux-musl" ;; \
-        "aarch64") KANZO_TARGET="aarch64-unknown-linux-musl" ;; \
-        *) echo "Unsupported architecture: ${BUILD_ARCH}"; exit 1 ;; \
-    esac; \
-    curl -fL -sS "https://github.com/emanuele-em/kanzo/releases/download/v${KANZO_VERSION}/kanzo-${KANZO_TARGET}.tar.xz" \
-        -o /tmp/kanzo.tar.xz; \
-    tar -xJf /tmp/kanzo.tar.xz -C /tmp; \
-    install -m 755 "/tmp/kanzo-${KANZO_TARGET}/kanzo" /usr/local/bin/kanzo; \
-    rm -rf /tmp/kanzo.tar.xz "/tmp/kanzo-${KANZO_TARGET}"; \
-    kanzo --version
+# --- binaire compilé à l'étape précédente ---
+COPY --from=kanzo-builder /usr/local/cargo/bin/kanzo /usr/local/bin/kanzo
 
 # --- scripts ---
 COPY root /
