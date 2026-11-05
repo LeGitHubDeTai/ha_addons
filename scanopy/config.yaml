@@ -1,5 +1,5 @@
 name: Scanopy
-version: "26.10.12"
+version: "26.11.1"
 slug: scanopy
 panel_title: Scanopy - Network Scanner
 panel_icon: "mdi:network"

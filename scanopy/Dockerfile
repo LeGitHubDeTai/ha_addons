@@ -95,6 +95,10 @@ COPY --from=backend-builder /builder/ui/ ./
 COPY --from=backend-builder /builder/messages/ ../messages/
 COPY --from=backend-builder /fixtures/ ./src/lib/data/
 
+# vite.config.ts reads ../backend/THIRD-PARTY-NOTICES.txt (i.e. /app/backend/...) when it
+# writes third-party-licenses.txt, so the backend notices must exist next to /app/ui.
+COPY --from=backend-builder /builder/backend/THIRD-PARTY-NOTICES.txt /app/backend/THIRD-PARTY-NOTICES.txt
+
 # Install dependencies and build
 RUN npm ci && \
     npm run build
