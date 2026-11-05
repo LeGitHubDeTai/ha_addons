@@ -1,0 +1,13 @@
+---
+configuration:
+  TZ:
+    name: Fuseau horaire
+    description: Définit le fuseau horaire du conteneur.
+  data_dir:
+    name: Dossier de données
+    description: Dossier utilisé par l'add-on pour stocker le tableau (kanzo.db) et ses réglages (config.toml), ex. /share/kanzo.
+  env_vars_list:
+    name: Variables d'environnement supplémentaires
+    description: 'Variables d''environnement libres au format "CLE: valeur".'
+network:
+  4242/tcp: Interface web Kanzo (Ingress recommandé)

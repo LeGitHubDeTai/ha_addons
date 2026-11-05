@@ -1,0 +1,7 @@
+build_from:
+  amd64: ghcr.io/home-assistant/amd64-base:3.24
+  aarch64: ghcr.io/home-assistant/aarch64-base:3.24
+labels:
+  org.opencontainers.image.title: "Kanzo"
+  org.opencontainers.image.description: "Tableau Kanban minimaliste partagé entre vous et vos agents IA (accès MCP intégré)"
+  org.opencontainers.image.source: "https://github.com/LeGitHubDeTai/ha_addons/tree/main/kanzo"

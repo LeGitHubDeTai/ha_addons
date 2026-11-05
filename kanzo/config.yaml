@@ -1,0 +1,41 @@
+name: Kanzo
+version: "26.11.1"
+slug: kanzo
+panel_title: Kanzo
+panel_icon: "mdi:view-column"
+description: Tableau Kanban minimaliste partagé entre vous et vos agents IA (accès MCP intégré)
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/kanzo
+image: ghcr.io/legithubdetai/ha_addons/kanzo-{arch}
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: false
+apparmor: true
+hassio_role: default
+ingress: true
+ingress_port: 4242
+ingress_stream: true
+webui: http://[HOST]:[PORT:4242]/
+ports:
+  4242/tcp: null
+ports_description:
+  4242/tcp: Interface web Kanzo. Ingress recommandé, exposition optionnelle.
+map:
+  - addon_config:rw
+  - share:rw
+  - media:rw
+  - backup:rw
+backup_exclude:
+  - "kanzo/logs/*"
+options:
+  TZ: Europe/Paris
+  data_dir: /share/kanzo
+  env_vars_list: []
+schema:
+  TZ: str
+  data_dir: match(/share/.+|/media/.+)
+  env_vars_list: [
+    "match(^[A-Z_0-9]+: .*$)"
+  ]

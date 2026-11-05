@@ -1,0 +1,13 @@
+---
+configuration:
+  TZ:
+    name: Timezone
+    description: Set the timezone for the container.
+  data_dir:
+    name: Data directory
+    description: Folder used by the add-on to store the board (kanzo.db) and its settings (config.toml), e.g. /share/kanzo.
+  env_vars_list:
+    name: Extra environment variables
+    description: 'Free environment variables as "KEY: value".'
+network:
+  4242/tcp: Kanzo web interface (Ingress recommended)
