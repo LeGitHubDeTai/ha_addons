@@ -1,0 +1,33 @@
+configuration:
+  TZ:
+    name: Fuseau horaire
+    description: Définit le fuseau horaire du conteneur.
+  data_dir:
+    name: Dossier de données
+    description: Dossier des fichiers Sync-in (doit être dans /share ou /media).
+  public_url:
+    name: URL publique
+    description: URL publique utilisée pour les notifications et les éditeurs bureautiques (optionnelle).
+  db_root_password:
+    name: Mot de passe root MariaDB
+    description: Mot de passe root de MariaDB embarqué (laisser vide pour en générer un).
+  encryption_key:
+    name: Clé de chiffrement
+    description: Clé de chiffrement des secrets MFA (laisser vide pour en générer une).
+  access_secret:
+    name: Secret des jetons d'accès
+    description: Secret utilisé pour signer les jetons d'accès (laisser vide pour en générer un).
+  refresh_secret:
+    name: Secret des jetons de rafraîchissement
+    description: Secret utilisé pour signer les jetons de rafraîchissement (laisser vide pour en générer un).
+  init_admin_login:
+    name: Identifiant administrateur
+    description: Identifiant de l'administrateur créé au premier démarrage (défaut sync-in).
+  init_admin_password:
+    name: Mot de passe administrateur
+    description: Mot de passe de l'administrateur créé au premier démarrage (défaut sync-in).
+  env_vars_list:
+    name: Variables d'environnement supplémentaires
+    description: 'Variables d''environnement libres au format "CLE: valeur".'
+network:
+  8080/tcp: Interface web Sync-in (Ingress recommandé, exposition optionnelle)

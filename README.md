@@ -48,6 +48,7 @@
 | [**TimescaleDB**](./timescaledb/) | Base de données PostgreSQL avec hypertables (séries temporelles) | 5432 |
 | [**CTFREAK**](./ctfreak/) | Planificateur de tâches IT auto-hébergé (scripts, SSH, bases de données) | 6700 |
 | [**Kanzo**](./kanzo/) | Tableau Kanban pour vous et vos agents IA (accès MCP intégré) | 4242 |
+| [**Sync-in**](./sync-in/) | Suite collaborative auto-hébergée (documents, tableurs, synchronisation) | 8080 |
 
 ---
 

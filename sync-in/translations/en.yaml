@@ -1,0 +1,33 @@
+configuration:
+  TZ:
+    name: Timezone
+    description: Set the timezone for the container.
+  data_dir:
+    name: Data directory
+    description: Folder used to store Sync-in files (must be under /share or /media).
+  public_url:
+    name: Public URL
+    description: Public URL used for notifications and office editors (optional).
+  db_root_password:
+    name: MariaDB root password
+    description: Root password of the embedded MariaDB (leave empty to generate one automatically).
+  encryption_key:
+    name: Encryption key
+    description: Key used to encrypt MFA secrets at rest (leave empty to generate one).
+  access_secret:
+    name: Access token secret
+    description: Secret used to sign access tokens (leave empty to generate one).
+  refresh_secret:
+    name: Refresh token secret
+    description: Secret used to sign refresh tokens (leave empty to generate one).
+  init_admin_login:
+    name: Administrator login
+    description: Login of the administrator created on first start (default sync-in).
+  init_admin_password:
+    name: Administrator password
+    description: Password of the administrator created on first start (default sync-in).
+  env_vars_list:
+    name: Extra environment variables
+    description: 'Free environment variables as "KEY: value".'
+network:
+  8080/tcp: Sync-in web interface (Ingress recommended, port exposure optional)

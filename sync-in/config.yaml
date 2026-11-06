@@ -1,0 +1,51 @@
+name: Sync-in
+version: "26.11.1"
+slug: sync-in
+panel_title: Sync-in
+panel_icon: "mdi:cloud-sync-outline"
+description: 'Suite collaborative auto-hébergée : documents, tableurs, présentations et synchronisation de fichiers'
+url: https://github.com/LeGitHubDeTai/ha_addons/tree/main/sync-in
+image: ghcr.io/legithubdetai/ha_addons/sync-in-{arch}
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: false
+apparmor: true
+hassio_role: default
+ingress: true
+ingress_port: 8080
+ingress_stream: true
+webui: http://[HOST]:[PORT:8080]/
+ports:
+  8080/tcp: null
+ports_description:
+  8080/tcp: Interface web Sync-in. Ingress recommandé, exposition optionnelle (requis pour les éditeurs bureautiques).
+map:
+  - share:rw
+  - media:rw
+options:
+  TZ: Europe/Paris
+  data_dir: /share/sync-in
+  public_url: ""
+  db_root_password: ""
+  encryption_key: ""
+  access_secret: ""
+  refresh_secret: ""
+  init_admin_login: ""
+  init_admin_password: ""
+  env_vars_list: []
+schema:
+  TZ: str
+  data_dir: match(/share/.+|/media/.+)
+  public_url: str
+  db_root_password: password
+  encryption_key: password
+  access_secret: password
+  refresh_secret: password
+  init_admin_login: str
+  init_admin_password: password
+  env_vars_list: [
+    "match(^[A-Z_0-9]+: .*$)"
+  ]

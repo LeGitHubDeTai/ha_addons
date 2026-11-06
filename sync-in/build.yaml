@@ -1,0 +1,7 @@
+build_from:
+  amd64: syncin/server:2.6.2
+  aarch64: syncin/server:2.6.2
+labels:
+  org.opencontainers.image.title: "Sync-in"
+  org.opencontainers.image.description: "Suite collaborative auto-hébergée (Sync-in) pour Home Assistant"
+  org.opencontainers.image.source: "https://github.com/LeGitHubDeTai/ha_addons/tree/main/sync-in"
