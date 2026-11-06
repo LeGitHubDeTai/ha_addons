@@ -8,13 +8,6 @@ on:
       - '**/Dockerfile'
       - '**/build.yaml'
       - '**/root/**'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - '**/config.yaml'
-      - '**/Dockerfile'
-      - '**/build.yaml'
-      - '**/root/**'
   workflow_dispatch:
 
 env:
@@ -44,7 +37,7 @@ jobs:
             # For manual dispatch, build all addons
             ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' ' ')
           else
-            # For push/PR, build addon based on branch name
+            # For push, build addon based on branch name
             BRANCH_NAME="${{ github.ref_name }}"
             echo "🔍 Branch name: $BRANCH_NAME"
             
@@ -81,10 +74,7 @@ jobs:
               ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
               
               # Handle different contexts for git diff
-              if [ "${{ github.event_name }}" == "pull_request" ]; then
-                # For PRs, compare against the base branch
-                BASE_SHA="${{ github.event.pull_request.base.sha }}"
-              elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+              if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
                 # For pushes with valid before SHA
                 BASE_SHA="${{ github.event.before }}"
               else
@@ -107,9 +97,7 @@ jobs:
               # Fallback to git diff if addon not found
               ALL_ADDONS=$(find . -maxdepth 2 -name "config.yaml" -exec dirname {} \; | sed 's|^\./||' | grep -v '^\.' | tr '\n' '|' | sed 's/|$//')
               
-              if [ "${{ github.event_name }}" == "pull_request" ]; then
-                BASE_SHA="${{ github.event.pull_request.base.sha }}"
-              elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+              if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
                 BASE_SHA="${{ github.event.before }}"
               else
                 BASE_SHA=$(git rev-parse HEAD~1)
