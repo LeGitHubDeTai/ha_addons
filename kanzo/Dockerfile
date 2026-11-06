@@ -20,6 +20,10 @@ RUN apk add --no-cache build-base ca-certificates \
   && cargo install kanzo --version "${KANZO_VERSION}" --locked
 
 # --- Étape 2 : image finale ---
+#
+# Architecture : nginx (4243, Ingress HA + accès réseau direct) -> Kanzo sur
+# 127.0.0.1:4242. nginx réécrit Host/Origin et les URLs absolues de Kanzo,
+# qui n'est pas compatible avec l'Ingress de son état (voir nginx.conf).
 FROM ${BUILD_FROM}
 
 ARG BUILD_VERSION
@@ -30,11 +34,15 @@ LABEL \
     io.hass.type="addon" \
     io.hass.arch="${BUILD_ARCH}"
 
+# Outils : bash + jq pour les options HA (bashio), curl pour le healthcheck,
+# nginx (reverse proxy Ingress), supervisor (gestion des processus).
 RUN apk add --no-cache \
     bash \
     ca-certificates \
     curl \
     jq \
+    nginx \
+    supervisor \
     tzdata \
   && mkdir -p /usr/local/lib /share /media /backup \
   && curl -fL -sS https://raw.githubusercontent.com/LeGitHubDeTai/ha_addons/main/.scripts/bashio-standalone.sh \
@@ -44,13 +52,17 @@ RUN apk add --no-cache \
 # --- binaire compilé à l'étape précédente ---
 COPY --from=kanzo-builder /usr/local/cargo/bin/kanzo /usr/local/bin/kanzo
 
+# --- reverse proxy + supervision ---
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY supervisord.conf /etc/supervisord.conf
+
 # --- scripts ---
 COPY root /
 RUN chmod +x /usr/local/bin/kanzo-entrypoint.sh
 
-EXPOSE 4242
+EXPOSE 4243
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:4242/ || exit 1
+    CMD curl -fsS http://127.0.0.1:4243/ || exit 1
 
-ENTRYPOINT ["/usr/local/bin/kanzo-entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

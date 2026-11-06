@@ -10,4 +10,4 @@ configuration:
     name: Extra environment variables
     description: 'Free environment variables as "KEY: value".'
 network:
-  4242/tcp: Kanzo web interface (Ingress recommended)
+  4243/tcp: Kanzo web interface via nginx (Ingress recommended)

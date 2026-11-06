@@ -26,18 +26,40 @@
   qui provoquent un crash silencieux (SIGILL) au démarrage sur les CPU sans
   BMI2 (avant Haswell, anciennes VM). L'add-on compile donc Kanzo avec
   l'outilchain Alpine pour garantir l'ISA de base (x86-64 / armv8).
-- Au premier démarrage, l'add-on crée `config.toml` avec `port = 4242`, `listen = "0.0.0.0"` et `mcp_http = true` (le serveur MCP est disponible sur `/mcp`).
-- L'écoute est forcée sur `0.0.0.0` dans le conteneur, nécessaire pour l'Ingress HA ; l'exposition réseau réelle reste maîtrisée par les options de port de l'add-on.
+- **Architecture** : un reverse proxy nginx (`nginx.conf`) expose le port
+  conteneur `4243`, à la fois pour l'Ingress HA (non publié par défaut) et
+  pour l'accès réseau direct (publié sur le port hôte). Kanzo lui-même
+  écoute sur `127.0.0.1:4242` : nginx réécrit Host/Origin et les URLs
+  absolues de Kanzo, qui ne supporte pas nativement l'Ingress.
+- Au premier démarrage, l'add-on crée `config.toml` avec `port = 4242`,
+  `listen = "127.0.0.1"` et `mcp_http = true` (le serveur MCP est disponible
+  sur `/mcp`). `port` et `listen` sont forcés à ces valeurs à chaque
+  démarrage : nginx attend Kanzo sur `127.0.0.1:4242`.
 
 ## Ports
 
 | Port | Usage |
 |------|-------|
-| `4242/tcp` | Interface web Kanzo. Normalement non exposé : l'Ingress Home Assistant est recommandé. Vous pouvez exposer ce port pour contourner l'Ingress (panel_iframe, client externe…). |
+| `4243/tcp` | Interface web Kanzo via nginx. Normalement non exposée : l'Ingress Home Assistant est recommandé. Vous pouvez exposer ce port (idéalement sur le port hôte `4242`, celui que Kanzo affiche dans ses instructions de partage) pour un accès réseau direct (panel_iframe, clients MCP externes…). |
 
 ## Ingress
 
 L'add-on supporte l'**Ingress** Home Assistant : l'interface est accessible depuis la sidebar HA sans ouvrir de port, de manière sécurisée (recommandé).
+
+Kanzo n'est pas compatible avec l'Ingress de sa version actuelle (URLs absolues `fetch("/api")`, `src="/app.js"`… et contrôles Host/Origin stricts). L'add-on place donc un reverse proxy nginx devant lui, qui :
+
+- reconnaît les requêtes Ingress (`X-Ingress-Path`, posé par HA core après filtrage, non falsifiable par le navigateur) et réécrit les URLs relatives (`/api`, `/images`, `/app.js`, `/logo.png`) avec le préfixe d'Ingress ;
+- présente à Kanzo une identité `localhost:4242` acceptée par ses contrôles, après avoir vérifié le vrai Host/Origin reçus (anti DNS-rebinding / CSRF) ;
+- n'autorise la gestion du réseau Kanzo (rejoindre/quitter un board) que depuis l'Ingress authentifié, comme Kanzo upstream ne l'autorise qu'à l'ordinateur qui porte le board.
+
+### Accès réseau direct (sans Ingress)
+
+Exposez le port `4243/tcp` de l'add-on (port hôte suggéré : `4242`). Depuis un autre poste :
+
+- interface web : `http://<IP-HA>:4242/` — le Host doit être une adresse IP ou `localhost` (les noms de domaine sont refusés, comme chez Kanzo upstream) ;
+- MCP : `http://<IP-HA>:4242/mcp`.
+
+À savoir : les adresses IP affichées par Kanzo (`kanzo join …`) sont celles du conteneur Docker ; utilisez l'IP de l'hôte Home Assistant et le port `4242`.
 
 ## Support
 

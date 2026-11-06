@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Point d'entrée Kanzo : applique les options Home Assistant (TZ, data_dir,
-# env_vars_list), force l'écoute réseau dans config.toml (nécessaire pour
-# l'Ingress HA) puis lance le tableau de bord sur le port 4242.
+# Point d'entrée Kanzo (lancé par supervisord) : applique les options Home
+# Assistant (TZ, data_dir, env_vars_list), aligne config.toml sur le reverse
+# proxy nginx (port 4242 en loopback, cf. nginx.conf) puis lance le board.
 set -euo pipefail
 
 # Charge bashio (fonctions bashio::*) — présent dans les images de base HA.
@@ -30,21 +30,42 @@ fi
 export KANZO_HOME="${DATA_DIR}"
 bashio::log.info "Dossier de données : ${DATA_DIR}"
 
-# --- config.toml : le board doit écouter sur 0.0.0.0 (Ingress + réseau) ---
+# --- config.toml : nginx attend Kanzo sur 127.0.0.1:4242 (cf. nginx.conf) ---
+# port et listen sont forcés : une valeur différente casserait le proxy.
 CONFIG_TOML="${DATA_DIR}/config.toml"
 if [ ! -f "${CONFIG_TOML}" ]; then
     cat > "${CONFIG_TOML}" <<'EOF'
 port = 4242
-listen = "0.0.0.0"
+listen = "127.0.0.1"
 mcp_http = true
 EOF
-    bashio::log.info "config.toml créé (port 4242, listen 0.0.0.0, mcp_http true)"
-elif grep -Eq '^listen[[:space:]]*=[[:space:]]*"127\.0\.0\.1"' "${CONFIG_TOML}"; then
-    sed -i 's/^listen[[:space:]]*=.*/listen = "0.0.0.0"/' "${CONFIG_TOML}"
-    bashio::log.info "config.toml : listen passé de 127.0.0.1 à 0.0.0.0"
-elif ! grep -Eq '^listen[[:space:]]*=' "${CONFIG_TOML}"; then
-    printf '\nlisten = "0.0.0.0"\n' >> "${CONFIG_TOML}"
-    bashio::log.info "config.toml : listen 0.0.0.0 ajouté"
+    bashio::log.info "config.toml créé (port 4242, listen 127.0.0.1, mcp_http true)"
+else
+    KANZO_FORCED=0
+    if ! grep -Eq '^port[[:space:]]*=[[:space:]]*4242[[:space:]]*$' "${CONFIG_TOML}"; then
+        if grep -Eq '^port[[:space:]]*=' "${CONFIG_TOML}"; then
+            sed -i 's/^port[[:space:]]*=.*/port = 4242/' "${CONFIG_TOML}"
+        else
+            printf 'port = 4242\n' >> "${CONFIG_TOML}"
+        fi
+        KANZO_FORCED=1
+    fi
+    if ! grep -Eq '^listen[[:space:]]*=[[:space:]]*"127\.0\.0\.1"[[:space:]]*$' "${CONFIG_TOML}"; then
+        if grep -Eq '^listen[[:space:]]*=' "${CONFIG_TOML}"; then
+            sed -i 's/^listen[[:space:]]*=.*/listen = "127.0.0.1"/' "${CONFIG_TOML}"
+        else
+            printf 'listen = "127.0.0.1"\n' >> "${CONFIG_TOML}"
+        fi
+        KANZO_FORCED=1
+    fi
+    if [ "${KANZO_FORCED}" = "1" ]; then
+        bashio::log.info "config.toml : port 4242 / listen 127.0.0.1 forcés (attendus par nginx)"
+    fi
+    # MCP sur /mcp : activé par défaut, l'utilisateur peut le désactiver.
+    if ! grep -Eq '^mcp_http[[:space:]]*=' "${CONFIG_TOML}"; then
+        printf 'mcp_http = true\n' >> "${CONFIG_TOML}"
+        bashio::log.info "config.toml : mcp_http true ajouté"
+    fi
 fi
 
 # --- Variables d'environnement libres (env_vars_list, format "CLE: valeur") ---
