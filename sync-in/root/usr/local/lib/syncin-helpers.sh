@@ -28,9 +28,11 @@ rand_secret() {
 }
 
 # Lit une valeur persistée dans $SECRETS_FILE (cut = pas d'interprétation
-# de & ou \ dans la valeur, contrairement au remplacement sed)
+# de & ou \ dans la valeur, contrairement au remplacement sed).
+# `|| true` est indispensable : sans fichier ou sans clé, grep renvoie 1 et
+# set -euo pipefail tuerait le script silencieusement (aucun log).
 stored_secret() {
-  grep "^$1=" "$SECRETS_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2-
+  grep "^$1=" "$SECRETS_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2- || true
 }
 
 # Écrit/Remplace une valeur persistée dans $SECRETS_FILE

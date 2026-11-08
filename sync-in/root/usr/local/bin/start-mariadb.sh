@@ -20,6 +20,7 @@ exec "$MARIADBD" \
   --pid-file=/run/mysqld/mysqld.pid \
   --bind-address=127.0.0.1 \
   --port=3306 \
+  --skip-networking=0 \
   --character-set-server=utf8mb4 \
   --collation-server=utf8mb4_uca1400_ai_ci \
   --max-allowed-packet=1G \

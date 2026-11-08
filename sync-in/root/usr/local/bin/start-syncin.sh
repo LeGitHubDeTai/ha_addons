@@ -55,18 +55,16 @@ if [ "$AUTH_OK" != "true" ]; then
 fi
 
 # --- Authentification root : mot de passe + plugin ------------------------
-# Sur le premier démarrage, root@localhost utilise l'authentification par
-# socket (ou un mot de passe vide) : on impose mysql_native_password avec le
-# mot de passe attendu par Sync-in (connexion TCP 127.0.0.1).
-CURRENT_PLUGIN="$(run_sql "$AUTH_PW" \
-  "SELECT plugin FROM mysql.user WHERE user='root' AND host='localhost' LIMIT 1" \
-  2>/dev/null || true)"
-if [ "$AUTH_PW" != "$DB_PASSWORD" ] || [ "$CURRENT_PLUGIN" != "mysql_native_password" ]; then
-  log "Configuration du mot de passe root MariaDB..."
-  run_sql "$AUTH_PW" \
-    "ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('$(sql_escape "$DB_PASSWORD")'); FLUSH PRIVILEGES;" \
-    || die "impossible de définir le mot de passe root MariaDB"
-fi
+# ALTER systématique (idempotent) : root@localhost est créé par MariaDB comme
+# `mysql_native_password USING 'invalid' OR unix_socket`. En socket, le
+# fallback unix_socket (OS root) fait "réussir" n'importe quel test de mot
+# de passe, ce qui rendait toute condition de test fausse et laissait le
+# compte en 'invalid' : la connexion TCP de Sync-in échouait alors en
+# ERROR 1698. On impose donc le mot de passe attendu à chaque démarrage.
+log "Configuration du mot de passe root MariaDB..."
+run_sql "$AUTH_PW" \
+  "ALTER USER 'root'@'localhost' IDENTIFIED BY '$(sql_escape "$DB_PASSWORD")'; FLUSH PRIVILEGES;" \
+  || die "impossible de définir le mot de passe root MariaDB"
 
 # --- Accès TCP + base de données ------------------------------------------
 PW_ESC="$(sql_escape "$DB_PASSWORD")"
