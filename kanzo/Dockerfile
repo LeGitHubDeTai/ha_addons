@@ -14,7 +14,7 @@ ARG BUILD_ARCH
 
 # --- Étape 1 : compilation du binaire ---
 FROM rust:1-alpine AS kanzo-builder
-ARG KANZO_VERSION="0.4.1"
+ARG KANZO_VERSION="0.4.2"
 # build-base = gcc, musl-dev, make (requis pour rusqlite/sqlite3.c)
 RUN apk add --no-cache build-base ca-certificates \
   && cargo install kanzo --version "${KANZO_VERSION}" --locked
