@@ -13,7 +13,7 @@ LABEL \
     io.hass.type="addon" \
     io.hass.arch="${BUILD_ARCH}"
 
-ARG TIMESCALEDB_VERSION="2.31.0"
+ARG TIMESCALEDB_VERSION="2.32.0"
 ARG PG_MAJOR=17
 
 RUN apk add --no-cache \
