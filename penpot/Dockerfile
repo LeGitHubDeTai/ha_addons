@@ -140,7 +140,25 @@ COPY --from=penpot-frontend /tmp/resolvers.conf.template /tmp/penpot-resolvers.c
 # Optional templates (may be renamed/removed upstream): copy only if present
 RUN --mount=from=penpot-frontend,src=/tmp,dst=/tmp/pf-tmp \
     if [ -f /tmp/pf-tmp/nginx-mcp-locations.conf.template ]; then cp -a /tmp/pf-tmp/nginx-mcp-locations.conf.template /tmp/penpot-mcp-locations.conf.template; echo "mcp template copied"; else echo "mcp template absent, skipping"; fi
-COPY --from=penpot-frontend /etc/nginx/nginx-security-headers.conf /etc/nginx/nginx-security-headers.conf
+# Security headers: penpot >= 2.18.1 no longer bakes the static file into the
+# image, it ships only the template (rendered at runtime with CSP/HSTS vars).
+# Support both layouts, plus the CSP script hashes the template may reference.
+RUN --mount=from=penpot-frontend,src=/tmp,dst=/tmp/pf-tmp \
+    --mount=from=penpot-frontend,src=/etc/nginx,dst=/tmp/pf-nginx \
+    if [ -f /tmp/pf-nginx/nginx-security-headers.conf ]; then \
+        cp -a /tmp/pf-nginx/nginx-security-headers.conf /etc/nginx/nginx-security-headers.conf; \
+        echo "static security-headers copied"; \
+    fi; \
+    if [ -f /tmp/pf-tmp/nginx-security-headers.conf.template ]; then \
+        cp -a /tmp/pf-tmp/nginx-security-headers.conf.template /tmp/penpot-security-headers.conf.template; \
+        echo "security-headers template copied"; \
+    else \
+        echo "security-headers template absent, skipping"; \
+    fi; \
+    if [ -f /tmp/pf-nginx/csp-script-hashes.txt ]; then \
+        cp -a /tmp/pf-nginx/csp-script-hashes.txt /etc/nginx/csp-script-hashes.txt; \
+        echo "csp script hashes copied"; \
+    fi
 COPY --from=penpot-frontend /etc/nginx/mime.types /etc/nginx/penpot-mime.types
 COPY --from=penpot-frontend /etc/nginx/overrides/location.d/external-locations.conf /etc/nginx/overrides/location.d/external-locations.conf
 # Exporter: node app + browsers (browsers dir may vary, copy conditionally)

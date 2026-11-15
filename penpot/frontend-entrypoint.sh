@@ -87,6 +87,78 @@ if [ -f /tmp/penpot-resolvers.conf.template ]; then
     < /tmp/penpot-resolvers.conf.template > /etc/nginx/overrides/http.d/resolvers.conf
 fi
 
+# --- security headers (CSP/HSTS) ---
+# penpot >= 2.18.1 ships only a template; the official entrypoint renders it
+# with the CSP/HSTS variables below. If the static file came with the image
+# (older versions), keep it as-is.
+if [ ! -s /etc/nginx/nginx-security-headers.conf ]; then
+  export PENPOT_CSP_MODE="${PENPOT_CSP_MODE:-report-only}"
+
+  if [ -r /etc/nginx/csp-script-hashes.txt ]; then
+    PENPOT_CSP_SCRIPT_HASHES=" $(tr -d '\n' < /etc/nginx/csp-script-hashes.txt)"
+  else
+    PENPOT_CSP_SCRIPT_HASHES=""
+  fi
+
+  # Default policy: same rationale as upstream (report-only, plugins/SES keep
+  # reporting eval violations; wasm-unsafe-eval for the render engine).
+  if [ -z "${PENPOT_CSP_POLICY:-}" ]; then
+    export PENPOT_CSP_POLICY="default-src 'self'\
+; base-uri 'self'\
+; object-src 'none'\
+; frame-ancestors 'self'\
+; form-action 'self'\
+; manifest-src 'self'\
+; script-src 'self' 'wasm-unsafe-eval'${PENPOT_CSP_SCRIPT_HASHES}\
+; style-src 'self' 'unsafe-inline'\
+; img-src 'self' data: blob:\
+; font-src 'self'\
+; connect-src 'self' blob: data:\
+; frame-src 'self'\
+; worker-src 'self' blob:\
+; media-src 'self' blob:"
+  fi
+
+  case "${PENPOT_CSP_MODE}" in
+    enforce)
+      export PENPOT_CSP_DIRECTIVE="add_header Content-Security-Policy \"${PENPOT_CSP_POLICY}\" always;" ;;
+    report-only)
+      export PENPOT_CSP_DIRECTIVE="add_header Content-Security-Policy-Report-Only \"${PENPOT_CSP_POLICY}\" always;" ;;
+    disabled)
+      export PENPOT_CSP_DIRECTIVE="" ;;
+    *)
+      echo "[frontend] invalid PENPOT_CSP_MODE '${PENPOT_CSP_MODE}'; expected enforce, report-only or disabled" >&2
+      exit 1 ;;
+  esac
+
+  # HSTS only makes sense behind https; the addon is usually plain http on :9001.
+  if [ -n "${PENPOT_HSTS_VALUE:-}" ]; then
+    export PENPOT_HSTS_DIRECTIVE="add_header Strict-Transport-Security \"${PENPOT_HSTS_VALUE}\" always;"
+  else
+    export PENPOT_HSTS_DIRECTIVE=""
+  fi
+
+  if [ -f /tmp/penpot-security-headers.conf.template ]; then
+    envsubst '$PENPOT_CSP_DIRECTIVE,$PENPOT_HSTS_DIRECTIVE' \
+      < /tmp/penpot-security-headers.conf.template > /etc/nginx/nginx-security-headers.conf
+  else
+    # Fallback: template missing upstream — write the static header set only.
+    cat > /etc/nginx/nginx-security-headers.conf <<'EOF'
+add_header X-Content-Type-Options "nosniff" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+add_header X-Frame-Options SAMEORIGIN always;
+EOF
+    if [ -n "$PENPOT_CSP_DIRECTIVE" ]; then
+      echo "$PENPOT_CSP_DIRECTIVE" >> /etc/nginx/nginx-security-headers.conf
+    fi
+    if [ -n "$PENPOT_HSTS_DIRECTIVE" ]; then
+      echo "$PENPOT_HSTS_DIRECTIVE" >> /etc/nginx/nginx-security-headers.conf
+    fi
+  fi
+  echo "[frontend] security headers rendered ($(wc -c < /etc/nginx/nginx-security-headers.conf) bytes)"
+fi
+
 mkdir -p /run/nginx /tmp/cache /tmp/client_temp /tmp/proxy_temp_path
 nginx -t
 
