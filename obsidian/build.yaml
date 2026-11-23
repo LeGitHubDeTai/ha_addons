@@ -1,6 +1,6 @@
 build_from:
-  amd64: "lscr.io/linuxserver/obsidian:amd64-v1.15.1-ls153"
-  aarch64: "lscr.io/linuxserver/obsidian:arm64v8-v1.15.1-ls153"
+  amd64: "lscr.io/linuxserver/obsidian:amd64-v1.15.1-ls154"
+  aarch64: "lscr.io/linuxserver/obsidian:arm64v8-v1.15.1-ls154"
 labels:
   org.opencontainers.image.title: "Home Assistant & Obsidian"
   org.opencontainers.image.description: "Obsidian Notes Server pour Home Assistant"
