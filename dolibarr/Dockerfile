@@ -6,7 +6,7 @@ LABEL \
   io.hass.type="addon" \
   io.hass.arch="${BUILD_ARCH}"
 
-ARG DOLIBARR_VERSION="24.0.3"
+ARG DOLIBARR_VERSION="24.0.4"
 ENV DOLIBARR_VERSION=${DOLIBARR_VERSION}
 
 # ===============================
