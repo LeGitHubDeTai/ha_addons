@@ -1,6 +1,6 @@
 build_from:
-  amd64: "lscr.io/linuxserver/lidarr:amd64-nightly-4.0.0.5236-ls229"
-  aarch64: "lscr.io/linuxserver/lidarr:arm64v8-nightly-4.0.0.5236-ls229"
+  amd64: "lscr.io/linuxserver/lidarr:amd64-nightly-4.0.0.5247-ls230"
+  aarch64: "lscr.io/linuxserver/lidarr:arm64v8-nightly-4.0.0.5247-ls230"
 labels:
   org.opencontainers.image.title: "Lidarr Nightly"
   org.opencontainers.image.description: "Gestionnaire de collection musicale (Lidarr, branche nightly) pour Home Assistant"
